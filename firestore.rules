@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null && request.auth.token.role == 'admin';
+    }
+
+    // Allow anonymous and authenticated users to manage their own progress
+    match /users/{userId} {
+      allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+    }
+    
+    // Narrative content: Public read, Admin write
+    match /season1_days/{dayId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /season1_prologues/{prologueId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

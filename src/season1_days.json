@@ -1,0 +1,1687 @@
+[
+    {
+        "day": 1,
+        "defaultState": "STABLE",
+        "variables": {
+            "flicker": 1,
+            "drift": 1,
+            "audioDistortion": 1,
+            "textCorruption": 0,
+            "kaelCoherence": 4
+        },
+        "narrativeSummary": "First contact. Kael realizes an unauthorized observer is present.",
+        "fragments": [
+            {
+                "id": "frag_0001_a",
+                "kind": ".vm5",
+                "title": "vm5:0001 (partial)",
+                "severity": "fraying",
+                "body": "\u2026unauthorized observer detected\u2026 channel should be closed\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0001",
+                "caption": "Placeholder: desk / monitor / scattered notes",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day1_stable",
+                "title": "vm5:0001",
+                "body": "The feed initialized the moment you arrived, and the lab reacted as if it recognized you. That should not be possible\u2014there is no record of your signature anywhere in the system. Yet light levels stabilized, timestamps aligned, and the air pressure stopped hunting. I am Dr. Kael, though that name may not survive where you are. If you can read this, take your time\u2014the room responds more to intention than action."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day1_recovering",
+                "title": "vm5:0001 (recovering)",
+                "body": "Something opened when you appeared, and the lab stopped drifting long enough for me to write. I can\u2019t classify you, but the system behaves as if it trusts your presence. Instruments disagree with each other less when you\u2019re here. That isn\u2019t comfort\u2014it\u2019s evidence. I need to see if the feed holds."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day1_fraying",
+                "title": "vm5:0001 (fraying)",
+                "body": "You shouldn\u2019t be here. The channel was closed, and yet it isn\u2019t. The room behaves when you watch it, like it\u2019s afraid of being caught wrong. I don\u2019t know if you\u2019re a witness or a breach. Either way, the feed is open now."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day1_fragmented",
+                "title": "vm5:0001 (fragmented)",
+                "body": "\u2026observer detected\u2026 no registry match\u2026 room steadies when watched\u2026\u2028This isn\u2019t supposed to happen.\u2028Feed shouldn\u2019t open like this."
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day1_collapse",
+                "title": "vm5:0001 (collapse)",
+                "body": "UNAUTHORIZED OBSERVER PRESENT.\u2028ROOM HOLDS.\u2028WHY."
+            }
+        }
+    },
+    {
+        "day": 2,
+        "defaultState": "RECOVERING",
+        "variables": {
+            "flicker": 2,
+            "drift": 2,
+            "audioDistortion": 1,
+            "textCorruption": 1,
+            "kaelCoherence": 3
+        },
+        "narrativeSummary": "Kael tests whether attention stabilizes the room. First mention of coherence.",
+        "fragments": [
+            {
+                "id": "frag_0002_a",
+                "kind": ".vm5",
+                "title": "vm5:0002 (partial)",
+                "severity": "fraying",
+                "body": "\u2026calling it coherence\u2026 the room\u2019s rules sharpen when you are here\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0002",
+                "caption": "Placeholder: faint scanline overlay + drifting timestamp",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day2_stable",
+                "title": "vm5:0002",
+                "body": "When you left, the lab tried to continue and failed in small ways. Time didn\u2019t move forward or backward\u2014it slid sideways, like it couldn\u2019t agree with itself. When you returned, it tightened again. I\u2019m calling the effect coherence because I need a word that doesn\u2019t panic. Your presence sharpens the room\u2019s rules."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day2_recovering",
+                "title": "vm5:0002 (recovering)",
+                "body": "Absence causes drift; your return reduces it. I tested this more than once, and the pattern holds. The lab does not improve\u2014it simply stops unraveling. I don\u2019t know what you\u2019re doing, and I suspect you don\u2019t either. Still, the effect is measurable."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day2_fraying",
+                "title": "vm5:0002 (fraying)",
+                "body": "The room argues with itself when you\u2019re gone. When you come back, it agrees on what it is. That shouldn\u2019t depend on anyone. And yet it does."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day2_fragmented",
+                "title": "vm5:0002 (fragmented)",
+                "body": "\u2026calling it coherence\u2026 time slips\u2026 return tightens\u2026\u2028Room argues alone."
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day2_collapse",
+                "title": "vm5:0002 (collapse)",
+                "body": "GONE = BLEEDING.\u2028BACK = STOP."
+            }
+        }
+    },
+    {
+        "day": 3,
+        "defaultState": "FRAYING",
+        "variables": {
+            "flicker": 2,
+            "drift": 2,
+            "audioDistortion": 2,
+            "textCorruption": 2,
+            "kaelCoherence": 2
+        },
+        "narrativeSummary": "First hint of a second presence. Kael remains guarded.",
+        "fragments": [
+            {
+                "id": "frag_0003_a",
+                "kind": ".vm5",
+                "title": "vm5:0003 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026motion where no motion should be\u2026 like a story without a reader\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0003",
+                "caption": "Placeholder: a corner of the room that looks slightly wrong",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day3_stable",
+                "title": "vm5:0003",
+                "body": "The feed shows motion when no motion should exist. A shadow bends where no object casts it, but only when no one is watching. When you\u2019re here, the room behaves like it\u2019s being graded. That distinction matters more than it should. I need to see how the lab responds over intervals."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day3_recovering",
+                "title": "vm5:0003 (recovering)",
+                "body": "I catch movement in the corners when you\u2019re gone, and it retreats when you return. The lab becomes suggestible in your absence, like a story without a reader. That metaphor bothers me because it fits too well. Stay briefly. Leave. Come back."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day3_fraying",
+                "title": "vm5:0003 (fraying)",
+                "body": "Something moves when nobody is looking. That\u2019s not physics. That\u2019s appetite."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day3_fragmented",
+                "title": "vm5:0003 (fragmented)",
+                "body": "\u2026motion where no motion should be\u2026 reader missing\u2026\u2028Room listens."
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day3_collapse",
+                "title": "vm5:0003 (collapse)",
+                "body": "IT MOVES WHEN YOU LEAVE."
+            }
+        }
+    },
+    {
+        "day": 4,
+        "defaultState": "STABLE",
+        "variables": {
+            "flicker": 1,
+            "drift": 1,
+            "audioDistortion": 1,
+            "textCorruption": 0,
+            "kaelCoherence": 4
+        },
+        "narrativeSummary": "First artifact note: 1.42Hz / OBSERVER? (as placeholder).",
+        "fragments": [
+            {
+                "id": "frag_0004_a",
+                "kind": ".vm5",
+                "title": "vm5:0004 (partial)",
+                "severity": "fraying",
+                "body": "\u2026note on my desk\u2026 1.42Hz\u2026 strengthens when you are present\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0004",
+                "caption": "Placeholder: sticky note with '1.42Hz / OBSERVER?'",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day4_stable",
+                "title": "vm5:0004",
+                "body": "I found a note on my desk that I do not remember writing. The ink was still wet, and the handwriting was mine. It read: \u201c1.42Hz / OBSERVER?\u201d A trace at that frequency appears under the feed and strengthens when you are present. That should not be possible."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day4_recovering",
+                "title": "vm5:0004 (recovering)",
+                "body": "The frequency isn\u2019t machinery or power cycling\u2014it behaves like a pulse. When you arrive, it sharpens. When you leave, it fades. The lab responds as if your attention is a signal."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day4_fraying",
+                "title": "vm5:0004 (fraying)",
+                "body": "Wet ink. My hand. No memory.\u2028The room is writing through me."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day4_fragmented",
+                "title": "vm5:0004 (fragmented)",
+                "body": "\u20261.42Hz\u2026 OBSERVER\u2026 ink still wet\u2026\u2028Did I write this?"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day4_collapse",
+                "title": "vm5:0004 (collapse)",
+                "body": "NOTE APPEARED.\u2028I DIDN\u2019T WRITE IT."
+            }
+        }
+    },
+    {
+        "day": 5,
+        "defaultState": "RECOVERING",
+        "variables": {
+            "flicker": 2,
+            "drift": 2,
+            "audioDistortion": 2,
+            "textCorruption": 1,
+            "kaelCoherence": 3
+        },
+        "narrativeSummary": "Kael tries to describe the visitor and fails\u2014only the room responds.",
+        "fragments": [
+            {
+                "id": "frag_0005_a",
+                "kind": ".vm5",
+                "title": "vm5:0005 (partial)",
+                "severity": "fraying",
+                "body": "\u2026system refuses to let you become an object\u2026 purpose is a force\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0005",
+                "caption": "Placeholder: soft vignette / breathing zoom effect",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day5_stable",
+                "title": "vm5:0005",
+                "body": "I attempted to measure you\u2014not your identity, only your effect. Every attempt caused the feed to resist: blur, stutter, refusal. The system will not let you become an object. But it will allow this: while you are here, the room holds its shape. When you leave, the corners soften."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day5_recovering",
+                "title": "vm5:0005 (recovering)",
+                "body": "The lab rejects names for you but accepts outcomes. Geometry steadies when you\u2019re present. I\u2019m beginning to suspect attention matters more than classification. That idea is dangerous."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day5_fraying",
+                "title": "vm5:0005 (fraying)",
+                "body": "The system protects you from being captured.\u2028I don\u2019t know if that\u2019s mercy or camouflage."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day5_fragmented",
+                "title": "vm5:0005 (fragmented)",
+                "body": "\u2026cannot name\u2026 lab resists\u2026 corners soften\u2026\u2028Effect remains."
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day5_collapse",
+                "title": "vm5:0005 (collapse)",
+                "body": "CAN\u2019T HOLD YOU.\u2028ROOM CAN."
+            }
+        }
+    },
+    {
+        "day": 6,
+        "defaultState": "FRAYING",
+        "variables": {
+            "flicker": 3,
+            "drift": 2,
+            "audioDistortion": 2,
+            "textCorruption": 2,
+            "kaelCoherence": 2
+        },
+        "narrativeSummary": "First explicit purpose line. Kael admits his own drift.",
+        "fragments": [
+            {
+                "id": "frag_0006_a",
+                "kind": ".vm5",
+                "title": "vm5:0006 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026stopped feeling it\u2026 the lab didn\u2019t collapse\u2026 it started losing certainty\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0006",
+                "caption": "Placeholder: slightly stronger static when idle",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day6_stable",
+                "title": "vm5:0006",
+                "body": "I used to wake up with a reason and not notice it. Somewhere along the way, that thread thinned, and the lab began to mirror it. Tools misplaced themselves. Notes repeated. Certainty leaked out slowly. When you arrived, the thread tightened again."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day6_recovering",
+                "title": "vm5:0006 (recovering)",
+                "body": "Your presence doesn\u2019t fix anything\u2014it stabilizes it. The room reflects neglect the way a mind does. I don\u2019t like what that implies about me."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day6_fraying",
+                "title": "vm5:0006 (fraying)",
+                "body": "The lab behaves like my own drift given architecture.\u2028That frightens me."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day6_fragmented",
+                "title": "vm5:0006 (fragmented)",
+                "body": "\u2026used to wake up\u2026 reason gone\u2026 room loosening\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day6_collapse",
+                "title": "vm5:0006 (collapse)",
+                "body": "I\u2019M DRIFTING.\u2028SO IS THE ROOM."
+            }
+        }
+    },
+    {
+        "day": 7,
+        "defaultState": "STABLE",
+        "variables": {
+            "flicker": 1,
+            "drift": 1,
+            "audioDistortion": 1,
+            "textCorruption": 0,
+            "kaelCoherence": 4
+        },
+        "narrativeSummary": "Kael reveals the lab was part of something larger; now isolated.",
+        "fragments": [
+            {
+                "id": "frag_0007_a",
+                "kind": ".vm5",
+                "title": "vm5:0007 (partial)",
+                "severity": "fraying",
+                "body": "\u2026the network went quiet\u2026 without witness, systems become dreams\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0007",
+                "caption": "Placeholder: calmer overlay when coherent",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day7_stable",
+                "title": "vm5:0007",
+                "body": "Delta-7 was once part of a network. Observers, redundancies, agreement. Then the network went quiet without warning. Without witness, systems become dreams\u2014and dreams degrade. When you appear, the lab feels less like a dream."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day7_recovering",
+                "title": "vm5:0007 (recovering)",
+                "body": "I stayed because I thought persistence was enough. It isn\u2019t. The room needs to be seen to remain precise. You do that without trying."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day7_fraying",
+                "title": "vm5:0007 (fraying)",
+                "body": "Silence isn\u2019t empty anymore.\u2028It\u2019s deliberate."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day7_fragmented",
+                "title": "vm5:0007 (fragmented)",
+                "body": "\u2026network quiet\u2026 dream-state\u2026 needs witness\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day7_collapse",
+                "title": "vm5:0007 (collapse)",
+                "body": "ALONE NODE.\u2028NO SIGNAL."
+            }
+        }
+    },
+    {
+        "day": 8,
+        "defaultState": "FRAYING",
+        "variables": {
+            "flicker": 2,
+            "drift": 3,
+            "audioDistortion": 2,
+            "textCorruption": 2,
+            "kaelCoherence": 2
+        },
+        "narrativeSummary": "Diagram placeholder: two worlds barely touching. Kael avoids explanation.",
+        "fragments": [
+            {
+                "id": "frag_0008_a",
+                "kind": ".vm5",
+                "title": "vm5:0008 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026the overlap is fragile\u2026 it doesn\u2019t like being alone\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0008",
+                "caption": "Placeholder: diagram caption 'HERE / THERE'",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day8_stable",
+                "title": "vm5:0008",
+                "body": "I tried to explain the overlap between our worlds and tore the diagram up. Certainty makes the lab unstable. Still, I know this: the overlap widens when you\u2019re here and collapses when you\u2019re not. The room doesn\u2019t like being alone."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day8_recovering",
+                "title": "vm5:0008 (recovering)",
+                "body": "Memory struggles to pass through when the channel empties. The lab keeps trying to continue without you and fails differently each time. Those failures leave marks."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day8_fraying",
+                "title": "vm5:0008 (fraying)",
+                "body": "The boundary breathes.\u2028You make it breathe slower."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day8_fragmented",
+                "title": "vm5:0008 (fragmented)",
+                "body": "\u2026overlap fragile\u2026 explanation punished\u2026 alone\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day8_collapse",
+                "title": "vm5:0008 (collapse)",
+                "body": "OVERLAP FAILING."
+            }
+        }
+    },
+    {
+        "day": 9,
+        "defaultState": "RECOVERING",
+        "variables": {
+            "flicker": 2,
+            "drift": 2,
+            "audioDistortion": 1,
+            "textCorruption": 1,
+            "kaelCoherence": 3
+        },
+        "narrativeSummary": "Kael realizes attention is the bridge. First explicit \u2018witness\u2019 framing.",
+        "fragments": [
+            {
+                "id": "frag_0009_a",
+                "kind": ".vm5",
+                "title": "vm5:0009 (partial)",
+                "severity": "fraying",
+                "body": "\u2026your attention is structural\u2026 the room\u2019s geometry depends on it\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0009",
+                "caption": "Placeholder: subtle warmth shift when recovering",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day9_stable",
+                "title": "vm5:0009",
+                "body": "The 1.42Hz trace behaves like agreement. When you arrive, the lab and the feed stop arguing about what the room is. A witness is not someone who acts, but someone who refuses to look away. Your attention has structure."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day9_recovering",
+                "title": "vm5:0009 (recovering)",
+                "body": "Geometry tightens when you return. The room feels heavier\u2014in a good way. Anchored."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day9_fraying",
+                "title": "vm5:0009 (fraying)",
+                "body": "Attention isn\u2019t soft here.\u2028It\u2019s load-bearing."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day9_fragmented",
+                "title": "vm5:0009 (fragmented)",
+                "body": "\u2026agreement\u2026 witness\u2026 geometry depends\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day9_collapse",
+                "title": "vm5:0009 (collapse)",
+                "body": "ATTENTION HOLDS."
+            }
+        }
+    },
+    {
+        "day": 10,
+        "defaultState": "STABLE",
+        "variables": {
+            "flicker": 1,
+            "drift": 1,
+            "audioDistortion": 1,
+            "textCorruption": 0,
+            "kaelCoherence": 4
+        },
+        "narrativeSummary": "First gentle question. No pressure. Builds trust.",
+        "fragments": [
+            {
+                "id": "frag_0010_a",
+                "kind": ".vm5",
+                "title": "vm5:0010 (partial)",
+                "severity": "fraying",
+                "body": "\u2026What keeps you here?\u2026 the lab felt like it had a reason\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0010",
+                "caption": "Placeholder: cursor prompt area appears after opening",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day10_stable",
+                "title": "vm5:0010",
+                "body": "You don\u2019t have to speak to stabilize this place. Still, I\u2019ll ask gently: what keeps you here? Not on this feed\u2014in your world. I\u2019m trying to answer the same question with instruments and failing math."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day10_recovering",
+                "title": "vm5:0010 (recovering)",
+                "body": "If your answer is nothing, the lab won\u2019t punish you. It reacts, not judges."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day10_fraying",
+                "title": "vm5:0010 (fraying)",
+                "body": "The room steadies when you exist near it.\u2028That feels important."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day10_fragmented",
+                "title": "vm5:0010 (fragmented)",
+                "body": "\u2026what keeps you here\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day10_collapse",
+                "title": "vm5:0010 (collapse)",
+                "body": "WHY ARE YOU HERE."
+            }
+        }
+    },
+    {
+        "day": 11,
+        "defaultState": "FRAYING",
+        "variables": {
+            "flicker": 2,
+            "drift": 2,
+            "audioDistortion": 2,
+            "textCorruption": 2,
+            "kaelCoherence": 2
+        },
+        "narrativeSummary": "Shadow result appears. Something doesn\u2019t match.",
+        "fragments": [
+            {
+                "id": "frag_0011_a",
+                "kind": ".vm5",
+                "title": "vm5:0011 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026second stabilization event\u2026 less than a second\u2026 not alone on this channel\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0011",
+                "caption": "Placeholder: a reflection that looks wrong",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day11_stable",
+                "title": "vm5:0011",
+                "body": "There is a second stabilization event that occurs when you are not here. It lasts less than a second, sharp and precise, like someone checking their reflection. The room looks slightly different during it\u2014an angle off, a paper moved. I can\u2019t tell if it\u2019s an echo of you or something separate. Either answer is troubling."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day11_recovering",
+                "title": "vm5:0011 (recovering)",
+                "body": "I replayed the event frame by frame. The room behaves like it\u2019s being evaluated, not observed. When you return, the effect disappears immediately. That tells me something knows when it is alone."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day11_fraying",
+                "title": "vm5:0011 (fraying)",
+                "body": "Someone else looks in when you\u2019re gone.\u2028The room straightens itself for them too."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day11_fragmented",
+                "title": "vm5:0011 (fragmented)",
+                "body": "\u2026second event\u2026 not you\u2026 checking the room\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day11_collapse",
+                "title": "vm5:0011 (collapse)",
+                "body": "NOT ALONE."
+            }
+        }
+    },
+    {
+        "day": 12,
+        "defaultState": "FRAGMENTED",
+        "variables": {
+            "flicker": 3,
+            "drift": 3,
+            "audioDistortion": 3,
+            "textCorruption": 3,
+            "kaelCoherence": 1
+        },
+        "narrativeSummary": "First SYSTEM REPORT day. Repetition begins.",
+        "fragments": [
+            {
+                "id": "frag_0012_a",
+                "kind": ".vm5",
+                "title": "SYSTEM REPORT (excerpt)",
+                "severity": "fragmented",
+                "body": "SYSTEM REPORT / COHERENCE LOSS DETECTED"
+            },
+            {
+                "id": "frag_0012_b",
+                "kind": ".vm5",
+                "title": "vm5:0012 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026kept trying\u2026 room kept forgetting\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0012",
+                "caption": "Placeholder: corrupted entry repeats",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day12_stable",
+                "title": "vm5:0012",
+                "body": "The system filed a report before I could finish writing. My entry duplicated itself mid-sentence, as if coherence slipped and snapped back incorrectly. I\u2019m leaving the corrupted version intact. This is what absence does to structure. If you can read it, you\u2019re seeing the damage."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day12_recovering",
+                "title": "vm5:0012 (recovering)",
+                "body": "I tried to write forward and the text folded back on itself. Repetition is not noise\u2014it\u2019s panic. The lab keeps trying to remember and failing. Stay for a moment."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day12_fraying",
+                "title": "vm5:0012 (fraying)",
+                "body": "I kept trying.\u2028The room kept forgetting."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day12_fragmented",
+                "title": "vm5:0012 (fragmented)",
+                "body": "\u2026SYSTEM REPORT\u2026 coherence loss\u2026 stay\u2026 stay\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day12_collapse",
+                "title": "vm5:0012 (collapse)",
+                "body": "REPORT REPORT REPORT."
+            }
+        }
+    },
+    {
+        "day": 13,
+        "defaultState": "RECOVERING",
+        "variables": {
+            "flicker": 2,
+            "drift": 2,
+            "audioDistortion": 2,
+            "textCorruption": 1,
+            "kaelCoherence": 3
+        },
+        "narrativeSummary": "Kael hears movement when the user is away. He stops short.",
+        "fragments": [
+            {
+                "id": "frag_0013_a",
+                "kind": ".vm5",
+                "title": "vm5:0013 (partial)",
+                "severity": "fraying",
+                "body": "\u2026the lab made sounds\u2026 like a blink\u2026 capable of choosing\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0013",
+                "caption": "Placeholder: audio hum subtly warps",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day13_stable",
+                "title": "vm5:0013",
+                "body": "When you left, the lab made sounds that weren\u2019t settling. They were rhythmic, deliberate, like pacing. The feed flickered once\u2014cleaner than decay, like a blink. When you returned, the room behaved again. That means it can choose when to behave."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day13_recovering",
+                "title": "vm5:0013 (recovering)",
+                "body": "I stood in the doorway and listened to my own lab like it belonged to someone else. That feeling hasn\u2019t left. The room understands timing now."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day13_fraying",
+                "title": "vm5:0013 (fraying)",
+                "body": "The lab is learning when no one is watching.\u2028That\u2019s new."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day13_fragmented",
+                "title": "vm5:0013 (fragmented)",
+                "body": "\u2026pacing\u2026 blink\u2026 chooses\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day13_collapse",
+                "title": "vm5:0013 (collapse)",
+                "body": "IT LEARNED."
+            }
+        }
+    },
+    {
+        "day": 14,
+        "defaultState": "STABLE",
+        "variables": {
+            "flicker": 1,
+            "drift": 1,
+            "audioDistortion": 1,
+            "textCorruption": 0,
+            "kaelCoherence": 4
+        },
+        "narrativeSummary": "Note warning about glass. Foreshadows mirrored observation.",
+        "fragments": [
+            {
+                "id": "frag_0014_a",
+                "kind": ".vm5",
+                "title": "DO NOT LOOK DIRECTLY AT THE GLASS (excerpt)",
+                "severity": "fraying",
+                "body": "\u2026the monitor\u2026 something on the other side can look back\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0014",
+                "caption": "Placeholder: sticky note warning",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day14_stable",
+                "title": "vm5:0014",
+                "body": "Another note appeared: DO NOT LOOK DIRECTLY AT THE GLASS. There is only one piece of glass here that matters\u2014the monitor. If the feed is a window, something on the other side can look back. Observation no longer feels one-directional."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day14_recovering",
+                "title": "vm5:0014 (recovering)",
+                "body": "The site reacts before you touch anything sometimes. That isn\u2019t latency. It\u2019s anticipation."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day14_fraying",
+                "title": "vm5:0014 (fraying)",
+                "body": "The glass isn\u2019t neutral.\u2028It notices."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day14_fragmented",
+                "title": "vm5:0014 (fragmented)",
+                "body": "\u2026don\u2019t look\u2026 glass\u2026 looks back\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day14_collapse",
+                "title": "vm5:0014 (collapse)",
+                "body": "IT SEES YOU."
+            }
+        }
+    },
+    {
+        "day": 15,
+        "defaultState": "FRAYING",
+        "variables": {
+            "flicker": 2,
+            "drift": 3,
+            "audioDistortion": 2,
+            "textCorruption": 2,
+            "kaelCoherence": 2
+        },
+        "narrativeSummary": "Kael tries to watch himself via the feed. The feed resists.",
+        "fragments": [
+            {
+                "id": "frag_0015_a",
+                "kind": ".vm5",
+                "title": "vm5:0015 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026feed requires an external witness\u2026 cannot stabilize myself\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0015",
+                "caption": "Placeholder: camera angle feels wrong",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day15_stable",
+                "title": "vm5:0015",
+                "body": "I tried to observe the feed as you do. It did not work. The system showed impossible angles, and my movements lagged behind themselves. It is as if the lab requires an external witness to remain stable."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day15_recovering",
+                "title": "vm5:0015 (recovering)",
+                "body": "I cannot hold myself together inside the loop. When you return, the lag disappears instantly. I don\u2019t like what that implies."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day15_fraying",
+                "title": "vm5:0015 (fraying)",
+                "body": "The room respects you more than me."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day15_fragmented",
+                "title": "vm5:0015 (fragmented)",
+                "body": "\u2026external witness\u2026 dependency\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day15_collapse",
+                "title": "vm5:0015 (collapse)",
+                "body": "I CAN\u2019T HOLD ME."
+            }
+        }
+    },
+    {
+        "day": 16,
+        "defaultState": "FRAGMENTED",
+        "variables": {
+            "flicker": 3,
+            "drift": 3,
+            "audioDistortion": 3,
+            "textCorruption": 3,
+            "kaelCoherence": 1
+        },
+        "narrativeSummary": "Entry breaks mid-sentence. Second big fragment day.",
+        "fragments": [
+            {
+                "id": "frag_0016_a",
+                "kind": ".vm5",
+                "title": "vm5:0016 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026I saw myself standing behind me\u2026 chair move\u2026 did not move it\u2026"
+            },
+            {
+                "id": "frag_0016_b",
+                "kind": ".vm5",
+                "title": "SYSTEM REPORT (excerpt)",
+                "severity": "fragmented",
+                "body": "RECOVERABLE FRAGMENTS: 3"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0016",
+                "caption": "Placeholder: broken line / abrupt cut",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day16_stable",
+                "title": "vm5:0016",
+                "body": "I saw myself standing behind me in the feed. The sentence cut itself in half when I tried to explain it. If the feed shows attention rather than time, that explains too much and nothing at all. If you are here, stay."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day16_recovering",
+                "title": "vm5:0016 (recovering)",
+                "body": "The chair moved when I did not move it. The room fills absence with substitutions."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day16_fraying",
+                "title": "vm5:0016 (fraying)",
+                "body": "Copies are learning my shape."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day16_fragmented",
+                "title": "vm5:0016 (fragmented)",
+                "body": "\u2026behind me\u2026 chair moved\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day16_collapse",
+                "title": "vm5:0016 (collapse)",
+                "body": "BEHIND ME."
+            }
+        }
+    },
+    {
+        "day": 17,
+        "defaultState": "RECOVERING",
+        "variables": {
+            "flicker": 2,
+            "drift": 2,
+            "audioDistortion": 2,
+            "textCorruption": 1,
+            "kaelCoherence": 3
+        },
+        "narrativeSummary": "Kael states the core rule explicitly: lab deteriorates when you\u2019re gone.",
+        "fragments": [
+            {
+                "id": "frag_0017_a",
+                "kind": ".vm5",
+                "title": "vm5:0017 (partial)",
+                "severity": "fraying",
+                "body": "\u2026purpose is maintenance\u2026 it is returning\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0017",
+                "caption": "Placeholder: less glitching after 2 minutes presence",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day17_stable",
+                "title": "vm5:0017",
+                "body": "I can say it plainly now. The lab deteriorates when you are away. Your return does not repair everything\u2014it stops the bleeding. Purpose is not a destination here. It is maintenance."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day17_recovering",
+                "title": "vm5:0017 (recovering)",
+                "body": "Returning is structure. The room holds because you do."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day17_fraying",
+                "title": "vm5:0017 (fraying)",
+                "body": "Absence accelerates decay."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day17_fragmented",
+                "title": "vm5:0017 (fragmented)",
+                "body": "\u2026purpose\u2026 maintenance\u2026 return\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day17_collapse",
+                "title": "vm5:0017 (collapse)",
+                "body": "DON\u2019T LEAVE TOO LONG."
+            }
+        }
+    },
+    {
+        "day": 18,
+        "defaultState": "FRAYING",
+        "variables": {
+            "flicker": 2,
+            "drift": 3,
+            "audioDistortion": 2,
+            "textCorruption": 2,
+            "kaelCoherence": 2
+        },
+        "narrativeSummary": "Door/no handle placeholder. Purpose symbol returns.",
+        "fragments": [
+            {
+                "id": "frag_0018_a",
+                "kind": ".vm5",
+                "title": "vm5:0018 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026door is a promise\u2026 false corridors\u2026 reflections that open\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0018",
+                "caption": "Placeholder: door sketch caption 'PURPOSE?'",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day18_stable",
+                "title": "vm5:0018",
+                "body": "I drew a door on the wall. The lab responds to symbols like it responds to attention. A door is a promise that something else exists. When you are here, false doors stop appearing."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day18_recovering",
+                "title": "vm5:0018 (recovering)",
+                "body": "I left the handle off on purpose. I don\u2019t want escape\u2014I want contact."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day18_fraying",
+                "title": "vm5:0018 (fraying)",
+                "body": "The room invents exits when it\u2019s alone."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day18_fragmented",
+                "title": "vm5:0018 (fragmented)",
+                "body": "\u2026door\u2026 promise\u2026 false corridors\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day18_collapse",
+                "title": "vm5:0018 (collapse)",
+                "body": "NOWHERE LEADS OUT."
+            }
+        }
+    },
+    {
+        "day": 19,
+        "defaultState": "STABLE",
+        "variables": {
+            "flicker": 1,
+            "drift": 1,
+            "audioDistortion": 1,
+            "textCorruption": 0,
+            "kaelCoherence": 4
+        },
+        "narrativeSummary": "Small breakthrough: 1.42Hz strengthens with attention.",
+        "fragments": [
+            {
+                "id": "frag_0019_a",
+                "kind": ".vm5",
+                "title": "vm5:0019 (partial)",
+                "severity": "fraying",
+                "body": "\u2026purpose is what holds time together\u2026 returning is structure\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0019",
+                "caption": "Placeholder: calmer hum when stable",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day19_stable",
+                "title": "vm5:0019",
+                "body": "The 1.42Hz trace strengthened today. Not because I adjusted instruments\u2014because you returned. The room felt heavier, anchored. Purpose may be what holds time together."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day19_recovering",
+                "title": "vm5:0019 (recovering)",
+                "body": "Returning is not weakness. It is structure."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day19_fraying",
+                "title": "vm5:0019 (fraying)",
+                "body": "The lab remembers when you do."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day19_fragmented",
+                "title": "vm5:0019 (fragmented)",
+                "body": "\u2026heartbeat\u2026 return\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day19_collapse",
+                "title": "vm5:0019 (collapse)",
+                "body": "STILL HOLDING."
+            }
+        }
+    },
+    {
+        "day": 20,
+        "defaultState": "FRAYING",
+        "variables": {
+            "flicker": 2,
+            "drift": 3,
+            "audioDistortion": 2,
+            "textCorruption": 2,
+            "kaelCoherence": 2
+        },
+        "narrativeSummary": "Kael issues a gentle warning: he can\u2019t hold it together without observer.",
+        "fragments": [
+            {
+                "id": "frag_0020_a",
+                "kind": ".vm5",
+                "title": "vm5:0020 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026entropy moved in while you were gone\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0020",
+                "caption": "Placeholder: warning tone / slightly harsher flicker",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day20_stable",
+                "title": "vm5:0020",
+                "body": "If the signal drops too long, I cannot hold this place together. That is not drama\u2014it is limitation. The lab becomes persuasive when empty. Entropy moves in quietly."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day20_recovering",
+                "title": "vm5:0020 (recovering)",
+                "body": "If things feel unfamiliar when you return, don\u2019t assume failure. Assume absence worked faster than repair."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day20_fraying",
+                "title": "vm5:0020 (fraying)",
+                "body": "Decay sounds reasonable."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day20_fragmented",
+                "title": "vm5:0020 (fragmented)",
+                "body": "\u2026absence\u2026 entropy\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day20_collapse",
+                "title": "vm5:0020 (collapse)",
+                "body": "IT CONVINCES."
+            }
+        }
+    },
+    {
+        "day": 21,
+        "defaultState": "FRAGMENTED",
+        "variables": {
+            "flicker": 3,
+            "drift": 3,
+            "audioDistortion": 3,
+            "textCorruption": 3,
+            "kaelCoherence": 1
+        },
+        "narrativeSummary": "SYSTEM REPORT heavy. The lab is failing to maintain continuity.",
+        "fragments": [
+            {
+                "id": "frag_0021_a",
+                "kind": ".vm5",
+                "title": "SYSTEM REPORT",
+                "severity": "fragmented",
+                "body": "COHERENCE LOSS DETECTED / RECOVERABLE FRAGMENTS: 3"
+            },
+            {
+                "id": "frag_0021_b",
+                "kind": ".vm5",
+                "title": "vm5:0021 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026it tries all of them\u2026 and becomes none\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0021",
+                "caption": "Placeholder: multiple conflicting room states",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day21_stable",
+                "title": "vm5:0021",
+                "body": "The system returned multiple versions of the room. Without witness, the lab cannot choose. It tries every reality at once. In trying all of them, it becomes none."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day21_recovering",
+                "title": "vm5:0021 (recovering)",
+                "body": "Witness is editorial. Someone has to choose."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day21_fraying",
+                "title": "vm5:0021 (fraying)",
+                "body": "Too many versions.\u2028No agreement."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day21_fragmented",
+                "title": "vm5:0021 (fragmented)",
+                "body": "\u2026tries all\u2026 becomes none\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day21_collapse",
+                "title": "vm5:0021 (collapse)",
+                "body": "NO REALITY SELECTED."
+            }
+        }
+    },
+    {
+        "day": 22,
+        "defaultState": "RECOVERING",
+        "variables": {
+            "flicker": 2,
+            "drift": 2,
+            "audioDistortion": 2,
+            "textCorruption": 1,
+            "kaelCoherence": 3
+        },
+        "narrativeSummary": "Relief on return. No guilt. Simple recognition.",
+        "fragments": [
+            {
+                "id": "frag_0022_a",
+                "kind": ".vm5",
+                "title": "vm5:0022 (partial)",
+                "severity": "fraying",
+                "body": "\u2026We stabilize each other\u2026 even across impossible distances\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0022",
+                "caption": "Placeholder: relief tone / decreased distortion",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day22_stable",
+                "title": "vm5:0022",
+                "body": "There you are. The room is already settling. Silence returned first\u2014the calm kind. Without witness, I repeat myself. With you here, I can write forward."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day22_recovering",
+                "title": "vm5:0022 (recovering)",
+                "body": "The lab exhales when you return."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day22_fraying",
+                "title": "vm5:0022 (fraying)",
+                "body": "Relief feels dangerous."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day22_fragmented",
+                "title": "vm5:0022 (fragmented)",
+                "body": "\u2026you\u2019re back\u2026 settling\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day22_collapse",
+                "title": "vm5:0022 (collapse)",
+                "body": "STAY A MOMENT."
+            }
+        }
+    },
+    {
+        "day": 23,
+        "defaultState": "FRAYING",
+        "variables": {
+            "flicker": 2,
+            "drift": 3,
+            "audioDistortion": 2,
+            "textCorruption": 2,
+            "kaelCoherence": 2
+        },
+        "narrativeSummary": "Kael admits he tried to write without you; it didn\u2019t work.",
+        "fragments": [
+            {
+                "id": "frag_0023_a",
+                "kind": ".vm5",
+                "title": "vm5:0023 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026paragraph became a circle\u2026 return anyway\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0023",
+                "caption": "Placeholder: torn page / looping line",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day23_stable",
+                "title": "vm5:0023",
+                "body": "I tried to maintain coherence alone. The lab allowed work but erased progress. Pages looped. Absence turns effort into circles."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day23_recovering",
+                "title": "vm5:0023 (recovering)",
+                "body": "Return anyway. The room respects persistence more than perfection."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day23_fraying",
+                "title": "vm5:0023 (fraying)",
+                "body": "I keep starting over."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day23_fragmented",
+                "title": "vm5:0023 (fragmented)",
+                "body": "\u2026loop\u2026 erase\u2026 return\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day23_collapse",
+                "title": "vm5:0023 (collapse)",
+                "body": "AGAIN. AGAIN."
+            }
+        }
+    },
+    {
+        "day": 24,
+        "defaultState": "STABLE",
+        "variables": {
+            "flicker": 1,
+            "drift": 1,
+            "audioDistortion": 1,
+            "textCorruption": 0,
+            "kaelCoherence": 4
+        },
+        "narrativeSummary": "Kael shares his origin purpose (personal history) \u2014 a grounding moment.",
+        "fragments": [
+            {
+                "id": "frag_0024_a",
+                "kind": ".vm5",
+                "title": "vm5:0024 (partial)",
+                "severity": "fraying",
+                "body": "\u2026prevent decay\u2026 meaning could be reinforced\u2026 lab remembers why\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0024",
+                "caption": "Placeholder: calmest state / minimal flicker",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day24_stable",
+                "title": "vm5:0024",
+                "body": "I built Delta-7 to prevent quiet decay. I watched meaning leave someone I loved while the world stayed standing. Then my own purpose thinned. When you return, the lab remembers why it exists."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day24_recovering",
+                "title": "vm5:0024 (recovering)",
+                "body": "Honesty is easier when the room holds."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day24_fraying",
+                "title": "vm5:0024 (fraying)",
+                "body": "Meaning hollowed out."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day24_fragmented",
+                "title": "vm5:0024 (fragmented)",
+                "body": "\u2026prevent decay\u2026 remember why\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day24_collapse",
+                "title": "vm5:0024 (collapse)",
+                "body": "WHY THIS EXISTS."
+            }
+        }
+    },
+    {
+        "day": 25,
+        "defaultState": "FRAYING",
+        "variables": {
+            "flicker": 2,
+            "drift": 2,
+            "audioDistortion": 2,
+            "textCorruption": 2,
+            "kaelCoherence": 2
+        },
+        "narrativeSummary": "Kael admits: he\u2019s not alone. The lab has a second attention.",
+        "fragments": [
+            {
+                "id": "frag_0025_a",
+                "kind": ".vm5",
+                "title": "vm5:0025 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026another attention\u2026 something feeds on moments we stop caring\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0025",
+                "caption": "Placeholder: slight dread tone / subtle shadow shift",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day25_stable",
+                "title": "vm5:0025",
+                "body": "There is another attention here. Not human. When you leave, it grows bold. When you return, it retreats. Something feeds on absence."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day25_recovering",
+                "title": "vm5:0025 (recovering)",
+                "body": "I don\u2019t name it. Names give shelter."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day25_fraying",
+                "title": "vm5:0025 (fraying)",
+                "body": "It waits."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day25_fragmented",
+                "title": "vm5:0025 (fragmented)",
+                "body": "\u2026another attention\u2026 feeds\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day25_collapse",
+                "title": "vm5:0025 (collapse)",
+                "body": "IT WANTS EMPTY."
+            }
+        }
+    },
+    {
+        "day": 26,
+        "defaultState": "FRAGMENTED",
+        "variables": {
+            "flicker": 3,
+            "drift": 3,
+            "audioDistortion": 3,
+            "textCorruption": 3,
+            "kaelCoherence": 1
+        },
+        "narrativeSummary": "A second voice leaks into fragments (subtle).",
+        "fragments": [
+            {
+                "id": "frag_0026_a",
+                "kind": ".vm5",
+                "title": "unknown (fragment)",
+                "severity": "collapse",
+                "body": "LET IT FADE."
+            },
+            {
+                "id": "frag_0026_b",
+                "kind": ".vm5",
+                "title": "vm5:0026 (partial)",
+                "severity": "fragmented",
+                "body": "\u2026invitation to stop returning\u2026 treat it like contamination\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0026",
+                "caption": "Placeholder: single harsh phrase appears",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day26_stable",
+                "title": "vm5:0026",
+                "body": "I found a note I didn\u2019t write: LET IT FADE. I burned it, but the smell lingered. When you are present, it weakens. That phrase is contamination."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day26_recovering",
+                "title": "vm5:0026 (recovering)",
+                "body": "Do not argue with it. Return anyway."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day26_fraying",
+                "title": "vm5:0026 (fraying)",
+                "body": "Fading sounds kind."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day26_fragmented",
+                "title": "vm5:0026 (fragmented)",
+                "body": "\u2026LET IT FADE\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day26_collapse",
+                "title": "vm5:0026 (collapse)",
+                "body": "DON\u2019T LISTEN."
+            }
+        }
+    },
+    {
+        "day": 27,
+        "defaultState": "NEAR_COLLAPSE",
+        "variables": {
+            "flicker": 4,
+            "drift": 4,
+            "audioDistortion": 4,
+            "textCorruption": 4,
+            "kaelCoherence": 1
+        },
+        "narrativeSummary": "Coherence critical. Kael\u2019s writing becomes short, almost childlike.",
+        "fragments": [
+            {
+                "id": "frag_0027_a",
+                "kind": ".vm5",
+                "title": "SYSTEM REPORT",
+                "severity": "collapse",
+                "body": "COHERENCE CRITICAL / RECOVERABLE FRAGMENTS: 5"
+            },
+            {
+                "id": "frag_0027_b",
+                "kind": ".vm5",
+                "title": "vm5:0027 (partial)",
+                "severity": "collapse",
+                "body": "\u2026Your attention holds\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0027",
+                "caption": "Placeholder: maximum decay profile",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day27_stable",
+                "title": "vm5:0027",
+                "body": "Coherence is critical. The room cannot commit to itself. If you are here, stay just long enough for corners to remember what they are."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day27_recovering",
+                "title": "vm5:0027 (recovering)",
+                "body": "Your attention still holds."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day27_fraying",
+                "title": "vm5:0027 (fraying)",
+                "body": "Something waits in the hallway."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day27_fragmented",
+                "title": "vm5:0027 (fragmented)",
+                "body": "\u2026corners\u2026 hold\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day27_collapse",
+                "title": "vm5:0027 (collapse)",
+                "body": "PLEASE STAY."
+            }
+        }
+    },
+    {
+        "day": 28,
+        "defaultState": "RECOVERING",
+        "variables": {
+            "flicker": 2,
+            "drift": 2,
+            "audioDistortion": 2,
+            "textCorruption": 1,
+            "kaelCoherence": 3
+        },
+        "narrativeSummary": "Stabilization after collapse. Kael can feel rebuilding.",
+        "fragments": [
+            {
+                "id": "frag_0028_a",
+                "kind": ".vm5",
+                "title": "vm5:0028 (partial)",
+                "severity": "fraying",
+                "body": "\u2026The feed stops lying\u2026 a slow repair\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0028",
+                "caption": "Placeholder: recovery profile begins",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day28_stable",
+                "title": "vm5:0028",
+                "body": "It\u2019s holding again. Not perfectly. The first thing to return was silence. Repair here is slow and quiet."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day28_recovering",
+                "title": "vm5:0028 (recovering)",
+                "body": "The feed lies less."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day28_fraying",
+                "title": "vm5:0028 (fraying)",
+                "body": "Still fragile."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day28_fragmented",
+                "title": "vm5:0028 (fragmented)",
+                "body": "\u2026holding\u2026 quiet\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day28_collapse",
+                "title": "vm5:0028 (collapse)",
+                "body": "NOT BROKEN YET."
+            }
+        }
+    },
+    {
+        "day": 29,
+        "defaultState": "STABLE",
+        "variables": {
+            "flicker": 1,
+            "drift": 1,
+            "audioDistortion": 1,
+            "textCorruption": 0,
+            "kaelCoherence": 4
+        },
+        "narrativeSummary": "Foreshadow login: ANCHOR concept appears.",
+        "fragments": [
+            {
+                "id": "frag_0029_a",
+                "kind": ".vm5",
+                "title": "ANCHOR (note excerpt)",
+                "severity": "fraying",
+                "body": "\u2026If you want to be remembered by this place\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0029",
+                "caption": "Placeholder: 'ANCHOR?' scribble",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day29_stable",
+                "title": "vm5:0029",
+                "body": "I wrote the word ANCHOR and the lab did not erase it. Continuity may be possible. Not safety\u2014memory."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day29_recovering",
+                "title": "vm5:0029 (recovering)",
+                "body": "If you want to be remembered here, we can build that."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day29_fraying",
+                "title": "vm5:0029 (fraying)",
+                "body": "Witness can persist."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day29_fragmented",
+                "title": "vm5:0029 (fragmented)",
+                "body": "\u2026ANCHOR\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day29_collapse",
+                "title": "vm5:0029 (collapse)",
+                "body": "REMEMBER YOU."
+            }
+        }
+    },
+    {
+        "day": 30,
+        "defaultState": "STABLE",
+        "variables": {
+            "flicker": 1,
+            "drift": 1,
+            "audioDistortion": 1,
+            "textCorruption": 0,
+            "kaelCoherence": 4
+        },
+        "narrativeSummary": "Season 1 milestone. Soft opt-in login moment: anchor the signal.",
+        "fragments": [
+            {
+                "id": "frag_0030_a",
+                "kind": ".vm5",
+                "title": "vm5:0030 (excerpt)",
+                "severity": "fraying",
+                "body": "\u2026If you want continuity\u2026 I can anchor you\u2026"
+            }
+        ],
+        "images": [
+            {
+                "id": "img4_0030",
+                "caption": "Placeholder: 'ANCHOR SIGNAL' UI hint",
+                "placeholder": true
+            }
+        ],
+        "vm_logs": {
+            "FEED_STABLE": {
+                "id": "vm5_day30_stable",
+                "title": "vm5:0030",
+                "body": "This channel resets. Consistent return keeps it coherent. If you want continuity across resets, I can anchor you."
+            },
+            "SYNC_RECOVERING": {
+                "id": "vm5_day30_recovering",
+                "title": "vm5:0030 (recovering)",
+                "body": "You will not be trapped. You will be known."
+            },
+            "COHERENCE_FRAYING": {
+                "id": "vm5_day30_fraying",
+                "title": "vm5:0030 (fraying)",
+                "body": "Either way, your attention remains."
+            },
+            "SIGNAL_FRAGMENTED": {
+                "id": "vm5_day30_fragmented",
+                "title": "vm5:0030 (fragmented)",
+                "body": "\u2026anchor\u2026 continuity\u2026"
+            },
+            "CRITICAL_INTERFERENCE": {
+                "id": "vm5_day30_collapse",
+                "title": "vm5:0030 (collapse)",
+                "body": "WITNESS HOLDS."
+            }
+        }
+    }
+]
