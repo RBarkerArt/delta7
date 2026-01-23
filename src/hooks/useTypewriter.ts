@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { soundEngine } from '../lib/SoundEngine';
+import { useSound } from './useSound';
 
 interface TypewriterOptions {
     speed?: number;
@@ -12,6 +12,7 @@ export const useTypewriter = (text: string, options: TypewriterOptions = {}) => 
     const { speed = 30, glitchProbability = 0 } = options;
     const [displayedText, setDisplayedText] = useState('');
     const [complete, setComplete] = useState(false);
+    const { playClick } = useSound();
 
     const type = useCallback(() => {
         let index = 0;
@@ -31,7 +32,7 @@ export const useTypewriter = (text: string, options: TypewriterOptions = {}) => 
             if (isGlitch) {
                 const randomChar = GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
                 setDisplayedText((prev) => prev + randomChar);
-                soundEngine.playClick();
+                playClick();
 
                 // Quick correction
                 setTimeout(() => {
@@ -39,7 +40,7 @@ export const useTypewriter = (text: string, options: TypewriterOptions = {}) => 
                 }, speed / 2);
             } else {
                 setDisplayedText((prev) => prev + char);
-                soundEngine.playClick();
+                playClick();
             }
 
             index++;

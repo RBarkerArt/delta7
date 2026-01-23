@@ -1,192 +1,287 @@
 /**
- * Delta-7 Generative Audio Engine
- * Pure Web Audio API implementation to avoid external assets.
+ * SoundEngine handles all audio synthesis for the Delta-7 atmosphere.
+ * Designed to represent a living, breathing machine.
  */
-
 class SoundEngine {
     private ctx: AudioContext | null = null;
-    private humOsc: OscillatorNode | null = null;
-    private humGain: GainNode | null = null;
+    private masterGain: GainNode | null = null;
+
+    // Core breath system
     private breathOsc: OscillatorNode | null = null;
     private breathGain: GainNode | null = null;
+    private breathFilter: BiquadFilterNode | null = null;
+
+    // Harmonic layer (adds body)
+    private harmonicOsc: OscillatorNode | null = null;
+    private harmonicGain: GainNode | null = null;
+
+    // LFO for breathing modulation
+    private lfoOsc: OscillatorNode | null = null;
+    private lfoGain: GainNode | null = null;
+
     private initialized = false;
-    private isMuted = false;
+    private muted = false;
     private currentScore = 100;
 
-    constructor() { }
+    public async init(): Promise<boolean> {
+        if (this.initialized && this.ctx?.state === 'running') return true;
 
-    public async init() {
-        if (this.initialized && this.ctx?.state === 'running') return;
+        try {
+            if (!this.ctx) {
+                this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            }
 
-        if (!this.ctx) {
-            this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        }
+            if (this.ctx.state === 'suspended') {
+                await this.ctx.resume();
+            }
 
-        if (this.ctx.state === 'suspended') {
-            await this.ctx.resume();
-        }
+            if (!this.masterGain) {
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.connect(this.ctx.destination);
+                this.masterGain.gain.setValueAtTime(this.muted ? 0 : 0.3, this.ctx.currentTime);
+            }
 
-        if (!this.initialized) {
+            this.setupBreathSystem();
             this.initialized = true;
-            this.startHum();
+            console.log('[SoundEngine] Living nexus audio link established.');
+            return true;
+        } catch (err) {
+            console.warn('[SoundEngine] Nexus audio failure:', err);
+            return false;
         }
     }
 
-    public async setMuted(muted: boolean) {
-        this.isMuted = muted;
-        if (!this.ctx) return;
+    private setupBreathSystem() {
+        if (!this.ctx || !this.masterGain) return;
 
-        if (!muted && this.ctx.state === 'suspended') {
-            await this.ctx.resume();
-        }
+        try {
+            const now = this.ctx.currentTime;
 
-        if (this.humGain) {
-            const targetVolume = muted ? 0 : (0.015 + (100 - this.currentScore) * 0.0003);
-            this.humGain.gain.setTargetAtTime(targetVolume, this.ctx.currentTime, 0.1);
+            // Main Breath
+            this.breathOsc = this.ctx.createOscillator();
+            this.breathGain = this.ctx.createGain();
+            this.breathFilter = this.ctx.createBiquadFilter();
+
+            this.breathOsc.type = 'sawtooth';
+            this.breathOsc.frequency.setValueAtTime(48, now);
+
+            this.breathFilter.type = 'lowpass';
+            this.breathFilter.frequency.setValueAtTime(120, now);
+            this.breathFilter.Q.setValueAtTime(1, now);
+
+            this.breathGain.gain.setValueAtTime(0.04, now);
+
+            // Harmonic
+            this.harmonicOsc = this.ctx.createOscillator();
+            this.harmonicGain = this.ctx.createGain();
+            this.harmonicOsc.type = 'sine';
+            this.harmonicOsc.frequency.setValueAtTime(96, now);
+            this.harmonicGain.gain.setValueAtTime(0.015, now);
+
+            // LFO
+            this.lfoOsc = this.ctx.createOscillator();
+            this.lfoGain = this.ctx.createGain();
+            this.lfoOsc.frequency.setValueAtTime(0.12, now);
+            this.lfoGain.gain.setValueAtTime(0, now);
+
+            // Connections
+            this.lfoOsc.connect(this.lfoGain);
+            this.lfoGain.connect(this.breathGain.gain);
+
+            this.breathOsc.connect(this.breathFilter);
+            this.breathFilter.connect(this.breathGain);
+            this.breathGain.connect(this.masterGain);
+
+            this.harmonicOsc.connect(this.harmonicGain);
+            this.harmonicGain.connect(this.masterGain);
+
+            this.breathOsc.start();
+            this.harmonicOsc.start();
+            this.lfoOsc.start();
+        } catch (e) {
+            // Silent fail
         }
     }
 
-    private startHum() {
-        if (!this.ctx) return;
-
-        this.humOsc = this.ctx.createOscillator();
-        this.humGain = this.ctx.createGain();
-
-        // Breath LFO (Mechanical Oscillation)
-        this.breathOsc = this.ctx.createOscillator();
-        this.breathGain = this.ctx.createGain();
-        this.breathOsc.type = 'sine';
-        this.breathOsc.frequency.setValueAtTime(0.2, this.ctx.currentTime); // 5s breath cycle
-        this.breathGain.gain.setValueAtTime(0, this.ctx.currentTime);
-        this.breathOsc.connect(this.breathGain);
-
-        // Initial waveform: confident sawtooth
-        this.humOsc.type = 'sawtooth';
-        this.humOsc.frequency.setValueAtTime(50, this.ctx.currentTime);
-
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(150, this.ctx.currentTime);
-
-        const initialVolume = this.isMuted ? 0 : (0.02 + (100 - this.currentScore) * 0.0003);
-        this.humGain.gain.setValueAtTime(initialVolume, this.ctx.currentTime);
-
-        // Connect hum through breath gain for oscillation
-        this.humOsc.connect(filter);
-        filter.connect(this.humGain);
-        this.breathGain.connect(this.humGain.gain); // Modulate hum volume
-        this.humGain.connect(this.ctx.destination);
-
-        this.humOsc.start();
-        this.breathOsc.start();
+    setMuted(muted: boolean) {
+        this.muted = muted;
+        if (this.masterGain && this.ctx) {
+            try {
+                this.masterGain.gain.setTargetAtTime(muted ? 0 : 0.3, this.ctx.currentTime, 0.1);
+            } catch (e) { /* silent */ }
+        }
     }
 
-    public setCoherence(score: number) {
+    getMuted(): boolean {
+        return this.muted;
+    }
+
+    isReady(): boolean {
+        return this.initialized && this.ctx?.state === 'running';
+    }
+
+    setCoherence(score: number) {
         this.currentScore = score;
-        if (!this.ctx || !this.humOsc || !this.humGain || !this.breathGain) return;
+        if (!this.isReady() || !this.breathOsc || !this.breathFilter || !this.lfoGain || !this.lfoOsc || !this.breathGain) return;
 
-        // TIERED BEHAVIOR:
-        // Tier 5/4 (100-70): Steady, sawtooth, no movement
-        // Tier 3 (69-45): Detuning, timing off (handled in component)
-        // Tier 2 (44-20): Mechanical breath (oscillation)
-        // Tier 1 (19-0): Thinning (sine wave), frequencies drop out
+        try {
+            const now = this.ctx!.currentTime;
+            const t = 1.5; // Time constant for transitions
 
-        // 1. Waveform Control
-        if (score < 20) {
-            this.humOsc.type = 'sine'; // Thinning
-        } else {
-            this.humOsc.type = 'sawtooth';
-        }
-
-        // 2. Frequency Control
-        // In the new model, frequency doesn't "panic" (rise sharply).
-        // It subtly detunes or settles.
-        const baseFreq = score < 20 ? 40 : 50; // Dropping out/lower energy at critical
-        const detune = score < 70 ? (Math.random() - 0.5) * 2 * (1 - score / 100) : 0;
-        this.humOsc.frequency.setTargetAtTime(baseFreq + detune, this.ctx.currentTime, 0.5);
-
-        // 3. Breath Oscillation (Tier 2/Low Coherence)
-        const breathIntensity = (score < 45 && score >= 20) ? 0.005 : 0;
-        this.breathGain.gain.setTargetAtTime(breathIntensity, this.ctx.currentTime, 2.0);
-
-        // 4. Volume Control
-        if (!this.isMuted) {
-            // Volume thins out at critical, stays steady otherwise
-            const baseVol = score < 20 ? 0.015 : 0.02;
-            this.humGain.gain.setTargetAtTime(baseVol, this.ctx.currentTime, 1.0);
-        }
+            if (score >= 70) {
+                // STABLE
+                this.breathOsc.type = 'sawtooth';
+                this.breathOsc.frequency.setTargetAtTime(48, now, t);
+                this.breathFilter.frequency.setTargetAtTime(120, now, t);
+                this.breathFilter.Q.setTargetAtTime(1, now, t);
+                this.lfoGain.gain.setTargetAtTime(0, now, t);
+                this.breathGain.gain.setTargetAtTime(0.04, now, t);
+            } else if (score >= 45) {
+                // FRAYING
+                const instability = (70 - score) / 25;
+                this.breathOsc.type = 'sawtooth';
+                this.breathOsc.frequency.setTargetAtTime(48 + (Math.random() * 4 - 2) * instability, now, t);
+                this.breathFilter.frequency.setTargetAtTime(100 + instability * 20, now, t);
+                this.lfoGain.gain.setTargetAtTime(0.003 * instability, now, t);
+                this.lfoOsc.frequency.setTargetAtTime(0.12, now, t);
+            } else if (score >= 20) {
+                // FRAGMENTED
+                const struggle = (45 - score) / 25;
+                this.breathOsc.type = 'sawtooth';
+                this.breathOsc.frequency.setTargetAtTime(45 - struggle * 3, now, t);
+                this.breathFilter.frequency.setTargetAtTime(80 + struggle * 40, now, t);
+                this.breathFilter.Q.setTargetAtTime(2 + struggle * 3, now, t);
+                this.lfoGain.gain.setTargetAtTime(0.008 + struggle * 0.006, now, t);
+                this.lfoOsc.frequency.setTargetAtTime(0.25 + struggle * 0.15, now, t);
+            } else {
+                // CRITICAL
+                const withdrawal = (20 - score) / 20;
+                this.breathOsc.type = 'sine';
+                this.breathOsc.frequency.setTargetAtTime(40 - withdrawal * 8, now, t);
+                this.breathGain.gain.setTargetAtTime(0.012 - withdrawal * 0.008, now, t);
+                this.lfoGain.gain.setTargetAtTime(0.004 - withdrawal * 0.003, now, t);
+                this.lfoOsc.frequency.setTargetAtTime(0.08, now, t);
+            }
+        } catch (e) { /* silent */ }
     }
 
-    public playClick() {
-        if (!this.ctx || this.isMuted) return;
+    public playBreathSurge(): void {
+        if (!this.ctx || !this.masterGain || this.muted) return;
+        if (this.currentScore > 50) return;
 
-        // Critical: Softens or chooses not to speak
-        if (this.currentScore < 20 && Math.random() > 0.7) return;
+        try {
+            if (this.ctx.state === 'suspended') this.ctx.resume();
+            const now = this.ctx.currentTime;
+            const intensity = (50 - this.currentScore) / 50;
 
-        if (this.ctx.state === 'suspended') this.ctx.resume();
+            const bufferSize = this.ctx.sampleRate * 0.3;
+            const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
 
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        const filter = this.ctx.createBiquadFilter();
+            let lastOut = 0;
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                output[i] = (lastOut + (0.02 * white)) / 1.02;
+                lastOut = output[i];
+                output[i] *= 3.5;
+            }
 
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(120 + Math.random() * 30, this.ctx.currentTime);
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = noiseBuffer;
 
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(800, this.ctx.currentTime);
-        filter.Q.setValueAtTime(10, this.ctx.currentTime);
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(200 + intensity * 300, now);
+            filter.Q.setValueAtTime(2 + intensity * 3, now);
 
-        // Volume thins out at critical
-        const vol = this.currentScore < 20 ? 0.005 : 0.015;
-        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.05);
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.015 + intensity * 0.02, now + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
 
-        osc.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.ctx.destination);
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.masterGain);
 
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.05);
+            noise.start(now);
+            noise.stop(now + 0.3);
+        } catch (e) { /* silent */ }
     }
 
-    public playPhantomClick() {
-        if (!this.ctx || this.isMuted || this.currentScore > 45) return;
-
-        const gain = this.ctx.createGain();
-        const osc = this.ctx.createOscillator();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(200, this.ctx.currentTime);
-
-        gain.gain.setValueAtTime(0.003, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.1);
-
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.1);
+    playGlitch() {
+        this.playBreathSurge();
     }
 
-    public playGlitch() {
-        // Refined guidance says "no glitch blasts". Glitches are now just "uncertainty".
-        if (!this.ctx || this.isMuted || this.currentScore > 40) return;
+    playPhantomClick() {
+        this.playClick();
+    }
 
-        const duration = 0.03 + Math.random() * 0.07;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
+    playClick() {
+        if (!this.isReady() || !this.ctx || !this.masterGain || this.muted) return;
 
-        osc.type = 'sine'; // Pure, thinning
-        osc.frequency.setValueAtTime(Math.random() * 500 + 100, this.ctx.currentTime);
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const filter = this.ctx.createBiquadFilter();
 
-        gain.gain.setValueAtTime(0.005, this.ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + duration);
+            filter.type = 'bandpass';
 
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
+            if (this.currentScore >= 70) {
+                // Confident
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.045);
+                filter.frequency.setValueAtTime(1200, now);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+            } else if (this.currentScore >= 45) {
+                // Unsteady
+                osc.type = 'square';
+                const detune = Math.random() * 30 - 15;
+                osc.frequency.setValueAtTime(180 + detune, now);
+                osc.frequency.exponentialRampToValueAtTime(80 + detune, now + 0.045);
+                filter.frequency.setValueAtTime(1200 + (Math.random() * 200 - 100), now);
+                gain.gain.setValueAtTime(0.06, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+            } else if (this.currentScore >= 20) {
+                // Glitchy
+                osc.type = Math.random() > 0.5 ? 'square' : 'sawtooth';
+                const detune = Math.random() * 60 - 30;
+                osc.frequency.setValueAtTime(180 + detune, now);
+                filter.frequency.setValueAtTime(1200 + detune * 5, now);
+                gain.gain.setValueAtTime(0.04 + Math.random() * 0.02, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
 
-        osc.start();
-        osc.stop(this.ctx.currentTime + duration);
+                // Occasional double click
+                if (Math.random() < 0.15) {
+                    setTimeout(() => this.playClick(), 30 + Math.random() * 40);
+                }
+            } else {
+                // Weak
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(100, now);
+                gain.gain.setValueAtTime(0.015, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+            }
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.masterGain);
+
+            osc.start(now);
+            osc.stop(now + 0.05);
+        } catch (e) { /* silent */ }
+    }
+
+    public dispose() {
+        try {
+            if (this.breathOsc) this.breathOsc.stop();
+            if (this.harmonicOsc) this.harmonicOsc.stop();
+            if (this.lfoOsc) this.lfoOsc.stop();
+            if (this.ctx) this.ctx.close();
+            this.initialized = false;
+        } catch (e) { /* silent */ }
     }
 }
 

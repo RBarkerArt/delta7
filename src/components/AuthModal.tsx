@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useCoherence } from '../context/CoherenceContext';
-import { X, Mail, Lock, Shield, ArrowRight } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { useAuth } from '../hooks/useAuth';
+import { X, Lock, Shield, ArrowRight, AlertTriangle } from 'lucide-react';
 
 interface AuthModalProps {
     isOpen: boolean;
@@ -9,233 +9,164 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-    const { signInWithGoogle, signInWithEmail, signUpWithEmail, logout, setMigrationProgress } = useAuth();
-    const { isAnchored, currentDay, score } = useCoherence();
-    const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('SIGNUP');
+    const { loginWithGoogle, login, signup, logout, user, isAuthorizing } = useAuth();
+    const [error, setError] = useState<string | null>(null);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [isSignup, setIsSignup] = useState(false);
 
-    if (!isOpen) return null;
-
-    const mapError = (code: string) => {
-        switch (code) {
-            case 'auth/popup-closed-by-user':
-            case 'auth/cancelled-popup-request':
-                return 'SYNCHRONIZATION_INTERRUPTED_BY_WITNESS';
-            case 'auth/popup-blocked':
-                return 'SYNCHRONIZATION_PORT_BLOCKED';
-            case 'auth/invalid-email':
-                return 'IDENTIFIER_RECOGNITION_ERROR';
-            case 'auth/user-not-found':
-            case 'auth/wrong-password':
-            case 'auth/invalid-credential':
-                return 'LINK_ESTABLISHMENT_DENIED';
-            case 'auth/email-already-in-use':
-                return 'IDENTIFIER_COLLISION_DETECTED';
-            case 'auth/weak-password':
-                return 'INSUFFICIENT_SECURITY_SEQUENCE';
-            default:
-                return 'PROTOCOL_SYNC_FAILURE';
+    const handleGoogleSignIn = async () => {
+        setError(null);
+        try {
+            await loginWithGoogle();
+            onClose();
+        } catch (err: unknown) {
+            setError((err as Error).message);
         }
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleEmailAuth = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
         setError(null);
         try {
-            if (mode === 'LOGIN') {
-                await signInWithEmail(email, password);
+            if (isSignup) {
+                await signup(email, password);
             } else {
-                await signUpWithEmail(email, password);
+                await login(email, password);
             }
             onClose();
-        } catch (err: any) {
-            setError(mapError(err.code || 'unknown'));
-        } finally {
-            setLoading(false);
+        } catch (err: unknown) {
+            setError((err as Error).message);
         }
     };
 
-    const handleGoogle = async () => {
-        setLoading(true);
+    const handleLogout = async () => {
         setError(null);
         try {
-            await signInWithGoogle(() => {
-                // CAPTURE STATE: Allow capture of values from CoherenceContext before redirect
-                setMigrationProgress(currentDay, score);
-            });
+            await logout();
             onClose();
-        } catch (err: any) {
-            // Only show error if it's not a simple cancellation, or show the specialized interrupted message
-            setError(mapError(err.code || 'unknown'));
-        } finally {
-            setLoading(false);
+        } catch (err: unknown) {
+            setError((err as Error).message);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={onClose} />
+        <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <Dialog.Portal>
+                <Dialog.Overlay className="fixed inset-0 bg-lab-black/80 backdrop-blur-md z-[10000] animate-fade-in" />
+                <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-zinc-900 border border-emerald-900/30 p-8 rounded-2xl shadow-2xl z-[10001] focus:outline-none animate-scale-in">
+                    <Dialog.Title className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
+                        <Lock className="text-emerald-500" size={24} />
+                        Establish Anchor
+                    </Dialog.Title>
+                    <Dialog.Description className="mt-4 text-zinc-400 font-mono text-sm leading-relaxed">
+                        Anchor your current observation metrics to a persistent identity.
+                        This ensures data integrity across terminal sessions.
+                    </Dialog.Description>
 
-            <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-                <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 text-zinc-500 hover:text-emerald-500 transition-colors"
-                >
-                    <X size={20} />
-                </button>
-
-                <div className="space-y-6">
-                    <div className="space-y-2 text-center">
-                        <div className="flex justify-center mb-4 text-emerald-500">
-                            <Shield size={32} />
-                        </div>
-                        <h2 className="text-emerald-500 font-mono text-xs font-bold tracking-[0.3em] uppercase">
-                            Anchor_Synchronization
-                        </h2>
-                        <div className="h-px bg-zinc-800 w-full" />
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest pl-1">
-                                [Neural_Index_Email]
-                            </label>
-                            <div className="relative group">
-                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-emerald-500 transition-colors" size={16} />
-                                <input
-                                    type="email"
-                                    required
-                                    autoComplete="email"
-                                    className="w-full bg-zinc-950 border border-zinc-800 rounded-none pl-10 pr-4 py-3 text-zinc-300 font-mono text-sm focus:outline-none focus:border-emerald-500 transition-all"
-                                    placeholder="Enter identifier..."
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest pl-1">
-                                [Crypt_Key_Password]
-                            </label>
-                            <div className="relative group">
-                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 group-focus-within:text-emerald-500 transition-colors" size={16} />
-                                <input
-                                    type="password"
-                                    required
-                                    autoComplete={mode === 'LOGIN' ? 'current-password' : 'new-password'}
-                                    className="w-full bg-zinc-950 border border-zinc-800 rounded-none pl-10 pr-4 py-3 text-zinc-300 font-mono text-sm focus:outline-none focus:border-emerald-500 transition-all"
-                                    placeholder="Enter sequence..."
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
+                    <div className="mt-8 space-y-6">
                         {error && (
-                            <div className="text-[10px] font-mono text-red-500/80 bg-red-500/5 p-2 border border-red-500/20">
-                                SIGNAL_ERROR: {error.toUpperCase()}
+                            <div className="p-4 bg-red-900/10 border border-red-900/30 rounded-xl flex items-center gap-3 text-red-500 text-sm">
+                                <AlertTriangle size={18} className="shrink-0" />
+                                <p>{error}</p>
                             </div>
                         )}
 
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold py-4 uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 group disabled:opacity-50"
-                        >
-                            {loading ? (
-                                <span className="animate-pulse">Processing...</span>
-                            ) : (
-                                <>
-                                    {mode === 'LOGIN' ? 'Initiate_Session' : 'Establish_Anchor'}
-                                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                                </>
-                            )}
-                        </button>
-                    </form>
-
-                    <div className="flex items-center gap-4 py-2">
-                        <div className="h-px flex-1 bg-zinc-800" />
-                        <span className="text-[10px] font-mono text-zinc-600 font-bold uppercase">Alternate_Protocol</span>
-                        <div className="h-px flex-1 bg-zinc-800" />
-                    </div>
-
-                    <button
-                        onClick={handleGoogle}
-                        className="w-full border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200 font-mono text-xs py-3 uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                    >
-                        Merge_via_Google
-                    </button>
-
-                    <div className="pt-4 text-center">
-                        <button
-                            onClick={() => setMode(mode === 'LOGIN' ? 'SIGNUP' : 'LOGIN')}
-                            className="text-[10px] font-mono text-zinc-500 hover:text-emerald-500 uppercase tracking-widest transition-colors"
-                        >
-                            {mode === 'LOGIN' ? '[Request_New_Induction]' : '[Access_Existing_Stream]'}
-                        </button>
-                    </div>
-                </div>
-
-                {isAnchored && (
-                    <div className="absolute inset-0 bg-zinc-900 border border-zinc-800 p-8 flex flex-col items-center justify-center text-center space-y-8 animate-in fade-in duration-500">
-                        <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                            <Shield size={32} />
-                        </div>
-
-                        <div className="space-y-4 max-w-xs">
-                            <h2 className="text-emerald-500 font-mono text-xs font-bold tracking-[0.3em] uppercase">
-                                Identity_Synchronized
-                            </h2>
-                            <div className="space-y-2">
-                                <p className="text-[11px] font-mono text-zinc-300 leading-relaxed">
-                                    "The anchor does not change what appears. It allows the system to recover more gently."
-                                </p>
-                                <p className="text-[10px] font-mono text-emerald-500/60 uppercase italic tracking-wider">
-                                    [STATION_RECOVERY_ENHANCED]
-                                </p>
+                        {user && !user.isAnonymous ? (
+                            <div className="p-6 bg-emerald-900/10 border border-emerald-900/20 rounded-xl text-center space-y-4 text-emerald-500 font-mono text-[10px] tracking-widest uppercase">
+                                <Shield className="mx-auto" size={48} />
+                                <div>
+                                    <p className="text-zinc-100 font-bold normal-case text-base tracking-normal">Identity Anchored</p>
+                                    <p className="text-emerald-500/70 mt-1 truncate">{user.email}</p>
+                                </div>
+                                <div className="space-y-2 pt-2">
+                                    <button
+                                        onClick={onClose}
+                                        className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-colors font-bold"
+                                    >
+                                        Return to Feed
+                                    </button>
+                                    <button
+                                        onClick={handleLogout}
+                                        disabled={isAuthorizing}
+                                        className="w-full py-2.5 text-red-500/70 hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all border border-transparent hover:border-red-500/10"
+                                    >
+                                        Unlink Account
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-
-                        <div className="w-full h-px bg-zinc-800" />
-
-                        <div className="w-full space-y-4">
-                            <button
-                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-bold py-4 uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 group"
-                            >
-                                Maintain The Anchor - $3/Month
-                            </button>
-
-                            <div className="flex flex-col gap-3">
-                                <button className="text-[10px] font-mono text-zinc-400 hover:text-emerald-400 uppercase tracking-widest transition-colors">
-                                    Manage Your Anchor
-                                </button>
+                        ) : (
+                            <div className="space-y-4">
                                 <button
-                                    onClick={async () => {
-                                        await logout();
-                                        onClose();
-                                    }}
-                                    className="text-[10px] font-mono text-zinc-500 hover:text-red-400 uppercase tracking-widest transition-colors"
+                                    onClick={handleGoogleSignIn}
+                                    disabled={isAuthorizing}
+                                    className="w-full flex items-center justify-between p-4 bg-white hover:bg-zinc-100 text-zinc-900 rounded-xl transition-all group disabled:opacity-50"
                                 >
-                                    Disengage Anchor
+                                    <div className="flex items-center gap-3 font-bold">
+                                        <div className="w-6 h-6 flex items-center justify-center">
+                                            <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /><path d="M1 1h22v22H1z" fill="none" /></svg>
+                                        </div>
+                                        <span>Link Google Account</span>
+                                    </div>
+                                    <ArrowRight size={18} className="text-zinc-400 group-hover:translate-x-1 transition-transform" />
                                 </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
 
-                <div className="mt-8 border-t border-zinc-800 pt-4 opacity-30 select-none">
-                    <p className="text-[10px] font-mono text-zinc-600 leading-tight">
-                        SYSTEM://ID_SYNC_PROTOCOL_V4.1<br />
-                        COHERENCE_REQUIRED: TRUE<br />
-                        BY_SIGNING_IN_YOU_ACKNOWLEDGE_WITNESS_RESPONSIBILITY
-                    </p>
-                </div>
-            </div>
-        </div>
+                                <div className="relative">
+                                    <div className="absolute inset-0 flex items-center">
+                                        <div className="w-full border-t border-emerald-900/10"></div>
+                                    </div>
+                                    <div className="relative flex justify-center text-[8px] uppercase tracking-[0.2em] font-mono">
+                                        <span className="bg-zinc-900 px-2 text-zinc-600">OR</span>
+                                    </div>
+                                </div>
+
+                                <form onSubmit={handleEmailAuth} className="space-y-3">
+                                    <div className="space-y-1">
+                                        <input
+                                            type="email"
+                                            placeholder="TERMINAL_EMAIL"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            required
+                                            className="w-full bg-zinc-950/50 border border-emerald-900/20 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition-colors font-mono"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <input
+                                            type="password"
+                                            placeholder="ACCESS_CODE"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            required
+                                            className="w-full bg-zinc-950/50 border border-emerald-900/20 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:border-emerald-500/30 transition-colors font-mono"
+                                        />
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        disabled={isAuthorizing}
+                                        className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-lab-black rounded-xl transition-all font-bold disabled:opacity-50"
+                                    >
+                                        {isSignup ? 'Create Account' : 'Authenticate'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsSignup(!isSignup)}
+                                        className="w-full text-[10px] text-zinc-500 hover:text-emerald-500/70 font-mono uppercase tracking-widest transition-colors py-1"
+                                    >
+                                        {isSignup ? 'Already anchored? Signal Login' : 'New Observer? Create Identity Anchor'}
+                                    </button>
+                                </form>
+                            </div>
+                        )}
+                    </div>
+
+                    <Dialog.Close asChild>
+                        <button className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-zinc-100 transition-colors">
+                            <X size={20} />
+                        </button>
+                    </Dialog.Close>
+                </Dialog.Content>
+            </Dialog.Portal>
+        </Dialog.Root>
     );
 };

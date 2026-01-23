@@ -21,7 +21,6 @@ export const GlitchText: React.FC<GlitchTextProps> = ({ text, coherenceScore, cl
     }, [coherenceScore]);
 
     useEffect(() => {
-        setGlitchedText(text);
         if (intensity === 0) {
             return;
         }

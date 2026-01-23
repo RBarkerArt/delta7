@@ -1,212 +1,130 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-    signInWithPopup,
-    GoogleAuthProvider,
     onAuthStateChanged,
-    signOut,
+    signInAnonymously,
+    GoogleAuthProvider,
+    signInWithPopup,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
-    signInAnonymously,
-    EmailAuthProvider,
-    linkWithCredential,
-    linkWithPopup,
-    type User as FirebaseUser
+    type User
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { getObserverSession, setObserverSession } from '../lib/visitor';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { AuthContext, type AuthContextType } from './contexts';
 
-export interface AuthUser extends FirebaseUser {
-    role?: 'admin' | 'visitor';
+export interface AuthUser extends User {
+    role?: 'admin' | 'observer';
 }
 
-interface AuthContextType {
-    user: AuthUser | null;
-    loading: boolean;
-    isAuthorizing: boolean; // Flag to prevent race conditions
-    isAdmin: boolean;
-    signInWithGoogle: (captureState?: () => void) => Promise<void>;
-    signInWithEmail: (email: string, pass: string) => Promise<void>;
-    signUpWithEmail: (email: string, pass: string) => Promise<void>;
-    logout: () => Promise<void>;
-    ensureUser: () => Promise<AuthUser>;
-    migrationPayload: { day: number; score: number } | null;
-    clearMigration: () => void;
-    setMigrationProgress: (day: number, score: number) => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const ADMIN_EMAIL = 'robert.barker2008@gmail.com';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<AuthUser | null>(null);
     const [loading, setLoading] = useState(true);
     const [isAuthorizing, setIsAuthorizing] = useState(false);
-
-    const [authInitialized, setAuthInitialized] = useState<Promise<AuthUser | null> | null>(null);
-    const resolveAuthRef = useRef<((u: AuthUser | null) => void) | null>(null);
-    const isInducingRef = useRef<Promise<AuthUser> | null>(null);
-
+    const [visitorId, setVisitorId] = useState<string | null>(null);
     const [migrationPayload, setMigrationPayload] = useState<{ day: number; score: number } | null>(null);
 
-    const setMigrationProgress = (day: number, score: number) => {
-        console.log(`[Delta-7] Auth: Capturing migration progress (Day ${day}, Score ${score})`);
-        setMigrationPayload({ day, score });
-    };
+    const clearMigration = () => setMigrationPayload(null);
 
-    const clearMigration = () => {
-        setMigrationPayload(null);
-    };
+    const ensureUser = useCallback(async (): Promise<AuthUser> => {
+        if (auth.currentUser) return auth.currentUser as AuthUser;
+        setIsAuthorizing(true);
+        try {
+            const result = await signInAnonymously(auth);
+            return result.user as AuthUser;
+        } finally {
+            setIsAuthorizing(false);
+        }
+    }, []);
 
     useEffect(() => {
-        console.log('[Delta-7] Auth: Initializing observer...');
-        const initPromise = new Promise<AuthUser | null>((resolve) => {
-            resolveAuthRef.current = resolve;
-        });
-        setAuthInitialized(initPromise);
+        const session = getObserverSession();
+        setVisitorId(session.visitorId);
 
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            console.log('[Delta-7] Auth: State Change detected:', firebaseUser?.uid || 'NONE');
-            try {
-                if (firebaseUser) {
-                    const idTokenResult = await firebaseUser.getIdTokenResult();
-                    const claimRole = idTokenResult.claims.role as 'admin' | 'visitor' | undefined;
+            if (firebaseUser) {
+                const idTokenResult = await firebaseUser.getIdTokenResult();
+                let role = idTokenResult.claims.role as 'admin' | 'observer' || 'observer';
 
-                    // Get user role from Firestore
-                    const userRef = doc(db, 'users', firebaseUser.uid);
-                    const userDoc = await getDoc(userRef);
-
-                    let role: 'admin' | 'visitor' = 'visitor';
-
-                    if (claimRole === 'admin') {
-                        role = 'admin';
-                    } else if (userDoc.exists()) {
-                        role = userDoc.data().role || 'visitor';
-                    }
-
-                    const extendedUser = firebaseUser as AuthUser;
-                    extendedUser.role = role;
-                    setUser(extendedUser);
-                    if (resolveAuthRef.current) resolveAuthRef.current(extendedUser);
-                } else {
-                    setUser(null);
-                    if (resolveAuthRef.current) resolveAuthRef.current(null);
+                // Hardcoded admin override for specific email
+                if (firebaseUser.email === ADMIN_EMAIL) {
+                    role = 'admin';
                 }
-            } catch (err) {
-                console.error('[Delta-7] Auth: Error processing user state:', err);
+
+                const authUser = firebaseUser as AuthUser;
+                authUser.role = role;
+
+                if (role === 'observer') {
+                    // IDENTITY_ANCHORING: Link Firebase UID to persistent Visitor ID
+                    console.log('[Delta-7] Syncing identity mapping for observer:', firebaseUser.uid);
+                    const mappingRef = doc(db, 'firebase_uid_mapping', firebaseUser.uid);
+
+                    try {
+                        const mappingDoc = await getDoc(mappingRef);
+                        if (mappingDoc.exists()) {
+                            const existingVisitorId = mappingDoc.data().visitorId;
+                            if (existingVisitorId !== session.visitorId) {
+                                console.log('[Delta-7] Re-anchoring to known Visitor ID:', existingVisitorId);
+                                setVisitorId(existingVisitorId);
+                                setObserverSession(existingVisitorId);
+                            }
+                        } else {
+                            console.log('[Delta-7] Establishing new identity anchor:', session.visitorId);
+                            await setDoc(mappingRef, {
+                                visitorId: session.visitorId,
+                                lastUpdated: serverTimestamp()
+                            });
+                        }
+                    } catch (err) {
+                        console.error('[Delta-7] Identity anchoring failure. Progress may not persist.', err);
+                    }
+                }
+
+                // Set user AFTER identity anchoring to ensure downstream contexts 
+                // have the correct visitorId when they re-render.
+                setUser(authUser);
+            } else {
                 setUser(null);
-                if (resolveAuthRef.current) resolveAuthRef.current(null);
-            } finally {
-                setLoading(false);
             }
+            setLoading(false);
         });
 
         return () => unsubscribe();
     }, []);
 
-    const ensureUser = async (): Promise<AuthUser> => {
-        // 1. Wait for initial onAuthStateChanged to fire
-        console.log('[Delta-7] Auth: ensureUser called, awaiting initialization...');
-        let currentUser = authInitialized ? await authInitialized : null;
-
-        // 2. If still no user, perform anonymous induction
-        if (!currentUser) {
-            // CONCURRENCY LOCK: Prevent multiple induction calls from overlapping
-            if (isInducingRef.current) {
-                console.log('[Delta-7] Auth: Induction already in progress, awaiting...');
-                return await isInducingRef.current;
-            }
-
-            const inductionPromise = (async () => {
-                try {
-                    console.log('[Delta-7] Auth: No witness detected. Initializing anonymous induction.');
-                    const result = await signInAnonymously(auth);
-                    const newUser = result.user as AuthUser;
-                    newUser.role = 'visitor'; // Initial assumption for anon
-                    setUser(newUser);
-                    return newUser;
-                } finally {
-                    isInducingRef.current = null;
-                }
-            })();
-
-            isInducingRef.current = inductionPromise;
-            currentUser = await inductionPromise;
-        }
-        return currentUser;
-    };
-
-    const signInWithGoogle = async (captureState?: () => void) => {
+    const login = async (email: string, pass: string) => {
         setIsAuthorizing(true);
         try {
-            // 1. Capture anonymous state BEFORE any auth redirect/popup
-            // This is our safety net if a collision forces a UID shift
-            if (captureState) {
-                console.log('[Delta-7] Auth: Capturing pre-auth state for potential migration...');
-                captureState();
+            if (auth.currentUser?.isAnonymous) {
+                console.log('[Delta-7] Anchoring anonymous session to Email identity...');
+                // We can't use linkWithPopup for email/pass usually without a credential
+                // But we can sign in and the onAuthStateChanged will handle the rest
+                await signInWithEmailAndPassword(auth, email, pass);
+            } else {
+                await signInWithEmailAndPassword(auth, email, pass);
             }
+        } finally {
+            setIsAuthorizing(false);
+        }
+    };
 
+    const signup = async (email: string, pass: string) => {
+        setIsAuthorizing(true);
+        try {
+            await createUserWithEmailAndPassword(auth, email, pass);
+        } finally {
+            setIsAuthorizing(false);
+        }
+    };
+
+    const loginWithGoogle = async () => {
+        setIsAuthorizing(true);
+        try {
             const provider = new GoogleAuthProvider();
-
-            // 2. STABLE IDENTITY PATH: If anonymous, we MUST link to keep the UID
-            if (auth.currentUser?.isAnonymous) {
-                try {
-                    console.log('[Delta-7] Auth: Attempting STABLE LINK (UID will not change)...');
-                    await linkWithPopup(auth.currentUser, provider);
-                    console.log('[Delta-7] Auth: Stable link successful. Identity anchored.');
-                } catch (err: any) {
-                    // 3. COLLISION PATH: Account already exists. We must shift UIDs and rely on Migration.
-                    if (err.code === 'auth/credential-already-in-use' || err.code === 'auth/email-already-in-use') {
-                        console.warn('[Delta-7] Auth: Identity collision. Switching to existing anchor. Migration payload will be applied.');
-                        await signInWithPopup(auth, provider);
-                    } else {
-                        throw err;
-                    }
-                }
-            } else {
-                // Not anonymous (already anchored or something else), just sign in normally
-                await signInWithPopup(auth, provider);
-            }
-        } finally {
-            setIsAuthorizing(false);
-        }
-    };
-
-    const signInWithEmail = async (email: string, pass: string) => {
-        // NOTE: In Delta-7, we don't 'Sign In' to upgrade. We 'Link'.
-        // If a user is already anonymous and tries to "Login", we should ask them to Merge?
-        // For now, if they are anonymous, we treat "Login" as an attempt to switch to an existing account.
-        setIsAuthorizing(true);
-        try {
-            if (auth.currentUser?.isAnonymous) {
-                console.log('[Delta-7] Auth: Login requested during anonymous session. Attempting switch...');
-            }
-            await signInWithEmailAndPassword(auth, email, pass);
-        } finally {
-            setIsAuthorizing(false);
-        }
-    };
-
-    const signUpWithEmail = async (email: string, pass: string) => {
-        setIsAuthorizing(true);
-        try {
-            const credential = EmailAuthProvider.credential(email, pass);
-
-            if (auth.currentUser?.isAnonymous) {
-                try {
-                    console.log('[Delta-7] Auth: Attempting STABLE EMAIL LINK...');
-                    await linkWithCredential(auth.currentUser, credential);
-                    console.log('[Delta-7] Auth: Stable email link successful.');
-                } catch (err: any) {
-                    // Collision during signup usually means "User already exists", so we sign in instead
-                    if (err.code === 'auth/email-already-in-use' || err.code === 'auth/credential-already-in-use') {
-                        console.warn('[Delta-7] Auth: Email collision during anchor establishment. Switching to existing.');
-                        await signInWithEmailAndPassword(auth, email, pass);
-                    } else {
-                        throw err;
-                    }
-                }
-            } else {
-                await createUserWithEmailAndPassword(auth, email, pass);
-            }
+            console.log('[Delta-7] Initiating Google Authentication...');
+            await signInWithPopup(auth, provider);
         } finally {
             setIsAuthorizing(false);
         }
@@ -215,36 +133,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const logout = async () => {
         setIsAuthorizing(true);
         try {
-            await signOut(auth);
+            await auth.signOut();
+            console.log('[Delta-7] Soft logout initiated. Reverting to anonymous observer...');
+            // Re-sign in anonymously immediately to keep the session alive
+            await signInAnonymously(auth);
         } finally {
             setIsAuthorizing(false);
         }
     };
 
+    const value: AuthContextType = {
+        user,
+        loading,
+        isAdmin: user?.role === 'admin',
+        login,
+        signup,
+        loginWithGoogle,
+        logout,
+        ensureUser,
+        migrationPayload,
+        clearMigration,
+        isAuthorizing,
+        visitorId
+    };
+
     return (
-        <AuthContext.Provider value={{
-            user,
-            loading,
-            isAuthorizing,
-            isAdmin: user?.role === 'admin',
-            signInWithGoogle,
-            signInWithEmail,
-            signUpWithEmail,
-            logout,
-            ensureUser,
-            migrationPayload,
-            clearMigration,
-            setMigrationProgress
-        }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );
-};
-
-export const useAuth = () => {
-    const context = useContext(AuthContext);
-    if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
-    return context;
 };

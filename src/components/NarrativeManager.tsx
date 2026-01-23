@@ -456,7 +456,7 @@ export const NarrativeManager: React.FC = () => {
                                     <button
                                         onClick={() => {
                                             const imgs = [...(editingDay.images || [])];
-                                            imgs.push({ id: '', caption: '', placeholder: false });
+                                            imgs.push({ id: '', url: '', caption: '', placeholder: false });
                                             setEditingDay({ ...editingDay, images: imgs });
                                         }}
                                         className="text-[10px] text-emerald-600 font-bold hover:underline font-mono uppercase tracking-widest"

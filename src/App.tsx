@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { CoherenceProvider, useCoherence } from './context/CoherenceContext';
+import { useCoherence } from './hooks/useCoherence';
+import { CoherenceProvider } from './context/CoherenceContext';
 import { db } from './lib/firebase';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import type { DayLog } from './types/schema';
 import { Activity, Terminal, Volume2, VolumeX, Lock, Shield } from 'lucide-react';
-import { DebugPanel } from './components/DebugPanel';
 import { GlitchText } from './components/GlitchText';
 
 import { Fragment } from './components/Fragment';
@@ -12,12 +12,13 @@ import { ScreenEffects } from './components/ScreenEffects';
 import { BackgroundAtmosphere } from './components/BackgroundAtmosphere';
 import { EvidenceViewer } from './components/EvidenceViewer';
 import { Prologue } from './components/Prologue';
-import { soundEngine } from './lib/SoundEngine';
 import { AudioAtmosphere } from './components/AudioAtmosphere';
 import { AuthModal } from './components/AuthModal';
+import { useSound } from './hooks/useSound';
+import { DebugPanel } from './components/DebugPanel';
 import prologueData from './season1_prologues.json';
 
-const AUTO_PROGRESS_DELAY = 4000; // Slightly longer to allow reading through glitches
+const AUTO_PROGRESS_DELAY = 4000;
 const TYPING_SPEED = 30;
 const GLITCH_CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?/\\';
 
@@ -29,24 +30,22 @@ const LabInterface: React.FC = () => {
   const [selectedPrologue, setSelectedPrologue] = useState<string>('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // Sequencer state
   const [lines, setLines] = useState<string[]>([]);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isComplete, setIsComplete] = useState(false);
+  const { playClick, setMuted } = useSound();
 
   const autoProgressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const scoreRef = useRef(score);
 
-  // Keep scoreRef in sync
   useEffect(() => {
     scoreRef.current = score;
   }, [score]);
 
-  // Effect 1: Handle Prologue Setup when day changes
   useEffect(() => {
     if (loading) return;
     const fetchPrologue = async () => {
@@ -74,17 +73,14 @@ const LabInterface: React.FC = () => {
     };
 
     fetchPrologue();
-
-    // Reset state for new day
     setIsPrologueActive(true);
     setDayData(null);
     setLines([]);
     setCurrentLineIndex(0);
     setDisplayedText('');
     setIsComplete(false);
-  }, [currentDay]);
+  }, [currentDay, loading]);
 
-  // Effect 2: Real-time listener for day data
   useEffect(() => {
     if (isPrologueActive) return;
 
@@ -106,21 +102,16 @@ const LabInterface: React.FC = () => {
     return () => unsubscribe();
   }, [currentDay, isPrologueActive]);
 
-  // Effect 3: Sequence builder
   useEffect(() => {
     if (!dayData || isPrologueActive) return;
 
     const currentLog = dayData.vm_logs?.[state] || dayData.vm_logs?.['FEED_STABLE'];
     const logBody = currentLog?.body || '';
-    // Split by period followed by space, or by double newline.
-    // We replace the period/delimiter with a marker to split while keeping the delimiter.
     const newLines = logBody
       .replace(/([.!?])\s+/g, "$1|")
       .split("|")
       .filter(l => l.trim() !== '');
 
-    // Only reset if the content for the current state actually changed
-    // This prevents jarring resets when other states or images are edited
     const currentLinesJoined = lines.join('|');
     const newLinesJoined = newLines.join('|');
 
@@ -131,7 +122,6 @@ const LabInterface: React.FC = () => {
       setIsComplete(false);
     }
 
-    // Trigger "glitch" transition visual feedback
     const interface_el = document.querySelector('.scanlines');
     if (interface_el) {
       interface_el.classList.add('glitch-intense');
@@ -139,7 +129,6 @@ const LabInterface: React.FC = () => {
     }
   }, [state, dayData, isPrologueActive, lines]);
 
-  // Progression logic
   const moveToNextLine = useCallback(() => {
     if (autoProgressTimer.current) clearTimeout(autoProgressTimer.current);
 
@@ -157,11 +146,9 @@ const LabInterface: React.FC = () => {
     setDisplayedText(lines[currentLineIndex]);
     setIsTyping(false);
 
-    // Dynamic delay: Silence between lines feels longer as coherence drops
     const currentScore = scoreRef.current;
     const dynamicDelay = AUTO_PROGRESS_DELAY + (100 - currentScore) * 40;
 
-    // Start auto-progress timer
     if (currentLineIndex < lines.length - 1) {
       autoProgressTimer.current = setTimeout(moveToNextLine, dynamicDelay);
     } else {
@@ -169,11 +156,7 @@ const LabInterface: React.FC = () => {
     }
   }, [lines, currentLineIndex, moveToNextLine]);
 
-
-
-  // Stabilize prologue finish callback to prevent re-renders in child
   const handlePrologueComplete = useCallback(async () => {
-    console.log('[Delta-7] Prologue stabilized. Inducing witness identity...');
     try {
       await ensureUser();
     } catch (err) {
@@ -182,7 +165,6 @@ const LabInterface: React.FC = () => {
     setIsPrologueActive(false);
   }, [ensureUser]);
 
-  // Auto-progress timer for ambient feel
   useEffect(() => {
     if (isPrologueActive || isComplete || dataLoading || !dayData) return;
 
@@ -190,38 +172,18 @@ const LabInterface: React.FC = () => {
       if (!isTyping) {
         moveToNextLine();
       }
-    }, 12000); // Progress every 12s if nothing manual happens
+    }, 12000);
 
     return () => clearInterval(timer);
   }, [isPrologueActive, isComplete, dataLoading, dayData, isTyping, moveToNextLine]);
 
-  // Handle automatic audio initialization on first user interaction
-  useEffect(() => {
-    const initAudio = () => {
-      soundEngine.init();
-      // Only need to do this once
-      window.removeEventListener('click', initAudio);
-      window.removeEventListener('keydown', initAudio);
-    };
 
-    window.addEventListener('click', initAudio);
-    window.addEventListener('keydown', initAudio);
-
-    return () => {
-      window.removeEventListener('click', initAudio);
-      window.removeEventListener('keydown', initAudio);
-    };
-  }, []);
-
-  // Typing effect
   useEffect(() => {
     if (lines.length === 0 || currentLineIndex >= lines.length || isComplete) return;
 
     const textToType = lines[currentLineIndex];
     let index = 0;
     setIsTyping(true);
-
-    // Capture score AT THE START of the sentence for stable timing
     const sentenceStartScore = scoreRef.current;
 
     const typeNextChar = () => {
@@ -229,7 +191,6 @@ const LabInterface: React.FC = () => {
         finishCurrentLine();
         return;
       }
-
       const char = textToType[index];
       const variance = sentenceStartScore < 60 ? Math.random() * (100 - sentenceStartScore) * 0.5 : 0;
       const glitchProbability = sentenceStartScore < 30 ? 0.15 : sentenceStartScore < 60 ? 0.05 : 0.01;
@@ -238,41 +199,23 @@ const LabInterface: React.FC = () => {
       if (isGlitch) {
         const randomChar = GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
         setDisplayedText(prev => prev + randomChar);
-        if (isAudioEnabled) soundEngine.playClick();
+        if (isAudioEnabled) playClick();
         setTimeout(() => {
           setDisplayedText(prev => prev.slice(0, -1) + char);
         }, TYPING_SPEED / 2);
       } else {
         setDisplayedText(prev => prev + char);
-        if (isAudioEnabled) soundEngine.playClick();
+        if (isAudioEnabled) playClick();
       }
-
       index++;
-
       const nextDelay = (sentenceStartScore < 40 ? TYPING_SPEED * 1.5 : TYPING_SPEED) + variance + (sentenceStartScore < 70 ? Math.random() * 20 : 0);
       typingTimer.current = setTimeout(typeNextChar, nextDelay);
     };
-
     typingTimer.current = setTimeout(typeNextChar, TYPING_SPEED);
-
     return () => {
       if (typingTimer.current) clearTimeout(typingTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLineIndex, lines, finishCurrentLine, isComplete]);
-
-  // Debug visibility
-  useEffect(() => {
-    if (user) {
-      console.log('[Delta-7] Anchor Visibility Check:', {
-        day: currentDay,
-        anchored: isAnchored,
-        anonymous: user.isAnonymous,
-        uid: user.uid.slice(0, 8),
-        visible: (currentDay >= 30 || isAdmin || isAnchored || !user.isAnonymous)
-      });
-    }
-  }, [currentDay, isAdmin, isAnchored, user]);
+  }, [currentLineIndex, lines, finishCurrentLine, isComplete, isAudioEnabled]);
 
   if (loading) {
     return (
@@ -282,20 +225,11 @@ const LabInterface: React.FC = () => {
     );
   }
 
-  // Refined penalties: Less blur, higher minimum opacity
   const blurAmount = Math.min(0.8, Math.max(0, (100 - score) / 80));
   const opacityAmount = Math.max(0.7, score / 100);
 
-  // Variable Logic
-  // @ts-ignore
-  const flickerDelay = dayData?.variables?.flicker || 1;
-  // @ts-ignore
-  const driftIntensity = dayData?.variables?.drift || 1;
-
-  // Use live score for visual effects
   const glitchClass = score < 20 ? 'glitch-heavy' : score < 70 ? 'glitch-subtle' : '';
   const scanlineClass = score < 50 ? 'scanlines-active' : '';
-  const driftClass = driftIntensity > 1 ? 'animate-drift-screen' : '';
 
   return (
     <>
@@ -309,13 +243,12 @@ const LabInterface: React.FC = () => {
       {isAudioEnabled && <AudioAtmosphere />}
 
       <div
-        className={`relative min-h-screen w-full bg-lab-black text-signal-green font-mono scanlines p-4 sm:p-8 flex flex-col transition-colors duration-1000 overflow-x-hidden ${glitchClass} ${scanlineClass} ${driftClass}`}
+        className={`relative min-h-screen w-full bg-lab-black text-signal-green font-mono scanlines p-4 sm:p-8 flex flex-col transition-colors duration-1000 overflow-x-hidden ${glitchClass} ${scanlineClass}`}
       >
         <div className="fixed inset-0 z-0 opacity-0 sm:opacity-100" />
         <BackgroundAtmosphere score={score} />
-        <ScreenEffects flickerLevel={flickerDelay} driftLevel={driftIntensity} />
+        <ScreenEffects flickerLevel={1} driftLevel={1} />
 
-        {/* Header */}
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-signal-green/30 pb-4 mb-4 sm:mb-8 select-none relative z-10">
           <div className="flex items-center gap-4 w-full sm:w-auto">
             <Terminal size={24} className="text-signal-green shrink-0" />
@@ -328,13 +261,12 @@ const LabInterface: React.FC = () => {
                 onClick={() => {
                   const newState = !isAudioEnabled;
                   setIsAudioEnabled(newState);
-                  soundEngine.setMuted(!newState);
+                  setMuted(!newState);
                 }}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all duration-300 border ${isAudioEnabled
                   ? 'border-signal-green text-signal-green bg-signal-green/5 opacity-100 shadow-[0_0_10px_rgba(20,184,166,0.1)]'
                   : 'border-white/10 text-white/30 hover:border-white/30 hover:text-white/60 bg-white/5'
                   }`}
-                title={isAudioEnabled ? "Silence Feed" : "Initialize Audio"}
               >
                 {isAudioEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
                 <span className="text-[10px] font-mono tracking-[0.2em] uppercase hidden sm:inline">
@@ -346,8 +278,6 @@ const LabInterface: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={async () => {
-                      // ENSURE_IDENTITY: Before showing the anchor interface, we must
-                      // guarantee a session exists (anonymous or otherwise) to allow linking.
                       try {
                         await ensureUser();
                         setIsAuthModalOpen(true);
@@ -359,7 +289,6 @@ const LabInterface: React.FC = () => {
                       ? 'bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
                       : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20 animate-pulse-gentle'
                       }`}
-                    title={isAnchored ? "Connection Stable" : "Establish Anchor"}
                   >
                     {isAnchored ? (
                       <Shield size={14} className="drop-shadow-[0_0_2px_rgba(16,185,129,1)]" />
@@ -367,12 +296,6 @@ const LabInterface: React.FC = () => {
                       <Lock size={14} />
                     )}
                   </button>
-                  {/* DIAGNOSTIC COMPONENT: Only visible if isAnchored is true to confirm state */}
-                  {isAnchored && (
-                    <span className="text-[8px] text-emerald-500/40 font-mono uppercase tracking-tighter hidden lg:inline">
-                      [ANCHOR_LOCKED]
-                    </span>
-                  )}
                 </div>
               )}
             </div>
@@ -397,12 +320,7 @@ const LabInterface: React.FC = () => {
           </div>
         </header>
 
-        {/* Main Display */}
         <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full relative z-10">
-          <div className="absolute top-0 left-0 text-[10px] text-signal-green/20 select-none">
-            FEED_07_VM5_COH:{score}
-          </div>
-
           <div
             className="mt-8 sm:mt-12 transition-all duration-700"
             style={{
@@ -445,51 +363,19 @@ const LabInterface: React.FC = () => {
                       ))}
                   </div>
                 )}
-
-                {isComplete && (
-                  <div className="pt-8 sm:pt-12 text-center select-none">
-                    <span className="text-signal-green/30 text-[10px] animate-pulse">
-                      --- END OF TRANSMISSION ---
-                    </span>
-                  </div>
-                )}
               </div>
             )}
           </div>
         </main>
-
-        <footer className="mt-8 pt-4 border-t border-signal-green/10 flex flex-col sm:flex-row justify-between gap-2 text-[10px] text-signal-green/30 select-none relative z-10">
-          <div>DELTA-7_LAB_ENV: PROXIMITY_LOCK_ACTIVE</div>
-          <div className="sm:text-right">OBSERVER_RECORD: {user?.uid.slice(0, 8)}...</div>
-        </footer>
       </div>
 
-      {/* Ghost Thoughts Layer - Higher than everything else, placed last in DOM */}
       <div className="fixed inset-0 pointer-events-none z-[9999]">
         {!dataLoading && dayData?.fragments?.map((frag, idx) => {
-          // EXCLUSIVE STATE CYCLING:
-          // 1. Check if ANY fragment in the list matches the current state exactly
           const hasExactMatch = dayData.fragments.some(f => f.severity === state);
-
-          // 2. If an exact match exists, only show fragments matching that state
-          // 3. If no exact match exists, fallback to displaying the first fragment (legacy/original support)
-          const isCorrectState = hasExactMatch
-            ? frag.severity === state
-            : idx === 0;
-
-          // STAGGERED MANIFESTATION:
-          // For a natural feel, we still use reading progress thresholds
+          const isCorrectState = hasExactMatch ? frag.severity === state : idx === 0;
           const triggerThreshold = (idx + 1) * 0.12;
           const logProgress = lines.length > 0 ? (currentLineIndex + 1) / lines.length : 0;
-
-          // Immediate manifestation if it's an exact state match (for testing/responsive feedback)
-          // or if the progress threshold is met (for visitor immersion)
-          const isManifested = (hasExactMatch && isCorrectState) || logProgress >= triggerThreshold || isComplete;
-
-          const isVisible = isCorrectState && isManifested;
-
-          // DIAGNOSTIC_TAP: Log lifecycle for every fragment to the console
-          console.debug(`[Ghost_Trace] ID:${frag.id} | State:${state} | Need:${frag.severity || 'DEFAULT'} | Match:${isCorrectState} | FinalVisible:${isVisible}`);
+          const isVisible = isCorrectState && (logProgress >= triggerThreshold || isComplete);
 
           return (
             <Fragment
@@ -508,6 +394,8 @@ const LabInterface: React.FC = () => {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
       />
+
+      <DebugPanel />
     </>
   );
 };
@@ -528,17 +416,12 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public Lab Feed */}
           <Route path="/" element={
             <CoherenceProvider>
               <LabInterface />
-              <DebugPanel />
             </CoherenceProvider>
           } />
-
-          {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLogin />} />
-
           <Route path="/admin" element={<ProtectedRoute />}>
             <Route element={<AdminLayout />}>
               <Route index element={<DashboardOverview />} />
@@ -546,7 +429,6 @@ function App() {
               <Route path="prologues" element={<PrologueManager />} />
               <Route path="narrative" element={<NarrativeReader />} />
               <Route path="observers" element={<ObserverDirectory />} />
-              {/* Future admin routes will go here */}
             </Route>
           </Route>
         </Routes>

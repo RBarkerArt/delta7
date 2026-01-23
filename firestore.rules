@@ -4,12 +4,31 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Helper function to check if user is admin
     function isAdmin() {
-      return request.auth != null && request.auth.token.role == 'admin';
+      return request.auth != null && (
+        request.auth.token.role == 'admin' || 
+        request.auth.token.email == 'robert.barker2008@gmail.com'
+      );
     }
 
-    // Allow anonymous and authenticated users to manage their own progress
+    // Helper to check if current user owns this visitorId
+    function isVisitorOwner(visitorId) {
+      return request.auth != null && 
+        get(/databases/$(database)/documents/firebase_uid_mapping/$(request.auth.uid)).data.visitorId == visitorId;
+    }
+
+    // Legacy users collection (preserved for admin settings and backward compatibility)
     match /users/{userId} {
       allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+    }
+
+    // New dual-identity observers collection
+    match /observers/{visitorId} {
+      allow read, write: if isAdmin() || isVisitorOwner(visitorId);
+    }
+
+    // Lookup table for mapping Firebase UID to Visitor ID
+    match /firebase_uid_mapping/{firebaseUid} {
+      allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == firebaseUid);
     }
     
     // Narrative content: Public read, Admin write

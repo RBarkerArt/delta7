@@ -1,89 +1,47 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import type { CoherenceState } from '../types/schema';
+import { GlitchText } from './GlitchText';
 
 interface FragmentProps {
     id: string;
     body: string;
     severity: CoherenceState;
     coherenceScore: number;
-    isVisible?: boolean;
+    isVisible: boolean;
 }
 
-export const Fragment: React.FC<FragmentProps> = ({ body, isVisible = true }) => {
-    // Initial random positions and velocities
-    const [pos, setPos] = useState({
-        x: 20 + Math.random() * 60,
-        y: 20 + Math.random() * 60
-    });
+export const Fragment: React.FC<FragmentProps> = ({ body, severity, coherenceScore, isVisible }) => {
+    // Lazy initializer is pure-safe and avoids set-state-in-effect
+    const [pos] = useState(() => ({
+        x: 10 + Math.random() * 80,
+        y: 10 + Math.random() * 80
+    }));
 
-    const vel = useRef({
-        x: (Math.random() - 0.5) * 0.08, // Slightly faster, still slow
-        y: (Math.random() - 0.5) * 0.08
-    });
+    if (!isVisible) return null;
 
-    const requestRef = useRef<number>(0);
-    const boundary = 10; // 10% padding
-
-    const update = () => {
-        setPos(prev => {
-            let nextX = prev.x + vel.current.x;
-            let nextY = prev.y + vel.current.y;
-
-            // Bounce X
-            if (nextX <= boundary) {
-                nextX = boundary;
-                vel.current.x *= -1;
-            } else if (nextX >= 100 - boundary) {
-                nextX = 100 - boundary;
-                vel.current.x *= -1;
-            }
-
-            // Bounce Y
-            if (nextY <= boundary) {
-                nextY = boundary;
-                vel.current.y *= -1;
-            } else if (nextY >= 100 - boundary) {
-                nextY = 100 - boundary;
-                vel.current.y *= -1;
-            }
-
-            return { x: nextX, y: nextY };
-        });
-        requestRef.current = requestAnimationFrame(update);
-    };
-
-    useEffect(() => {
-        requestRef.current = requestAnimationFrame(update);
-        return () => cancelAnimationFrame(requestRef.current);
-    }, []); // Always run physics once mounted
-
-    // Opacity calculation based on distance from center (50, 50)
-    const distFromCenter = Math.sqrt(Math.pow(pos.x - 50, 2) + Math.pow(pos.y - 50, 2));
-    // Center is (50, 50). Max distance to any boundary point is roughly 40-56.
-    // We want it to be ~0.3 at distance 50, and 1.0 at distance 0.
-    const centerWeight = Math.max(0.2, 1 - (distFromCenter / 65));
-
-    // Combine trigger visibility with spatial opacity
-    const finalOpacity = isVisible ? centerWeight : 0;
+    // Ghost thoughts are more glitched when they appear
+    const displayOpacity = Math.max(0.1, (100 - coherenceScore) / 200);
 
     return (
         <div
-            className="absolute pointer-events-none select-none z-[999] transition-opacity duration-[1200ms] ease-in-out"
+            className="absolute transition-all duration-1000 pointer-events-none p-4 max-w-xs"
             style={{
                 left: `${pos.x}%`,
                 top: `${pos.y}%`,
-                transform: 'translate(-50%, -50%)',
-                opacity: finalOpacity,
-                width: 'max-content',
-                maxWidth: '240px'
+                opacity: displayOpacity,
+                transform: `translate(-50%, -50%)`,
             }}
         >
-            <div className="font-['EB_Garamond'] italic text-sm sm:text-lg text-white font-medium tracking-wide leading-relaxed drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
-                {body}
+            <div className={`p-4 rounded-xl backdrop-blur-sm border ${severity === 'CRITICAL_INTERFERENCE' ? 'bg-red-950/10 border-red-900/20 text-red-400' :
+                    'bg-emerald-950/10 border-emerald-900/20 text-emerald-400'
+                }`}>
+                <div className="text-[10px] font-mono uppercase tracking-widest opacity-40 mb-2">Memory_Leak::{severity}</div>
+                <GlitchText
+                    text={body}
+                    coherenceScore={coherenceScore}
+                    className="text-sm italic font-mono leading-relaxed"
+                />
             </div>
-
-            {/* Subtle positioning indicator/ghostly light */}
-            <div className="absolute -inset-4 bg-white/10 blur-2xl -z-10 rounded-full" />
         </div>
     );
 };
