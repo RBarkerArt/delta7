@@ -128,7 +128,9 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     lastSeenAt: Timestamp.now()
                 };
 
-                if (!isAdminRole && !currentUser.isAnonymous && !data.isAnchored) {
+                // FIX: Only sync "Anchored" state if the user actually has a Linked Provider (Google/Email).
+                // Custom Tokens (Access Codes) make !isAnonymous true, but shouldn't trigger Anchoring.
+                if (!isAdminRole && hasProvider && !data.isAnchored) {
                     console.log('[Delta-7] Syncing anchored identity to persistent record...');
                     updates.isAnchored = true;
                     updates.anchoredFirebaseUid = currentUser.uid;
