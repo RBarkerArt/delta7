@@ -1,6 +1,10 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HelmetProvider, Helmet } from 'react-helmet-async';
+import { initAppCheck } from './lib/appCheck';
 import { useCoherence } from './hooks/useCoherence';
 import { CoherenceProvider } from './context/CoherenceContext';
+import { AuthProvider } from './context/AuthContext';
 import { db } from './lib/firebase';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import type { DayLog } from './types/schema';
@@ -14,21 +18,33 @@ import { EvidenceViewer } from './components/EvidenceViewer';
 import { Prologue } from './components/Prologue';
 import { AudioAtmosphere } from './components/AudioAtmosphere';
 import { AuthModal } from './components/AuthModal';
+import { TuningInterface } from './components/TuningInterface'; // Project Signal
 import { useSound } from './hooks/useSound';
 import { DebugPanel } from './components/DebugPanel';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import prologueData from './season1_prologues.json';
+
+// Lazy Load Admin Components (7.2 Payload Hygiene)
+const AdminLogin = lazy(() => import('./components/AdminLogin').then(m => ({ default: m.AdminLogin })));
+const AdminLayout = lazy(() => import('./components/AdminLayout').then(m => ({ default: m.AdminLayout })));
+const DashboardOverview = lazy(() => import('./components/DashboardOverview').then(m => ({ default: m.DashboardOverview })));
+const NarrativeManager = lazy(() => import('./components/NarrativeManager').then(m => ({ default: m.NarrativeManager })));
+const PrologueManager = lazy(() => import('./components/PrologueManager').then(m => ({ default: m.PrologueManager })));
+const ObserverDirectory = lazy(() => import('./components/ObserverDirectory').then(m => ({ default: m.ObserverDirectory })));
+const NarrativeReader = lazy(() => import('./components/NarrativeReader').then(m => ({ default: m.NarrativeReader })));
 
 const AUTO_PROGRESS_DELAY = 4000;
 const TYPING_SPEED = 30;
 const GLITCH_CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?/\\';
 
 const LabInterface: React.FC = () => {
-  const { score, state, loading, user, currentDay, isAnchored, isAdmin, ensureUser } = useCoherence();
+  const { score, state, loading, currentDay, isAnchored, ensureUser, accessCode } = useCoherence();
   const [dayData, setDayData] = useState<DayLog | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [isPrologueActive, setIsPrologueActive] = useState(true);
   const [selectedPrologue, setSelectedPrologue] = useState<string>('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isTuningOpen, setIsTuningOpen] = useState(false);
 
   const [lines, setLines] = useState<string[]>([]);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
@@ -220,7 +236,7 @@ const LabInterface: React.FC = () => {
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-lab-black text-signal-green font-mono">
-        <div className="animate-pulse">{">"} INITIALIZING FEED...</div>
+        {/* Silent loading to prioritize Prologue */}
       </div>
     );
   }
@@ -250,13 +266,48 @@ const LabInterface: React.FC = () => {
         <ScreenEffects flickerLevel={1} driftLevel={1} />
 
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-signal-green/30 pb-4 mb-4 sm:mb-8 select-none relative z-10">
-          <div className="flex items-center gap-4 w-full sm:w-auto">
-            <Terminal size={24} className="text-signal-green shrink-0" />
-            <div className="min-w-0 flex items-center gap-3">
-              <div className={`text-sm sm:text-base font-bold truncate ${score < 30 ? 'text-decay-red' : 'text-signal-green'}`}>
-                <GlitchText text={state} coherenceScore={score} />
-              </div>
 
+          {/* LEFT SIDE: Frequency, User, Audio */}
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <div className="flex items-center gap-3">
+              {/* 1. Frequency Input/Display (Highlighted & Pulsing) */}
+              <button
+                onClick={() => setIsTuningOpen(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-all duration-300 border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 animate-pulse-gentle group"
+              >
+                <span className="text-[10px] font-mono tracking-[0.2em] uppercase group-hover:text-emerald-400 transition-colors">
+                  {accessCode ? `FREQ:${accessCode}` : 'TUNING...'}
+                </span>
+              </button>
+
+              {/* 2. User Icon (Lock/Shield) */}
+              {(isAnchored || currentDay >= 28) && (
+                <button
+                  onClick={async () => {
+                    if (isAnchored) return; // Already secured
+                    try {
+                      await ensureUser();
+                      setIsAuthModalOpen(true);
+                    } catch (err) {
+                      console.error('[Delta-7] Auth: Pre-synchronization failure:', err);
+                    }
+                  }}
+                  className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-1000 group hover:scale-110 ${isAnchored
+                    ? 'bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)] cursor-default'
+                    : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20 animate-pulse-gentle cursor-pointer'
+                    }`}
+                  aria-label={isAnchored ? "Connection Secured" : "Authenticate Session"}
+                  disabled={isAnchored}
+                >
+                  {isAnchored ? (
+                    <Shield size={14} className="drop-shadow-[0_0_2px_rgba(16,185,129,1)]" />
+                  ) : (
+                    <Lock size={14} /> // Blinking Lock for Day 28+
+                  )}
+                </button>
+              )}
+
+              {/* 3. Audio Control (Dimmed/Subtle) */}
               <button
                 onClick={() => {
                   const newState = !isAudioEnabled;
@@ -264,58 +315,46 @@ const LabInterface: React.FC = () => {
                   setMuted(!newState);
                 }}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all duration-300 border ${isAudioEnabled
-                  ? 'border-signal-green text-signal-green bg-signal-green/5 opacity-100 shadow-[0_0_10px_rgba(20,184,166,0.1)]'
-                  : 'border-white/10 text-white/30 hover:border-white/30 hover:text-white/60 bg-white/5'
-                  }`}
+                  ? 'border-emerald-900/40 text-emerald-700/60 bg-emerald-900/5'
+                  : 'border-white/5 text-white/20 bg-white/5'
+                  } hover:border-emerald-500/30 hover:text-emerald-500/50`}
+                aria-label={isAudioEnabled ? "Mute Audio" : "Enable Audio"}
               >
                 {isAudioEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
                 <span className="text-[10px] font-mono tracking-[0.2em] uppercase hidden sm:inline">
-                  {isAudioEnabled ? 'Audio_Active' : 'Audio_Offline'}
+                  {isAudioEnabled ? 'AUDIO_ON' : 'AUDIO_OFF'}
                 </span>
               </button>
-
-              {(currentDay >= 30 || isAdmin || isAnchored || (user && !user.isAnonymous)) && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={async () => {
-                      try {
-                        await ensureUser();
-                        setIsAuthModalOpen(true);
-                      } catch (err) {
-                        console.error('[Delta-7] Auth: Pre-synchronization failure:', err);
-                      }
-                    }}
-                    className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-1000 group hover:scale-110 ${isAnchored
-                      ? 'bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                      : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20 animate-pulse-gentle'
-                      }`}
-                  >
-                    {isAnchored ? (
-                      <Shield size={14} className="drop-shadow-[0_0_2px_rgba(16,185,129,1)]" />
-                    ) : (
-                      <Lock size={14} />
-                    )}
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-1 w-full sm:w-64">
-            <div className="flex justify-between items-end w-full px-1">
-              <span className={`text-[9px] uppercase tracking-widest animate-pulse ${score < 100 ? 'opacity-40' : 'opacity-0'}`}>
-                {score < 100 ? 'STABILIZING...' : ''}
-              </span>
-              <span className="text-[10px] text-signal-green/50">
-                {(score).toFixed(1)}%
-              </span>
+          {/* RIGHT SIDE: Feed Status (Terminal) + Coherence Bar */}
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 w-full sm:w-auto">
+            {/* Feed Status Moved Here */}
+            <div className="flex items-center gap-2 order-last sm:order-first">
+              <Terminal size={20} className="text-signal-green shrink-0" />
+              <div className={`text-sm sm:text-base font-bold truncate ${score < 30 ? 'text-decay-red' : 'text-signal-green'}`}>
+                <GlitchText text={state} coherenceScore={score} />
+              </div>
             </div>
-            <div className="w-full h-1.5 bg-lab-gray border border-signal-green/10 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-[3000ms] linear ${score > 70 ? 'bg-signal-green' : score > 30 ? 'bg-signal-amber' : 'bg-decay-red'
-                  }`}
-                style={{ width: `${score}%` }}
-              />
+
+            {/* Coherence Bar Container */}
+            <div className="flex flex-col items-end gap-1 w-full sm:w-64">
+              <div className="flex justify-between items-end w-full px-1">
+                <span className={`text-[9px] uppercase tracking-widest animate-pulse ${score < 100 ? 'opacity-40' : 'opacity-0'}`}>
+                  {score < 100 ? 'STABILIZING...' : ''}
+                </span>
+                <span className="text-[10px] text-signal-green/50">
+                  {(score).toFixed(1)}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-lab-gray border border-signal-green/10 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-[3000ms] linear ${score > 70 ? 'bg-signal-green' : score > 30 ? 'bg-signal-amber' : 'bg-decay-red'
+                    }`}
+                  style={{ width: `${score}%` }}
+                />
+              </div>
             </div>
           </div>
         </header>
@@ -395,45 +434,74 @@ const LabInterface: React.FC = () => {
         onClose={() => setIsAuthModalOpen(false)}
       />
 
+      <TuningInterface
+        isOpen={isTuningOpen}
+        onClose={() => setIsTuningOpen(false)}
+      />
+
       <DebugPanel />
     </>
   );
 };
 
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { AdminLogin } from './components/AdminLogin';
-import { AdminLayout } from './components/AdminLayout';
-import { DashboardOverview } from './components/DashboardOverview';
-import { NarrativeManager } from './components/NarrativeManager';
-import { PrologueManager } from './components/PrologueManager';
-import { ObserverDirectory } from './components/ObserverDirectory';
-import { NarrativeReader } from './components/NarrativeReader';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { WifiOff } from 'lucide-react';
 
 function App() {
+  const isOnline = useOnlineStatus();
+
+  useEffect(() => {
+    initAppCheck();
+  }, []);
+
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={
-            <CoherenceProvider>
-              <LabInterface />
-            </CoherenceProvider>
-          } />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin" element={<ProtectedRoute />}>
-            <Route element={<AdminLayout />}>
-              <Route index element={<DashboardOverview />} />
-              <Route path="logs" element={<NarrativeManager />} />
-              <Route path="prologues" element={<PrologueManager />} />
-              <Route path="narrative" element={<NarrativeReader />} />
-              <Route path="observers" element={<ObserverDirectory />} />
-            </Route>
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <GlobalErrorBoundary>
+      <AuthProvider>
+        <HelmetProvider>
+          <Helmet>
+            {/* 8.2 Dynamic Metadata: Default Tags */}
+            <title>Delta-7: Coherence Protocol</title>
+            <meta name="description" content="Secure communication terminal for the Delta-7 coherence project." />
+          </Helmet>
+
+          {!isOnline && (
+            <div className="fixed top-0 left-0 right-0 z-[10000] bg-red-600 text-white text-[10px] font-mono font-bold text-center py-1 flex items-center justify-center gap-2 animate-pulse">
+              <WifiOff size={10} />
+              OFFLINE_MODE_ACTIVE // CONNECTIVITY_LOST
+            </div>
+          )}
+
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={
+                <CoherenceProvider>
+                  <LabInterface />
+                </CoherenceProvider>
+              } />
+              <Route path="/admin/login" element={
+                <Suspense fallback={<div className="text-signal-green p-4 font-mono">LOADING_AUTH_MODULE...</div>}>
+                  <AdminLogin />
+                </Suspense>
+              } />
+              <Route path="/admin" element={<ProtectedRoute />}>
+                <Route element={
+                  <Suspense fallback={<div className="text-signal-green p-4 font-mono">LOADING_ADMIN_CORE...</div>}>
+                    <AdminLayout />
+                  </Suspense>
+                }>
+                  <Route index element={<DashboardOverview />} />
+                  <Route path="logs" element={<NarrativeManager />} />
+                  <Route path="prologues" element={<PrologueManager />} />
+                  <Route path="narrative" element={<NarrativeReader />} />
+                  <Route path="observers" element={<ObserverDirectory />} />
+                </Route>
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </HelmetProvider>
+      </AuthProvider>
+    </GlobalErrorBoundary>
   );
 }
 

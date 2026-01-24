@@ -5,6 +5,7 @@ import { db } from '../lib/firebase';
 import type { UserProgress, CoherenceState } from '../types/schema';
 import { useAuth } from '../hooks/useAuth';
 import { CoherenceContext, type CoherenceContextType } from './contexts';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 const DECAY_MS = 6 * 60 * 60 * 1000;
 const DEFAULT_DECAY = 5;
@@ -32,6 +33,7 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const [currentDay, setCurrentDayState] = useState<number>(1);
     const [isAdmin, setIsAdmin] = useState(false);
     const [isAnchored, setIsAnchored] = useState(false);
+    const [accessCode, setAccessCode] = useState<string | null>(null);
 
     const userProgressRef = useRef<UserProgress | null>(null);
     const initializationLockRef = useRef<string | null>(null);
@@ -61,15 +63,24 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const idTokenResult = await currentUser.getIdTokenResult();
             const isAdminRole = idTokenResult.claims.role === 'admin' || currentUser.email === ADMIN_EMAIL;
             setIsAdmin(isAdminRole);
-            setIsAnchored(!currentUser.isAnonymous);
+
+            // PROJECT SIGNAL REFINEMENT:
+            // "Anchored" now means explicitly linked to a provider (Google/Email), NOT just "not anonymous".
+            // Custom Tokens (Access Codes) make isAnonymous=false, but we want to treat them as "Unanchored" for UI purposes until Day 28.
+            const hasProvider = currentUser.providerData.some(p => p.providerId === 'google.com' || p.providerId === 'password');
+            const anchored = hasProvider;
+            setIsAnchored(anchored);
 
             const collectionName = isAdminRole ? 'users' : 'observers';
             const docId = isAdminRole ? currentUser.uid : visitorId;
             const userRef = doc(db, collectionName, docId);
             const userDoc = await getDoc(userRef);
 
+            let retrievedCode: string | null = null;
+
             if (userDoc.exists()) {
-                const data = userDoc.data() as UserProgress;
+                const data = userDoc.data() as UserProgress & { accessCode?: string };
+                retrievedCode = data.accessCode || null;
 
                 // Handle decay & temporal progression
                 const lastSeen = (data.lastSeenAt || Timestamp.now()).toMillis();
@@ -82,25 +93,26 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 const totalDecay = decayUnits * decayPoints;
                 const finalScore = Math.max(0, data.coherenceScore - totalDecay);
 
-                // 2. Calculate Temporal Progress (Day)
-                // If not an admin, calculate day based on days elapsed since startDate
+                // 2. Calculate Temporal Progress (Day) - UTC Midnight Rollover
                 const storedDay = data.dayProgress || 1;
                 const msPerDay = 24 * 60 * 60 * 1000;
-                let calculatedDay = Math.floor((now - startDate) / msPerDay) + 1;
 
-                // CRITICAL: Trust the stored progress if it's ahead of the calculation
-                // (e.g. manual override via diagnostic tool). 
-                // We realign the startDate to make this manual reality persistent.
+                // Convert timestamps to UTC Midnight to count calendar days
+                const startMidnight = new Date(startDate).setUTCHours(0, 0, 0, 0);
+                const nowMidnight = new Date(now).setUTCHours(0, 0, 0, 0);
+                let calculatedDay = Math.floor((nowMidnight - startMidnight) / msPerDay) + 1;
+
                 let finalStartDate = data.startDate;
                 if (!isAdminRole) {
+                    // Logic Loop: If stored day (e.g. manual debug set) is ahead of calc day, respect it by shifting start date
                     if (storedDay > calculatedDay) {
                         console.log(`[Delta-7] Day override detected (${storedDay} vs ${calculatedDay}). Realigning temporal origin...`);
                         calculatedDay = storedDay;
-                        const alignedStartTime = now - (storedDay - 1) * msPerDay;
-                        finalStartDate = Timestamp.fromMillis(alignedStartTime);
+                        // Shift start date back to ensure calculation holds
+                        const newStartMillis = now - (storedDay - 1) * msPerDay;
+                        finalStartDate = Timestamp.fromMillis(newStartMillis);
                     }
 
-                    // Cap at 30 if not anchored
                     if (!data.isAnchored) {
                         calculatedDay = Math.min(calculatedDay, 30);
                     }
@@ -116,7 +128,6 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     lastSeenAt: Timestamp.now()
                 };
 
-                // Sync anchoring info if the user recently signed in but the doc isn't updated
                 if (!isAdminRole && !currentUser.isAnonymous && !data.isAnchored) {
                     console.log('[Delta-7] Syncing anchored identity to persistent record...');
                     updates.isAnchored = true;
@@ -163,6 +174,27 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 startDateRef.current = initial.startDate;
                 lastSyncRef.current = { score: 100, day: 1, time: Date.now() };
             }
+
+            // PROJECT SIGNAL: Assign Frequency if missing and user is Anonymous or Anchored
+            if (!retrievedCode && !isAdminRole) {
+                try {
+                    const functions = getFunctions();
+                    const assignFrequency = httpsCallable(functions, 'assignFrequency');
+                    console.log('[Delta-7] Generating signal frequency...');
+                    const result = await assignFrequency();
+                    const { code } = result.data as { code: string };
+                    if (code) {
+                        retrievedCode = code;
+                        // Optimistic update to avoid refetch
+                        await setDoc(userRef, { accessCode: code }, { merge: true });
+                    }
+                } catch (err) {
+                    console.error('[Delta-7] Frequency assignment failed:', err);
+                }
+            }
+
+            setAccessCode(retrievedCode);
+
         } finally {
             setLoading(false);
         }
@@ -173,8 +205,6 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             if (user) {
                 initializeUserProgress(user);
             } else {
-                // If no user is logged in, we still need to stop loading
-                // so the LabInterface can show the Prologue (which handles ensureUser)
                 setLoading(false);
             }
         }
@@ -209,18 +239,14 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const scoreDiff = Math.abs(currentScore - lastSyncRef.current.score);
             const timeSinceSync = now - lastSyncRef.current.time;
 
-            // Sync if score changed by > 0.5%, or 15 seconds passed, or day changed
             if (scoreDiff > 0.5 || timeSinceSync > 15000 || currentDayVal !== lastSyncRef.current.day) {
                 try {
-                    // Re-calculate identity paths to ensure we hit the right record
                     const idTokenResult = await user.getIdTokenResult();
                     const isAdminRole = idTokenResult.claims.role === 'admin' || user.email === ADMIN_EMAIL;
 
                     const collectionName = isAdminRole ? 'users' : 'observers';
                     const docId = isAdminRole ? user.uid : visitorId;
                     const userRef = doc(db, collectionName, docId);
-
-                    console.log(`[Delta-7] Syncing ${collectionName}/${docId}...`, currentScore.toFixed(1));
 
                     await updateDoc(userRef, {
                         coherenceScore: currentScore,
@@ -232,15 +258,14 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
                     lastSyncRef.current = { score: currentScore, day: currentDayVal, time: now };
                 } catch (err) {
-                    // Silently fail if session is stale or network is down
                     console.warn('[Delta-7] Coherence sync deferred:', err);
                 }
             }
         };
 
-        const interval = setInterval(syncProgress, 5000); // Check every 5s
+        const interval = setInterval(syncProgress, 5000);
         return () => clearInterval(interval);
-    }, [user, loading, visitorId]); // Only restart if user identity changes
+    }, [user, loading, visitorId]);
 
     const setScore = (val: number) => {
         setScoreState(val);
@@ -251,7 +276,6 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setCurrentDayState(val);
         currentDayRef.current = val;
 
-        // Manual override realigns the virtual startDate
         const msPerDay = 24 * 60 * 60 * 1000;
         const newStartTime = Date.now() - (val - 1) * msPerDay;
         startDateRef.current = Timestamp.fromMillis(newStartTime);
@@ -268,7 +292,8 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isAdmin,
         setScore,
         setCurrentDay,
-        ensureUser
+        ensureUser,
+        accessCode
     };
 
     return (

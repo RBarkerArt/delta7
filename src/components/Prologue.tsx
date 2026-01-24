@@ -6,7 +6,7 @@ interface PrologueProps {
 }
 
 export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete }) => {
-    const [phase, setPhase] = useState<'reveal' | 'hold' | 'fade-out' | 'initializing'>('reveal');
+    const [phase, setPhase] = useState<'reveal' | 'hold' | 'fade-out' | 'final-sequence'>('reveal');
 
     useEffect(() => {
         if (phase === 'reveal') {
@@ -20,12 +20,13 @@ export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete }) => {
         }
 
         if (phase === 'fade-out') {
-            const timer = setTimeout(() => setPhase('initializing'), 3000);
+            const timer = setTimeout(() => setPhase('final-sequence'), 3000);
             return () => clearTimeout(timer);
         }
 
-        if (phase === 'initializing') {
-            const timer = setTimeout(onComplete, 1500);
+        if (phase === 'final-sequence') {
+            // Show both texts for 3 seconds, then complete
+            const timer = setTimeout(onComplete, 3000);
             return () => clearTimeout(timer);
         }
     }, [phase, onComplete]);
@@ -34,7 +35,7 @@ export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete }) => {
         <div className="fixed inset-0 bg-lab-black z-[100] flex items-center justify-center p-8 sm:p-24 overflow-hidden">
             <div className={`
                 max-w-3xl w-full text-center transition-all duration-[4000ms] ease-in-out
-                ${(phase === 'fade-out' || phase === 'initializing') ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100'}
+                ${(phase === 'fade-out' || phase === 'final-sequence') ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100'}
                 animate-memory-float
             `}>
                 <div className={`
@@ -50,8 +51,11 @@ export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete }) => {
                 </div>
             </div>
 
-            {phase === 'initializing' && (
-                <div className="absolute inset-0 flex items-center justify-center">
+            {phase === 'final-sequence' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                    <div className="font-mono text-emerald-500 text-sm sm:text-base animate-pulse tracking-widest">
+                        FREQUENCY FOUND?: TUNING...
+                    </div>
                     <div className="font-mono text-signal-green text-sm sm:text-base animate-pulse">
                         {">"} INITIALIZING SCREEN...
                     </div>

@@ -13,33 +13,42 @@ interface FragmentProps {
 export const Fragment: React.FC<FragmentProps> = ({ body, severity, coherenceScore, isVisible }) => {
     // Lazy initializer is pure-safe and avoids set-state-in-effect
     const [pos] = useState(() => ({
-        x: 10 + Math.random() * 80,
-        y: 10 + Math.random() * 80
+        // Keep them a bit more centralized to avoid edge cropping
+        x: 15 + Math.random() * 70,
+        y: 20 + Math.random() * 60
     }));
 
     if (!isVisible) return null;
 
-    // Ghost thoughts are more glitched when they appear
-    const displayOpacity = Math.max(0.1, (100 - coherenceScore) / 200);
+    // Ghost thoughts should be more visible now
+    // Base 0.5 opacity + up to 0.5 more based on chaos
+    const displayOpacity = Math.max(0.5, 0.5 + ((100 - coherenceScore) / 200));
 
     return (
         <div
-            className="absolute transition-all duration-1000 pointer-events-none p-4 max-w-xs"
+            className="absolute transition-all duration-1000 pointer-events-none p-4 max-w-sm"
             style={{
                 left: `${pos.x}%`,
                 top: `${pos.y}%`,
                 opacity: displayOpacity,
                 transform: `translate(-50%, -50%)`,
+                zIndex: 50 // Ensure it floats above standard content
             }}
         >
-            <div className={`p-4 rounded-xl backdrop-blur-sm border ${severity === 'CRITICAL_INTERFERENCE' ? 'bg-red-950/10 border-red-900/20 text-red-400' :
-                    'bg-emerald-950/10 border-emerald-900/20 text-emerald-400'
-                }`}>
-                <div className="text-[10px] font-mono uppercase tracking-widest opacity-40 mb-2">Memory_Leak::{severity}</div>
+            <div className={`
+                p-6 rounded-xl backdrop-blur-md border animate-float shadow-lg
+                ${severity === 'CRITICAL_INTERFERENCE'
+                    ? 'bg-red-950/40 border-red-500/30 text-red-200 shadow-red-900/20'
+                    : 'bg-emerald-950/40 border-emerald-400/30 text-emerald-100 shadow-emerald-900/20'
+                }
+            `}>
+                <div className="flex items-center justify-between mb-2 opacity-70">
+                    <span className="text-[10px] font-mono uppercase tracking-widest">Memory_Leak::{severity}</span>
+                </div>
                 <GlitchText
                     text={body}
                     coherenceScore={coherenceScore}
-                    className="text-sm italic font-mono leading-relaxed"
+                    className="text-base italic font-['EB_Garamond'] leading-relaxed drop-shadow-md"
                 />
             </div>
         </div>

@@ -6,9 +6,14 @@ import {
     signInWithPopup,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
+    linkWithPopup,
+    linkWithCredential,
+    signInWithCustomToken,
+    EmailAuthProvider,
     type User
 } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getObserverSession, setObserverSession } from '../lib/visitor';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { AuthContext, type AuthContextType } from './contexts';
@@ -82,8 +87,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     }
                 }
 
-                // Set user AFTER identity anchoring to ensure downstream contexts 
-                // have the correct visitorId when they re-render.
                 setUser(authUser);
             } else {
                 setUser(null);
@@ -99,8 +102,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             if (auth.currentUser?.isAnonymous) {
                 console.log('[Delta-7] Anchoring anonymous session to Email identity...');
-                // We can't use linkWithPopup for email/pass usually without a credential
-                // But we can sign in and the onAuthStateChanged will handle the rest
                 await signInWithEmailAndPassword(auth, email, pass);
             } else {
                 await signInWithEmailAndPassword(auth, email, pass);
@@ -130,12 +131,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const anchorIdentity = useCallback(async (method: 'google' | 'email', payload?: any) => {
+        if (!auth.currentUser) throw new Error('No active session to anchor');
+        setIsAuthorizing(true);
+        try {
+            if (method === 'google') {
+                const provider = new GoogleAuthProvider();
+                console.log('[Delta-7] Anchoring: Linking anonymous session to Google...');
+                await linkWithPopup(auth.currentUser, provider);
+            } else if (method === 'email') {
+                const { email, password } = payload;
+                if (!email || !password) throw new Error('Missing credentials');
+                const credential = EmailAuthProvider.credential(email, password);
+                console.log('[Delta-7] Anchoring: Linking anonymous session to Email...');
+                await linkWithCredential(auth.currentUser, credential);
+            }
+
+            // Force token refresh
+            await auth.currentUser.getIdToken(true);
+            console.log('[Delta-7] Anchoring complete. Identity preserved.');
+        } catch (error: any) {
+            console.error('[Delta-7] Anchoring failed:', error);
+            if (error.code === 'auth/credential-already-in-use') {
+                throw new Error('This account is already linked. Please sign in (current progress will be replaced).');
+            }
+            throw error;
+        } finally {
+            setIsAuthorizing(false);
+        }
+    }, []);
+
+    const recoverSession = useCallback(async (code: string) => {
+        setIsAuthorizing(true);
+        try {
+            const functions = getFunctions();
+            const recoverSignal = httpsCallable(functions, 'recoverSignal');
+
+            console.log(`[Delta-7] Attempting signal recovery: ${code}`);
+            const result = await recoverSignal({ code });
+            const { token } = result.data as { token: string };
+
+            if (token) {
+                console.log('[Delta-7] Signal locked. Re-authenticating...');
+                await signInWithCustomToken(auth, token);
+            } else {
+                throw new Error('Signal degraded. timestamp_mismatch.');
+            }
+        } catch (error: any) {
+            console.error('Recovery failed:', error);
+            throw new Error('Signal recovery failed. Frequency invalid.');
+        } finally {
+            setIsAuthorizing(false);
+        }
+    }, []);
+
     const logout = async () => {
         setIsAuthorizing(true);
         try {
             await auth.signOut();
             console.log('[Delta-7] Soft logout initiated. Reverting to anonymous observer...');
-            // Re-sign in anonymously immediately to keep the session alive
             await signInAnonymously(auth);
         } finally {
             setIsAuthorizing(false);
@@ -154,7 +208,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         migrationPayload,
         clearMigration,
         isAuthorizing,
-        visitorId
+        visitorId,
+        anchorIdentity,
+        recoverSession
     };
 
     return (

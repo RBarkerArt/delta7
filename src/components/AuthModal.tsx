@@ -9,34 +9,49 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-    const { loginWithGoogle, login, signup, logout, user, isAuthorizing } = useAuth();
-    const [error, setError] = useState<string | null>(null);
+    const { login, signup, loginWithGoogle, anchorIdentity, logout, user, isAuthorizing } = useAuth();
+    const [mode, setMode] = useState<'login' | 'signup'>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [isSignup, setIsSignup] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleGoogleSignIn = async () => {
+    const isAnonymous = user?.isAnonymous;
+    const title = isAnonymous && mode === 'signup' ? 'ANCHOR IDENTITY' : (mode === 'login' ? 'AUTHENTICATE' : 'INITIALIZE');
+    const submitText = isAnonymous && mode === 'signup' ? 'ESTABLISH ANCHOR' : (mode === 'login' ? 'ACCESS' : 'REGISTER');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
         setError(null);
+
         try {
-            await loginWithGoogle();
+            if (mode === 'login') {
+                await login(email, password);
+            } else {
+                if (isAnonymous) {
+                    // Anchor Mode: Link existing anon session
+                    await anchorIdentity('email', { email, password });
+                } else {
+                    // Standard Signup
+                    await signup(email, password);
+                }
+            }
             onClose();
-        } catch (err: unknown) {
-            setError((err as Error).message);
+        } catch (err: any) {
+            setError(err.message || 'Authentication failed');
         }
     };
 
-    const handleEmailAuth = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleGoogleLogin = async () => {
         setError(null);
         try {
-            if (isSignup) {
-                await signup(email, password);
+            if (isAnonymous) {
+                await anchorIdentity('google');
             } else {
-                await login(email, password);
+                await loginWithGoogle();
             }
             onClose();
-        } catch (err: unknown) {
-            setError((err as Error).message);
+        } catch (err: any) {
+            setError(err.message || 'Google Auth failed');
         }
     };
 
@@ -57,7 +72,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-zinc-900 border border-emerald-900/30 p-8 rounded-2xl shadow-2xl z-[10001] focus:outline-none animate-scale-in">
                     <Dialog.Title className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
                         <Lock className="text-emerald-500" size={24} />
-                        Establish Anchor
+                        {title}
                     </Dialog.Title>
                     <Dialog.Description className="mt-4 text-zinc-400 font-mono text-sm leading-relaxed">
                         Anchor your current observation metrics to a persistent identity.
@@ -98,7 +113,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                         ) : (
                             <div className="space-y-4">
                                 <button
-                                    onClick={handleGoogleSignIn}
+                                    onClick={handleGoogleLogin}
                                     disabled={isAuthorizing}
                                     className="w-full flex items-center justify-between p-4 bg-white hover:bg-zinc-100 text-zinc-900 rounded-xl transition-all group disabled:opacity-50"
                                 >
@@ -120,7 +135,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                     </div>
                                 </div>
 
-                                <form onSubmit={handleEmailAuth} className="space-y-3">
+                                <form onSubmit={handleSubmit} className="space-y-3">
                                     <div className="space-y-1">
                                         <input
                                             type="email"
@@ -146,14 +161,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                                         disabled={isAuthorizing}
                                         className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-lab-black rounded-xl transition-all font-bold disabled:opacity-50"
                                     >
-                                        {isSignup ? 'Create Account' : 'Authenticate'}
+                                        {submitText}
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setIsSignup(!isSignup)}
+                                        onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
                                         className="w-full text-[10px] text-zinc-500 hover:text-emerald-500/70 font-mono uppercase tracking-widest transition-colors py-1"
                                     >
-                                        {isSignup ? 'Already anchored? Signal Login' : 'New Observer? Create Identity Anchor'}
+                                        {mode === 'login' ? 'New Observer? Create Identity Anchor' : 'Already anchored? Signal Login'}
                                     </button>
                                 </form>
                             </div>

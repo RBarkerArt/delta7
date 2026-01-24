@@ -16,6 +16,8 @@ export interface AuthContextType {
     clearMigration: () => void;
     isAuthorizing: boolean;
     visitorId: string | null;
+    anchorIdentity: (method: 'google' | 'email', payload?: any) => Promise<void>;
+    recoverSession: (code: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +33,7 @@ export interface CoherenceContextType {
     setScore: (score: number) => void;
     setCurrentDay: (day: number) => void;
     ensureUser: () => Promise<AuthUser>;
+    accessCode: string | null;
 }
 
 export const CoherenceContext = createContext<CoherenceContextType | undefined>(undefined);

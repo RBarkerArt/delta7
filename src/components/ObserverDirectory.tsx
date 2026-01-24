@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, orderBy, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, Timestamp, limit } from 'firebase/firestore';
 import type { UserProgress } from '../types/schema';
 import { Search, Loader2, User as UserIcon, Calendar, Activity, ShieldCheck, ShieldAlert } from 'lucide-react';
 
@@ -18,7 +18,7 @@ export const ObserverDirectory: React.FC = () => {
         const fetchObservers = async () => {
             try {
                 const obsRef = collection(db, 'observers');
-                const q = query(obsRef, orderBy('lastSeenAt', 'desc'));
+                const q = query(obsRef, orderBy('lastSeenAt', 'desc'), limit(50));
                 const querySnapshot = await getDocs(q);
 
                 const data = querySnapshot.docs.map(doc => ({
@@ -102,8 +102,8 @@ export const ObserverDirectory: React.FC = () => {
                                 <UserIcon className="text-emerald-600" size={24} />
                             </div>
                             <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors ${obs.isAnchored
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                    : 'bg-zinc-100 text-zinc-500 border-zinc-200'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                : 'bg-zinc-100 text-zinc-500 border-zinc-200'
                                 }`}>
                                 {obs.isAnchored ? 'Stable_Anchor' : 'Volatile_Trace'}
                             </div>
