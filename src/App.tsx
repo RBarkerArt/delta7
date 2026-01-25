@@ -284,7 +284,7 @@ const LabInterface: React.FC = () => {
               {(isAnchored || currentDay >= 28) && (
                 <button
                   onClick={async () => {
-                    if (isAnchored) return; // Already secured
+                    // if (isAnchored) return; // Removed to allow accessing Unlink/Logout menu
                     try {
                       await ensureUser();
                       setIsAuthModalOpen(true);
@@ -297,7 +297,6 @@ const LabInterface: React.FC = () => {
                     : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20 animate-pulse-gentle cursor-pointer'
                     }`}
                   aria-label={isAnchored ? "Connection Secured" : "Authenticate Session"}
-                  disabled={isAnchored}
                 >
                   {isAnchored ? (
                     <Shield size={14} className="drop-shadow-[0_0_2px_rgba(16,185,129,1)]" />

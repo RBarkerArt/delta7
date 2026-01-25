@@ -68,8 +68,7 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             // "Anchored" now means explicitly linked to a provider (Google/Email), NOT just "not anonymous".
             // Custom Tokens (Access Codes) make isAnonymous=false, but we want to treat them as "Unanchored" for UI purposes until Day 28.
             const hasProvider = currentUser.providerData.some(p => p.providerId === 'google.com' || p.providerId === 'password');
-            const anchored = hasProvider;
-            setIsAnchored(anchored);
+            // setIsAnchored(hasProvider); // MOVED: Late-bind this after DB sync to ensure consistency.
 
             const collectionName = isAdminRole ? 'users' : 'observers';
             const docId = isAdminRole ? currentUser.uid : visitorId;
@@ -128,14 +127,35 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     lastSeenAt: Timestamp.now()
                 };
 
-                // FIX: Only sync "Anchored" state if the user actually has a Linked Provider (Google/Email).
-                // Custom Tokens (Access Codes) make !isAnonymous true, but shouldn't trigger Anchoring.
-                if (!isAdminRole && hasProvider && !data.isAnchored) {
-                    console.log('[Delta-7] Syncing anchored identity to persistent record...');
-                    updates.isAnchored = true;
-                    updates.anchoredFirebaseUid = currentUser.uid;
-                    updates.email = currentUser.email || null;
+                // FIX: Bidirectional Sync for Anchored State
+                // The DB might be "poisoned" with isAnchored: true from the previous bug.
+                // We must ensure the DB reflects the TRUE reality of the Auth Providers.
+                if (!isAdminRole) {
+                    if (hasProvider && !data.isAnchored) {
+                        console.log('[Delta-7] Syncing anchored identity to persistent record (FALSE -> TRUE)...');
+                        updates.isAnchored = true;
+                        updates.anchoredFirebaseUid = currentUser.uid;
+                        updates.email = currentUser.email || null;
+                    } else if (!hasProvider && data.isAnchored) {
+                        console.log('[Delta-7] Correcting persistent anchored record (TRUE -> FALSE)...');
+                        // Fix for users who were accidentally marked as Anchored via Access Code
+                        updates.isAnchored = false;
+                        updates.anchoredFirebaseUid = null;
+                        updates.email = null;
+                    }
                 }
+
+                // Debug Log to help trace "Phantom Anchoring"
+                console.log('[Delta-7] Auth/Anchored State:', {
+                    uid: currentUser.uid,
+                    hasProvider,
+                    dbAnchored: data.isAnchored,
+                    finalAnchored: hasProvider,
+                    providers: currentUser.providerData
+                });
+
+                // Set UI state to match the final calculated reality
+                setIsAnchored(hasProvider);
 
                 setScoreState(finalScore);
                 setState(getCoherenceState(finalScore));

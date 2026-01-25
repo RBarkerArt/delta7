@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from '../hooks/useAuth';
+import { useCoherence } from '../hooks/useCoherence';
 import { X, Lock, Shield, ArrowRight, AlertTriangle } from 'lucide-react';
 
 interface AuthModalProps {
@@ -10,6 +11,9 @@ interface AuthModalProps {
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     const { login, signup, loginWithGoogle, anchorIdentity, logout, user, isAuthorizing } = useAuth();
+    // Use centralized anchoring logic which correctly handles Access Codes (Custom Tokens)
+    const { isAnchored } = useCoherence();
+
     const [mode, setMode] = useState<'login' | 'signup'>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -18,6 +22,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     const isAnonymous = user?.isAnonymous;
     const title = isAnonymous && mode === 'signup' ? 'ANCHOR IDENTITY' : (mode === 'login' ? 'AUTHENTICATE' : 'INITIALIZE');
     const submitText = isAnonymous && mode === 'signup' ? 'ESTABLISH ANCHOR' : (mode === 'login' ? 'ACCESS' : 'REGISTER');
+
+    // ... handlers ...
+
+    // FIX: Rely on centralized 'isAnchored' to determine UI state, NOT just !user.isAnonymous
+    const showAnchoredState = user && isAnchored;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -87,7 +96,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                             </div>
                         )}
 
-                        {user && !user.isAnonymous ? (
+                        {showAnchoredState ? (
                             <div className="p-6 bg-emerald-900/10 border border-emerald-900/20 rounded-xl text-center space-y-4 text-emerald-500 font-mono text-[10px] tracking-widest uppercase">
                                 <Shield className="mx-auto" size={48} />
                                 <div>
