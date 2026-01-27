@@ -17,7 +17,10 @@ export const auth = getAuth(app);
 
 // PERSISTENCE_ENFORCEMENT: Ensure sessions survive window/tab closure
 setPersistence(auth, browserLocalPersistence).catch(err => {
-    console.error('[Delta-7] Auth Persistence Error:', err);
+    if (import.meta.env.DEV) console.error('[Delta-7] Auth Persistence Error:', err);
 });
 
 export const db = getFirestore(app);
+
+import { getFunctions } from 'firebase/functions';
+export const functions = getFunctions(app);

@@ -81,5 +81,15 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // Access codes: Backend-only access via Admin SDK
+    // These are used for session recovery (Project Signal)
+    match /access_codes/{codeId} {
+      allow read, write: if false;  // Only Admin SDK can access
+    }
+    // System settings: Admin-only
+    match /system/{document=**} {
+      allow read, write: if isAdmin();
+    }
   }
 }

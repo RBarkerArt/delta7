@@ -30,6 +30,7 @@ export interface CoherenceContextType {
     currentDay: number;
     isAnchored: boolean;
     isAdmin: boolean;
+    isGlitching: boolean; // True during day transition animation
     setScore: (score: number) => void;
     setCurrentDay: (day: number) => void;
     ensureUser: () => Promise<AuthUser>;

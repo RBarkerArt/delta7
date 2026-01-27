@@ -405,3 +405,211 @@ body {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(16, 185, 129, 0.4);
 }
+
+/* ========== GLITCH OVERLAY EFFECTS ========== */
+
+/* Micro glitch - barely perceptible */
+.glitch-overlay-micro {
+  animation: glitch-micro 0.1s steps(2) forwards;
+}
+
+@keyframes glitch-micro {
+  0% { opacity: 0; }
+  50% { opacity: 0.02; background: rgba(51, 255, 0, 0.02); }
+  100% { opacity: 0; }
+}
+
+/* Medium glitch - noticeable jitter */
+.glitch-overlay-medium {
+  animation: glitch-medium 0.15s steps(3) forwards;
+}
+
+@keyframes glitch-medium {
+  0% { 
+    opacity: 0;
+    transform: translateX(0);
+  }
+  25% { 
+    opacity: 0.05; 
+    background: linear-gradient(90deg, transparent 0%, rgba(255,0,0,0.03) 50%, transparent 100%);
+    transform: translateX(-2px);
+  }
+  50% { 
+    opacity: 0.08;
+    background: linear-gradient(90deg, transparent 0%, rgba(0,255,0,0.05) 50%, transparent 100%);
+    transform: translateX(2px);
+  }
+  75% {
+    opacity: 0.03;
+    transform: translateX(-1px);
+  }
+  100% { 
+    opacity: 0;
+    transform: translateX(0);
+  }
+}
+
+/* Heavy glitch - screen disruption */
+.glitch-overlay-heavy {
+  animation: glitch-heavy 0.3s steps(5) forwards;
+}
+
+@keyframes glitch-heavy {
+  0% { 
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  20% { 
+    opacity: 0.15;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(51, 255, 0, 0.03) 2px,
+      rgba(51, 255, 0, 0.03) 4px
+    );
+    clip-path: inset(30% 0 40% 0);
+    transform: translateX(-4px) skewX(-2deg);
+  }
+  40% { 
+    opacity: 0.2;
+    clip-path: inset(60% 0 20% 0);
+    transform: translateX(4px) skewX(1deg);
+  }
+  60% {
+    opacity: 0.12;
+    clip-path: inset(10% 0 70% 0);
+    transform: translateX(-2px);
+  }
+  80% {
+    opacity: 0.08;
+    clip-path: inset(50% 0 30% 0);
+    transform: translateX(1px);
+  }
+  100% { 
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    transform: translateX(0);
+  }
+}
+
+/* Critical glitch - major interference */
+.glitch-overlay-critical {
+  animation: glitch-critical 0.5s steps(8) forwards;
+}
+
+@keyframes glitch-critical {
+  0% { 
+    opacity: 0;
+  }
+  10% { 
+    opacity: 0.25;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(255, 0, 0, 0.1) 20%,
+      transparent 25%,
+      rgba(0, 255, 0, 0.15) 50%,
+      transparent 55%,
+      rgba(0, 0, 255, 0.1) 80%,
+      transparent 100%
+    );
+    filter: blur(1px);
+    transform: scale(1.002) translateX(-3px);
+  }
+  25% {
+    opacity: 0.3;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 1px,
+      rgba(255, 255, 255, 0.05) 1px,
+      rgba(255, 255, 255, 0.05) 2px
+    );
+    transform: scale(1.001) translateX(5px) skewX(-1deg);
+  }
+  40% {
+    opacity: 0.2;
+    filter: blur(2px) brightness(1.1);
+    transform: translateX(-4px) skewY(0.5deg);
+  }
+  60% {
+    opacity: 0.35;
+    filter: blur(0.5px) saturate(1.5);
+    transform: translateX(3px);
+  }
+  75% {
+    opacity: 0.15;
+    filter: blur(1px);
+    transform: translateX(-2px) skewX(0.5deg);
+  }
+  90% {
+    opacity: 0.08;
+    transform: translateX(1px);
+  }
+  100% { 
+    opacity: 0;
+    filter: none;
+    transform: none;
+  }
+}
+
+/* RGB Chromatic aberration */
+.glitch-rgb-shift {
+  animation: rgb-chromatic 0.2s steps(4) forwards;
+}
+
+@keyframes rgb-chromatic {
+  0% {
+    box-shadow: none;
+  }
+  25% {
+    box-shadow: 
+      -3px 0 0 rgba(255, 0, 0, 0.15),
+      3px 0 0 rgba(0, 255, 255, 0.15);
+  }
+  50% {
+    box-shadow: 
+      2px 0 0 rgba(255, 0, 0, 0.2),
+      -2px 0 0 rgba(0, 255, 255, 0.2);
+  }
+  75% {
+    box-shadow: 
+      -1px 0 0 rgba(255, 0, 0, 0.1),
+      1px 0 0 rgba(0, 255, 255, 0.1);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+/* Scanline tear effect */
+.glitch-scanline-tear {
+  width: 100%;
+  height: 8px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(51, 255, 0, 0.15) 20%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(51, 255, 0, 0.15) 80%,
+    transparent 100%
+  );
+  animation: scanline-tear 0.15s linear forwards;
+  transform-origin: left center;
+}
+
+@keyframes scanline-tear {
+  0% {
+    transform: scaleX(0) translateX(-10%);
+    opacity: 0;
+  }
+  30% {
+    transform: scaleX(1.2) translateX(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(0) translateX(110%);
+    opacity: 0;
+  }
+}

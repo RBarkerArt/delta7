@@ -18,6 +18,7 @@ import { EvidenceViewer } from './components/EvidenceViewer';
 import { Prologue } from './components/Prologue';
 import { AudioAtmosphere } from './components/AudioAtmosphere';
 import { AuthModal } from './components/AuthModal';
+import { GlitchOverlay } from './components/GlitchOverlay';
 import { TuningInterface } from './components/TuningInterface'; // Project Signal
 import { useSound } from './hooks/useSound';
 import { DebugPanel } from './components/DebugPanel';
@@ -32,13 +33,14 @@ const NarrativeManager = lazy(() => import('./components/NarrativeManager').then
 const PrologueManager = lazy(() => import('./components/PrologueManager').then(m => ({ default: m.PrologueManager })));
 const ObserverDirectory = lazy(() => import('./components/ObserverDirectory').then(m => ({ default: m.ObserverDirectory })));
 const NarrativeReader = lazy(() => import('./components/NarrativeReader').then(m => ({ default: m.NarrativeReader })));
+const AdminSettings = lazy(() => import('./components/AdminSettings').then(m => ({ default: m.AdminSettings })));
 
 const AUTO_PROGRESS_DELAY = 4000;
 const TYPING_SPEED = 30;
 const GLITCH_CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?/\\';
 
 const LabInterface: React.FC = () => {
-  const { score, state, loading, currentDay, isAnchored, ensureUser, accessCode } = useCoherence();
+  const { score, state, loading, currentDay, isAnchored, isGlitching, ensureUser, accessCode } = useCoherence();
   const [dayData, setDayData] = useState<DayLog | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [isPrologueActive, setIsPrologueActive] = useState(true);
@@ -77,7 +79,7 @@ const LabInterface: React.FC = () => {
           throw new Error('Firestore document missing');
         }
       } catch (error) {
-        console.warn('Falling back to local prologue data:', error);
+        if (import.meta.env.DEV) console.warn('Falling back to local prologue data:', error);
         const dayPrologue = prologueData.find(p => p.day === currentDay);
         if (dayPrologue && dayPrologue.sentences.length > 0) {
           const randomIndex = Math.floor(Math.random() * dayPrologue.sentences.length);
@@ -111,7 +113,7 @@ const LabInterface: React.FC = () => {
       }
       setDataLoading(false);
     }, (error) => {
-      console.error('Error listening to day data:', error);
+      if (import.meta.env.DEV) console.error('Error listening to day data:', error);
       setDataLoading(false);
     });
 
@@ -176,7 +178,7 @@ const LabInterface: React.FC = () => {
     try {
       await ensureUser();
     } catch (err) {
-      console.error('[Delta-7] Feed induction failure:', err);
+      if (import.meta.env.DEV) console.error('[Delta-7] Feed induction failure:', err);
     }
     setIsPrologueActive(false);
   }, [ensureUser]);
@@ -241,7 +243,9 @@ const LabInterface: React.FC = () => {
     );
   }
 
-  const blurAmount = Math.min(0.8, Math.max(0, (100 - score) / 80));
+  // Apply extra blur when glitching (day transition)
+  const baseBlur = Math.min(0.8, Math.max(0, (100 - score) / 80));
+  const blurAmount = isGlitching ? Math.max(2, baseBlur) : baseBlur;
   const opacityAmount = Math.max(0.7, score / 100);
 
   const glitchClass = score < 20 ? 'glitch-heavy' : score < 70 ? 'glitch-subtle' : '';
@@ -264,6 +268,7 @@ const LabInterface: React.FC = () => {
         <div className="fixed inset-0 z-0 opacity-0 sm:opacity-100" />
         <BackgroundAtmosphere score={score} />
         <ScreenEffects flickerLevel={1} driftLevel={1} />
+        <GlitchOverlay coherence={score} isGlitching={isGlitching} />
 
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-signal-green/30 pb-4 mb-4 sm:mb-8 select-none relative z-10">
 
@@ -289,7 +294,7 @@ const LabInterface: React.FC = () => {
                       await ensureUser();
                       setIsAuthModalOpen(true);
                     } catch (err) {
-                      console.error('[Delta-7] Auth: Pre-synchronization failure:', err);
+                      if (import.meta.env.DEV) console.error('[Delta-7] Auth: Pre-synchronization failure:', err);
                     }
                   }}
                   className={`flex items-center justify-center w-8 h-8 rounded-full transition-all duration-1000 group hover:scale-110 ${isAnchored
@@ -494,6 +499,7 @@ function App() {
                   <Route path="prologues" element={<PrologueManager />} />
                   <Route path="narrative" element={<NarrativeReader />} />
                   <Route path="observers" element={<ObserverDirectory />} />
+                  <Route path="settings" element={<AdminSettings />} />
                 </Route>
               </Route>
             </Routes>

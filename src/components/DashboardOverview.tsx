@@ -1,56 +1,125 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { db } from '../lib/firebase';
+import { collection, getDocs, query, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
 import {
     Activity,
     Users,
-    Database,
-    ShieldCheck,
-    AlertCircle
+    FileText,
+    Calendar,
+    Clock,
+    UserCheck,
+    Zap
 } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import type { UserProgress } from '../types/schema';
 
-function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
+interface DashboardStats {
+    totalUsers: number;
+    anchoredUsers: number;
+    activeToday: number;
+    avgCoherence: number;
+}
+
+interface ActivityItem {
+    id: string;
+    email?: string | null;
+    lastSeenAt: Timestamp;
+    event: string;
+    status: string;
 }
 
 export const DashboardOverview: React.FC = () => {
+    const navigate = useNavigate();
+    const [stats, setStats] = useState<DashboardStats>({
+        totalUsers: 0,
+        anchoredUsers: 0,
+        activeToday: 0,
+        avgCoherence: 0
+    });
+    const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const stats = [
-        { label: 'Active Observers', value: '1,284', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { label: 'Nexus Coherence', value: '94.2%', icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { label: 'Unstable Fragments', value: '12', icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
-        { label: 'Observation Points', value: '84.1k', icon: Database, color: 'text-purple-600', bg: 'bg-purple-50' },
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                const obsRef = collection(db, 'observers');
+                const q = query(obsRef, orderBy('lastSeenAt', 'desc'), limit(100)); // Limit to 100 for heavy stats calc on client for now
+                const snapshot = await getDocs(q);
+
+                const now = new Date();
+                const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+                let total = 0;
+                let anchored = 0;
+                let active = 0;
+                let totalCoherence = 0;
+                const activity: ActivityItem[] = [];
+
+                snapshot.forEach(doc => {
+                    const data = doc.data() as UserProgress;
+                    total++;
+                    if (data.isAnchored) anchored++;
+                    if (data.lastSeenAt.toDate() > oneDayAgo) active++;
+                    totalCoherence += data.coherenceScore || 0;
+
+                    // Build activity feed from recent users
+                    if (activity.length < 5) {
+                        activity.push({
+                            id: doc.id,
+                            email: data.email,
+                            lastSeenAt: data.lastSeenAt,
+                            event: data.email ? `User ${data.email.split('@')[0]} Active` : `Observer ${doc.id.substring(0, 6)} Active`,
+                            status: data.isAnchored ? 'Anchored' : 'Ghost'
+                        });
+                    }
+                });
+
+                setStats({
+                    totalUsers: total,
+                    anchoredUsers: anchored,
+                    activeToday: active,
+                    avgCoherence: total > 0 ? Math.round(totalCoherence / total) : 0
+                });
+                setRecentActivity(activity);
+            } catch (error) {
+                console.error("Error fetching dashboard stats:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDashboardData();
+    }, []);
+
+    const statCards = [
+        { label: 'Total Users', value: stats.totalUsers.toString(), icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { label: 'Anchored Users', value: stats.anchoredUsers.toString(), icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { label: 'Active (24h)', value: stats.activeToday.toString(), icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' },
+        { label: 'Avg Coherence', value: `${stats.avgCoherence}%`, icon: Activity, color: 'text-purple-600', bg: 'bg-purple-50' },
     ];
 
     return (
-        <div className="space-y-10">
-            <header className="space-y-4">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-100">
-                        <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                    </div>
-                    <span className="text-[10px] md:text-xs font-mono uppercase tracking-[0.2em] md:tracking-[0.3em] text-zinc-400">Observational Feed Status: NOMINAL</span>
-                </div>
-                <h1 className="text-2xl md:text-4xl font-bold text-zinc-900 tracking-tight">
-                    Welcome back, <span className="text-emerald-600">Observer</span>.
-                </h1>
-                <p className="text-zinc-500 max-w-2xl leading-relaxed text-sm md:text-base">
-                    The temporal anchor is stabilized. Observation Nexus is currently capturing primary neural feeds with standard deviation within nominal thresholds.
+        <div className="space-y-8">
+            <header className="space-y-2">
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <p className="text-gray-500 text-sm">
+                    System Overview and Real-time Metrics
                 </p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {stats.map((stat) => (
-                    <div key={stat.label} className="bg-white border border-zinc-200 p-6 rounded-2xl hover:border-emerald-200 hover:shadow-md transition-all duration-300 group">
+                {statCards.map((stat) => (
+                    <div key={stat.label} className="bg-white border border-gray-200 p-6 rounded-xl shadow-sm transition-all hover:shadow-md">
                         <div className="flex justify-between items-start mb-4">
-                            <div className={`p-3 rounded-xl ${stat.bg} ${stat.color} transition-colors group-hover:scale-110 duration-200`}>
+                            <div className={`p-3 rounded-lg ${stat.bg} ${stat.color}`}>
                                 <stat.icon size={24} />
                             </div>
-                            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">ACTIVE_CAPTURE</span>
                         </div>
                         <div className="space-y-1">
-                            <p className="text-3xl font-bold text-zinc-900 tracking-tight">{stat.value}</p>
-                            <p className="text-xs font-medium text-zinc-500">{stat.label}</p>
+                            <p className="text-2xl font-bold text-gray-900">
+                                {loading ? '-' : stat.value}
+                            </p>
+                            <p className="text-sm font-medium text-gray-500">{stat.label}</p>
                         </div>
                     </div>
                 ))}
@@ -58,64 +127,61 @@ export const DashboardOverview: React.FC = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm">
+                    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-zinc-900">Observation Feed History</h3>
-                            <button className="text-xs font-mono text-emerald-600 hover:text-emerald-700 uppercase tracking-widest font-bold">Access Nexus Logs</button>
+                            <h3 className="font-bold text-gray-900">Recent Activity</h3>
+                            <button onClick={() => navigate('/admin/observers')} className="text-sm font-medium text-emerald-600 hover:text-emerald-700">View Directory</button>
                         </div>
-                        <div className="space-y-4">
-                            {[
-                                { time: '14:23:01', event: 'Neural feed Day_04 synchronized', status: 'NOMINAL' },
-                                { time: '13:12:44', event: 'Minor coherence dip detected in sector 4', status: 'DEGRADED' },
-                                { time: '11:05:12', event: 'Primary fragment backup complete', status: 'NOMINAL' },
-                                { time: '09:44:33', event: 'Observer "X-993" initiated handoff', status: 'STABLE' },
-                            ].map((activity, i) => (
-                                <div key={i} className="flex items-center justify-between py-3 border-b border-zinc-100 last:border-0">
-                                    <div className="flex items-center gap-4">
-                                        <span className="text-[10px] font-mono text-zinc-400">{activity.time}</span>
-                                        <span className="text-sm text-zinc-600 font-medium">{activity.event}</span>
+                        <div className="space-y-0 divide-y divide-gray-100">
+                            {loading ? (
+                                <div className="py-8 text-center text-gray-400">Loading activity...</div>
+                            ) : recentActivity.length > 0 ? (
+                                recentActivity.map((activity, i) => (
+                                    <div key={i} className="flex items-center justify-between py-4 hover:bg-gray-50/50 transition-colors px-2 -mx-2 rounded-lg">
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-2 bg-gray-50 rounded-lg text-gray-400">
+                                                <Clock size={16} />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-900">{activity.event}</p>
+                                                <p className="text-xs text-gray-500">
+                                                    {activity.lastSeenAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${activity.status === 'Anchored' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                                            }`}>
+                                            {activity.status}
+                                        </span>
                                     </div>
-                                    <span className={cn(
-                                        "text-[8px] font-mono font-bold px-2 py-1 rounded",
-                                        activity.status === 'NOMINAL' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" :
-                                            activity.status === 'DEGRADED' ? "bg-amber-50 text-amber-600 border border-amber-100" :
-                                                "bg-zinc-100 text-zinc-500"
-                                    )}>
-                                        {activity.status}
-                                    </span>
-                                </div>
-                            ))}
+                                ))
+                            ) : (
+                                <div className="py-8 text-center text-gray-400">No recent activity found</div>
+                            )}
                         </div>
                     </div>
                 </div>
 
                 <div className="space-y-6">
-                    <div className="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-6 relative overflow-hidden group shadow-sm">
-                        <div className="relative z-10 space-y-4">
-                            <h3 className="font-bold text-emerald-700">Nexus Integrity</h3>
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-xs font-mono text-emerald-600/70">
-                                    <span>STABILITY_STATUS</span>
-                                    <span>98%</span>
-                                </div>
-                                <div className="h-1.5 bg-emerald-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-emerald-600 w-[98%]" />
-                                </div>
-                            </div>
-                            <p className="text-[10px] text-emerald-600/60 leading-relaxed font-mono font-medium">
-                                Nexus cycle 07 complete. Captured data streams remain coherent and synchronized with the temporal baseline.
-                            </p>
-                        </div>
-                        <Activity className="absolute -bottom-4 -right-4 w-32 h-32 text-emerald-600/5 group-hover:text-emerald-600/10 transition-colors" />
-                    </div>
-
-                    <div className="bg-white border border-zinc-200 rounded-2xl p-6 space-y-4 shadow-sm">
-                        <h3 className="font-bold text-zinc-900">Nexus Controls</h3>
+                    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-4">
+                        <h3 className="font-bold text-gray-900">Quick Actions</h3>
                         <div className="grid grid-cols-2 gap-3">
-                            <button className="p-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl text-xs font-semibold text-zinc-600 border border-zinc-100 transition-colors">Season Data</button>
-                            <button className="p-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl text-xs font-semibold text-zinc-600 border border-zinc-100 transition-colors">Log Nexus</button>
-                            <button className="p-3 bg-zinc-50 hover:bg-zinc-100 rounded-xl text-xs font-semibold text-zinc-600 border border-zinc-100 transition-colors">Re-anchor</button>
-                            <button className="p-3 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-xs font-mono text-white transition-colors shadow-sm font-bold">BROADCAST</button>
+                            <button onClick={() => navigate('/admin/narrative')} className="p-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-medium text-gray-700 border border-gray-200 transition-colors flex flex-col items-center gap-2">
+                                <Calendar size={20} className="text-gray-400" />
+                                Narrative
+                            </button>
+                            <button onClick={() => navigate('/admin/logs')} className="p-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-medium text-gray-700 border border-gray-200 transition-colors flex flex-col items-center gap-2">
+                                <FileText size={20} className="text-gray-400" />
+                                Logs
+                            </button>
+                            <button onClick={() => navigate('/admin/observers')} className="p-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-sm font-medium text-gray-700 border border-gray-200 transition-colors flex flex-col items-center gap-2">
+                                <Users size={20} className="text-gray-400" />
+                                Users
+                            </button>
+                            <button onClick={() => navigate('/admin/settings')} className="p-3 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-medium text-white transition-colors shadow-sm flex flex-col items-center gap-2">
+                                <Activity size={20} />
+                                Settings
+                            </button>
                         </div>
                     </div>
                 </div>

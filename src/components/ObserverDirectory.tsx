@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, orderBy, getDocs, Timestamp, limit } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, Timestamp, limit, doc, updateDoc } from 'firebase/firestore';
 import type { UserProgress } from '../types/schema';
-import { Search, Loader2, User as UserIcon, Calendar, Activity, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Search, Loader2, User as UserIcon, CheckCircle, Edit2, Save, X } from 'lucide-react';
 
-interface ObserverWithId extends UserProgress {
+interface ObserverWithId extends Omit<UserProgress, 'email'> {
     id: string;
+    email?: string | null;
 }
 
 export const ObserverDirectory: React.FC = () => {
@@ -14,37 +15,80 @@ export const ObserverDirectory: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [error, setError] = useState<string | null>(null);
 
+    // Editing state
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editForm, setEditForm] = useState<{
+        dayProgress: number;
+        coherenceScore: number;
+    }>({ dayProgress: 1, coherenceScore: 100 });
+    const [isSaving, setIsSaving] = useState(false);
+
     useEffect(() => {
-        const fetchObservers = async () => {
-            try {
-                const obsRef = collection(db, 'observers');
-                const q = query(obsRef, orderBy('lastSeenAt', 'desc'), limit(50));
-                const querySnapshot = await getDocs(q);
-
-                const data = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                })) as ObserverWithId[];
-
-                setObservers(data);
-            } catch (err: unknown) {
-                console.error('Error fetching observers:', err);
-                setError((err as Error).message);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchObservers();
     }, []);
 
+    const fetchObservers = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const obsRef = collection(db, 'observers');
+            const q = query(obsRef, orderBy('lastSeenAt', 'desc'), limit(100));
+            const querySnapshot = await getDocs(q);
+
+            const data = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as ObserverWithId[];
+
+            setObservers(data);
+        } catch (err: unknown) {
+            console.error('Error fetching observers:', err);
+            setError((err as Error).message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEditStart = (obs: ObserverWithId) => {
+        setEditingId(obs.id);
+        setEditForm({
+            dayProgress: obs.dayProgress,
+            coherenceScore: Math.round(obs.coherenceScore)
+        });
+    };
+
+    const handleSave = async () => {
+        if (!editingId) return;
+        setIsSaving(true);
+        try {
+            const obsRef = doc(db, 'observers', editingId);
+            await updateDoc(obsRef, {
+                dayProgress: editForm.dayProgress,
+                coherenceScore: editForm.coherenceScore
+            });
+
+            // Update local state
+            setObservers(prev => prev.map(o =>
+                o.id === editingId
+                    ? { ...o, dayProgress: editForm.dayProgress, coherenceScore: editForm.coherenceScore }
+                    : o
+            ));
+            setEditingId(null);
+        } catch (err) {
+            console.error('Failed to update observer:', err);
+            alert('Failed to save changes. Check console.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const filteredObservers = observers.filter(obs =>
         obs.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        obs.visitorId?.toLowerCase().includes(searchTerm.toLowerCase())
+        obs.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const formatDate = (ts: Timestamp | undefined) => {
-        if (!ts) return 'Unknown';
+        if (!ts) return '-';
         return ts.toDate().toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
@@ -55,110 +99,171 @@ export const ObserverDirectory: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-                <Loader2 className="animate-spin text-emerald-600" size={32} />
-                <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest">Accessing_Observer_Vault...</p>
+            <div className="flex items-center justify-center h-64">
+                <div className="text-gray-400 text-sm flex items-center gap-2">
+                    <Loader2 className="animate-spin" size={16} /> Loading Directory...
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
-            {/* Header Secion */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Observer Directory</h1>
-                    <p className="text-zinc-500 mt-1">Registry of all witness identities and temporal progress.</p>
+                    <h1 className="text-2xl font-bold text-gray-900">User Directory</h1>
+                    <p className="text-sm text-gray-500">Manage registered users and their progress states.</p>
                 </div>
-
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+                <div className="relative w-full md:w-80">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                     <input
                         type="text"
-                        placeholder="Search by ID or Trace..."
+                        placeholder="Search email or ID..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-zinc-50 border border-zinc-200 rounded-2xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500/50 transition-all"
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                     />
                 </div>
             </div>
 
             {error && (
-                <div className="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-sm flex items-center gap-3">
-                    <ShieldAlert size={18} />
+                <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm">
                     {error}
                 </div>
             )}
 
-            {/* Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredObservers.map((obs) => (
-                    <div
-                        key={obs.id}
-                        className="bg-zinc-50 border border-zinc-200 rounded-3xl p-6 hover:shadow-xl hover:shadow-emerald-900/5 transition-all duration-300 group"
-                    >
-                        <div className="flex items-start justify-between mb-6">
-                            <div className="w-12 h-12 bg-white border border-zinc-100 rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500">
-                                <UserIcon className="text-emerald-600" size={24} />
-                            </div>
-                            <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-colors ${obs.isAnchored
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                : 'bg-zinc-100 text-zinc-500 border-zinc-200'
-                                }`}>
-                                {obs.isAnchored ? 'Stable_Anchor' : 'Volatile_Trace'}
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <p className="text-[10px] text-zinc-400 font-mono uppercase tracking-widest mb-1">Observation_Subject</p>
-                                <p className="font-mono text-sm font-bold truncate">{obs.id}</p>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-1.5 text-zinc-400">
-                                        <Calendar size={12} />
-                                        <span className="text-[10px] font-mono uppercase">Last_Seen</span>
-                                    </div>
-                                    <p className="text-xs font-medium">{formatDate(obs.lastSeenAt)}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-1.5 text-zinc-400">
-                                        <Activity size={12} />
-                                        <span className="text-[10px] font-mono uppercase">Coherence</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-full h-1 bg-zinc-200 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-emerald-500"
-                                                style={{ width: `${obs.coherenceScore}%` }}
-                                            />
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm min-w-[800px]">
+                        <thead className="bg-gray-50 border-b border-gray-100">
+                            <tr>
+                                <th className="px-6 py-4 font-semibold text-gray-900">User / Identity</th>
+                                <th className="px-6 py-4 font-semibold text-gray-900">Code</th>
+                                <th className="px-6 py-4 font-semibold text-gray-900">Status</th>
+                                <th className="px-6 py-4 font-semibold text-gray-900">Day Progress</th>
+                                <th className="px-6 py-4 font-semibold text-gray-900">Coherence</th>
+                                <th className="px-6 py-4 font-semibold text-gray-900">Last Seen</th>
+                                <th className="px-6 py-4 font-semibold text-gray-900 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {filteredObservers.map((obs) => (
+                                <tr key={obs.id} className="hover:bg-gray-50/50 transition-colors">
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                                                <UserIcon size={14} />
+                                            </div>
+                                            <div>
+                                                <div className="font-medium text-gray-900">
+                                                    {obs.email || <span className="text-gray-400 italic">Anonymous</span>}
+                                                </div>
+                                                {/* ID removed to prevent duplication with Code column */}
+                                            </div>
                                         </div>
-                                        <span className="text-[10px] font-bold text-emerald-600">{Math.round(obs.coherenceScore)}%</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="pt-4 border-t border-zinc-100 flex items-center justify-between">
-                                <span className="text-[10px] text-zinc-400 font-mono uppercase tracking-widest">Progress</span>
-                                <div className="flex items-center gap-2">
-                                    <ShieldCheck size={14} className={obs.dayProgress >= 50 ? 'text-emerald-500' : 'text-zinc-300'} />
-                                    <span className="text-sm font-bold">DAY_{obs.dayProgress}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            {filteredObservers.length === 0 && !loading && (
-                <div className="text-center py-20 bg-zinc-50 rounded-[40px] border-2 border-dashed border-zinc-200">
-                    <UserIcon className="mx-auto text-zinc-300 mb-4" size={48} />
-                    <h3 className="text-zinc-900 font-bold">No Observers Detected</h3>
-                    <p className="text-zinc-500 text-sm mt-1">Try adjusting your temporal filters or registry ident.</p>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className="font-mono text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                                            {obs.accessCode || '-'}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-2">
+                                            {obs.isAnchored ? (
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
+                                                    <CheckCircle size={12} /> Anchored
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-medium">
+                                                    Ghost
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {editingId === obs.id ? (
+                                            <input
+                                                type="number"
+                                                className="w-16 border rounded px-2 py-1 text-sm"
+                                                value={editForm.dayProgress}
+                                                onChange={(e) => setEditForm({ ...editForm, dayProgress: parseInt(e.target.value) || 1 })}
+                                            />
+                                        ) : (
+                                            <span className="font-medium text-gray-900">Day {obs.dayProgress}</span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {editingId === obs.id ? (
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="range"
+                                                    min="0" max="100"
+                                                    value={editForm.coherenceScore}
+                                                    onChange={(e) => setEditForm({ ...editForm, coherenceScore: parseInt(e.target.value) })}
+                                                    className="w-24 accent-emerald-600"
+                                                />
+                                                <span className="text-xs w-8">{editForm.coherenceScore}%</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full ${obs.coherenceScore > 80 ? 'bg-emerald-500' :
+                                                            obs.coherenceScore > 40 ? 'bg-amber-500' : 'bg-red-500'
+                                                            }`}
+                                                        style={{ width: `${obs.coherenceScore}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-gray-600">{Math.round(obs.coherenceScore)}%</span>
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-500 text-xs">
+                                        {formatDate(obs.lastSeenAt)}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        {editingId === obs.id ? (
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    onClick={handleSave}
+                                                    disabled={isSaving}
+                                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded"
+                                                    title="Save"
+                                                >
+                                                    <Save size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => setEditingId(null)}
+                                                    className="p-1.5 text-gray-400 hover:text-gray-600 rounded"
+                                                    title="Cancel"
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleEditStart(obs)}
+                                                className="text-gray-400 hover:text-emerald-600 transition-colors"
+                                                title="Edit User"
+                                            >
+                                                <Edit2 size={16} />
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            )}
+
+                {filteredObservers.length === 0 && !loading && (
+                    <div className="p-12 text-center">
+                        <UserIcon className="mx-auto text-gray-300 mb-3" size={48} />
+                        <h3 className="text-gray-900 font-medium">No users found</h3>
+                        <p className="text-gray-500 text-sm mt-1">Try adjusting your search.</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

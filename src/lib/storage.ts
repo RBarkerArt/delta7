@@ -1,4 +1,11 @@
-import type { ObserverSession } from '../types/schema';
+// Local interface for storage - matches the extended session shape used here
+interface ObserverSession {
+    visitorId: string;
+    visitorToken: string;
+    isAnchored: boolean;
+    firebaseUid?: string;
+    anchoredEmail?: string;
+}
 
 const SESSION_KEY = 'delta7_observer_session';
 

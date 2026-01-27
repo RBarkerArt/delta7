@@ -11,9 +11,12 @@ export const getObserverSession = (): ObserverSession => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
         try {
-            return JSON.parse(stored);
+            const parsed = JSON.parse(stored);
+            if (parsed && typeof parsed.visitorId === 'string') {
+                return parsed;
+            }
         } catch (e) {
-            console.error('Failed to parse observer session', e);
+            if (import.meta.env.DEV) console.error('Failed to parse observer session', e);
         }
     }
 

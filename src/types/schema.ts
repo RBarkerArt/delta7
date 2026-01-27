@@ -2,13 +2,7 @@ import { Timestamp } from 'firebase/firestore';
 
 export type CoherenceState = 'FEED_STABLE' | 'SYNC_RECOVERING' | 'COHERENCE_FRAYING' | 'SIGNAL_FRAGMENTED' | 'CRITICAL_INTERFERENCE';
 
-export interface ObserverSession {
-    visitorId: string;        // Our generated UUID - primary identifier
-    visitorToken: string;     // Secret token for session validation
-    firebaseUid?: string;     // Current Firebase UID (changes are okay now)
-    isAnchored: boolean;      // Completed Day 30 anchoring?
-    anchoredEmail?: string;   // Email if anchored
-}
+// Note: ObserverSession is defined in lib/visitor.ts - do not duplicate here
 
 export interface UserProgress {
     startDate: Timestamp;
@@ -21,8 +15,9 @@ export interface UserProgress {
     isManualDayProgress?: boolean;
     isAnchored: boolean;
     email: string | null;
-    visitorId?: string;
+    visitorId?: string | null;
     anchoredFirebaseUid?: string | null;
+    accessCode?: string; // Tuning Code for manual matching
     createdAt?: Timestamp; // Legacy support
 }
 
@@ -56,7 +51,16 @@ export interface DayLog {
     };
 }
 
+
 export interface PrologueData {
     day: number;
     sentences: string[];
+}
+
+export interface SystemSettings {
+    maintenanceMode: boolean;
+    registrationOpen: boolean;
+    glitchIntensity: number;
+    aiRules?: string;
+    updatedAt?: Timestamp;
 }

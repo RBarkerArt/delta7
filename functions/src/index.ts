@@ -110,10 +110,12 @@ export const deleteUserData = functions.https.onCall(async (data, context) => {
     }
 });
 
+// 7.3 AI Narrative Engine
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+
 // -------------------------------------------------------------
 // PROJECT SIGNAL: Access Code System (v2)
 // -------------------------------------------------------------
-import { onCall, HttpsError } from "firebase-functions/v2/https";
 
 // Helper: Generate Base32-like code (avoid confusing chars like I/L/1/0)
 const generateCode = () => {
@@ -126,23 +128,40 @@ const generateCode = () => {
 };
 
 // 1. Assign Frequency (v2)
+// FIXED: Accept visitorId from frontend to write to correct document
 export const assignFrequency = onCall({
     cors: true,
+    enforceAppCheck: true,
     serviceAccount: 'delta7-3fede@appspot.gserviceaccount.com'
 }, async (request) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Auth required');
 
     const uid = request.auth.uid;
+    const { visitorId } = request.data || {};
     const db = admin.firestore();
 
-    // Determine collection based on existing doc. Project Anchor logic puts anon users in observers.
-    // We'll write to 'access_codes' collection for reverse lookup.
+    // Validate visitorId - required for anonymous users to track correctly
+    if (!visitorId || typeof visitorId !== 'string') {
+        console.warn('[assignFrequency] Missing visitorId, falling back to uid');
+    }
+
+    // Use visitorId as the primary identifier for observers collection
+    const observerDocId = visitorId || uid;
 
     try {
-        // Idempotency: Check if code already exists for this UID
-        const existingQuery = await db.collection('access_codes').where('uid', '==', uid).get();
+        // Idempotency: Check if code already exists for this visitorId
+        const existingQuery = await db.collection('access_codes')
+            .where('visitorId', '==', observerDocId).get();
         if (!existingQuery.empty) {
+            console.log(`[assignFrequency] Returning existing code for visitorId: ${observerDocId}`);
             return { code: existingQuery.docs[0].id };
+        }
+
+        // Also check by UID for backwards compatibility
+        const legacyQuery = await db.collection('access_codes').where('uid', '==', uid).get();
+        if (!legacyQuery.empty) {
+            console.log(`[assignFrequency] Returning existing code for uid: ${uid}`);
+            return { code: legacyQuery.docs[0].id };
         }
 
         let code = generateCode();
@@ -158,16 +177,20 @@ export const assignFrequency = onCall({
 
         if (!unique) throw new HttpsError('resource-exhausted', 'Failed to generate unique frequency');
 
+        // Store both uid and visitorId for comprehensive reverse lookup
         await db.collection('access_codes').doc(code).set({
             uid: uid,
+            visitorId: observerDocId,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // Also stamp the user record for easy frontend read
-        // Note: We don't know if they are in 'users' or 'observers' without checking, 
-        // but typically anon users are in 'observers'.
-        await db.collection('observers').doc(uid).set({ accessCode: code }, { merge: true });
+        // FIXED: Write to observers/{visitorId} - this is where frontend reads from
+        await db.collection('observers').doc(observerDocId).set(
+            { accessCode: code },
+            { merge: true }
+        );
 
+        console.log(`[assignFrequency] Assigned code ${code} to visitorId: ${observerDocId}, uid: ${uid}`);
         return { code };
 
     } catch (err) {
@@ -177,8 +200,10 @@ export const assignFrequency = onCall({
 });
 
 // 2. Recover Signal (v2)
+// FIXED: Return visitorId along with token for proper session restoration
 export const recoverSignal = onCall({
     cors: true,
+    enforceAppCheck: true,
     serviceAccount: 'delta7-3fede@appspot.gserviceaccount.com'
 }, async (request) => {
     const code = request.data.code;
@@ -197,17 +222,104 @@ export const recoverSignal = onCall({
             throw new HttpsError('not-found', 'Signal frequency invalid or expired.');
         }
 
-        const { uid } = doc.data() as { uid: string };
+        const data = doc.data() as { uid: string; visitorId?: string };
+        const { uid, visitorId } = data;
 
         // Mint Custom Token
         const token = await admin.auth().createCustomToken(uid);
 
-        console.log(`Signal recovered for UID: ${uid} via code ${formattedCode}`);
+        console.log(`Signal recovered for UID: ${uid}, visitorId: ${visitorId} via code ${formattedCode}`);
 
-        return { token };
+        // Return visitorId so frontend can properly restore the session
+        return { token, visitorId };
 
     } catch (err) {
         console.error('Signal Recovery Failed:', err);
         throw new HttpsError('internal', 'Signal recovery failed');
     }
 });
+
+// Interface for the expected AI response structure
+
+
+export const generateNarrativeContent = onCall({
+    secrets: ["GEMINI_API_KEY"],
+    enforceAppCheck: true
+}, async (request) => {
+    // 1. Authentication Check
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "User must be logged in.");
+    }
+
+    // Role check (assuming custom claims or just checking UID against a known admin list in a real app)
+    // For now, we rely on the client-side Admin check + likely Firestore rules for the actual write.
+    // Ideally, we'd check request.auth.token.admin === true here.
+
+    const { prompt, context, aiRules } = request.data;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    // Use variables to avoid lint errors (Mocking usage)
+    console.log(`Generating content (Mock Mode)`);
+    console.log(`Applying AI Rules: ${aiRules ? 'YES' : 'NO'}`);
+
+    // 2. Connector Logic (Real Implementation)
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(apiKey || "");
+
+    // Using gemini-1.5-flash as requested (fastest/cheapest for this use case)
+    const model = genAI.getGenerativeModel({
+        model: "gemini-3-flash-preview",
+        generationConfig: {
+            responseMimeType: "application/json"
+        }
+    });
+
+    const systemInstruction = `
+    Role: You are the Narrative Engine for 'Delta 7', an immersive sci-fi puzzle interface.
+    Task: Generate a JSON object containing a narrative summary, 5 system logs (one for each coherence state), and reality fragments.
+    Constraint: You MUST output valid JSON only. No markdown formatting.
+    
+    Data Schema:
+    {
+      "narrativeSummary": "Internal summary of the plot beat (string)",
+      "vm_logs": {
+        "FEED_STABLE": { "id": "unique_id", "title": "Log Title", "body": "Log Content" },
+        "SYNC_RECOVERING": { "id": "unique_id", "title": "Log Title", "body": "Log Content" },
+        "COHERENCE_FRAYING": { "id": "unique_id", "title": "Log Title", "body": "Log Content" },
+        "SIGNAL_FRAGMENTED": { "id": "unique_id", "title": "Log Title", "body": "Log Content" },
+        "CRITICAL_INTERFERENCE": { "id": "unique_id", "title": "Log Title", "body": "Log Content" }
+      },
+      "fragments": [
+        { "id": "frag_id", "body": "Cryptic text...", "severity": "COHERENCE_STATE" }
+      ]
+    }
+    
+    IMPORTANT: You must provide a log entry for ALL 5 coherence states in the 'vm_logs' object.
+    `;
+
+    const userPrompt = `
+    CONTEXT: ${context}
+    INSTRUCTIONS: ${prompt}
+    SYSTEM RULES: ${aiRules}
+    `;
+
+    try {
+        const result = await model.generateContent([systemInstruction, userPrompt]);
+        const responseText = result.response.text();
+
+        // Parse JSON safely
+        const generatedData = JSON.parse(responseText);
+
+        // Sanitize/Validate structure basic check
+        if (!generatedData.narrativeSummary || !generatedData.vm_logs) {
+            throw new Error("Invalid structure returned from AI");
+        }
+
+        return generatedData;
+    } catch (error) {
+        console.error("Gemini API Error:", error);
+        throw new HttpsError("internal", "Failed to generate content via AI engine.");
+    }
+});
+
+

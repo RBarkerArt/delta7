@@ -274,6 +274,156 @@ class SoundEngine {
         } catch (e) { /* silent */ }
     }
 
+    /**
+     * Signal Noise - Static burst that increases with low coherence
+     * Call this during glitch events for auditory feedback
+     */
+    playSignalNoise(intensity: number = 0.5) {
+        if (!this.isReady() || !this.ctx || !this.masterGain || this.muted) return;
+
+        try {
+            const now = this.ctx.currentTime;
+            const duration = 0.1 + intensity * 0.2;
+
+            // Create noise buffer
+            const bufferSize = this.ctx.sampleRate * duration;
+            const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = (Math.random() * 2 - 1) * 0.5;
+            }
+
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = noiseBuffer;
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.setValueAtTime(2000 + intensity * 3000, now);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.03 * intensity, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.masterGain);
+
+            noise.start(now);
+            noise.stop(now + duration);
+        } catch (e) { /* silent */ }
+    }
+
+    /**
+     * Blip - Subtle notification tone for events (fragments appearing, etc)
+     */
+    playBlip(pitch: 'high' | 'mid' | 'low' = 'mid') {
+        if (!this.isReady() || !this.ctx || !this.masterGain || this.muted) return;
+
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'sine';
+
+            const frequencies = { high: 880, mid: 440, low: 220 };
+            const baseFreq = frequencies[pitch];
+
+            osc.frequency.setValueAtTime(baseFreq, now);
+            osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, now + 0.1);
+
+            gain.gain.setValueAtTime(0.04, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+
+            osc.start(now);
+            osc.stop(now + 0.15);
+        } catch (e) { /* silent */ }
+    }
+
+    /**
+     * Temporal Shift - Day transition sound effect
+     * Creates an otherworldly sweep with harmonics
+     */
+    playTemporalShift() {
+        if (!this.isReady() || !this.ctx || !this.masterGain || this.muted) return;
+
+        try {
+            const now = this.ctx.currentTime;
+
+            // Main sweep oscillator
+            const osc1 = this.ctx.createOscillator();
+            const gain1 = this.ctx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(100, now);
+            osc1.frequency.exponentialRampToValueAtTime(800, now + 0.5);
+            osc1.frequency.exponentialRampToValueAtTime(200, now + 1.5);
+
+            gain1.gain.setValueAtTime(0, now);
+            gain1.gain.linearRampToValueAtTime(0.06, now + 0.3);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+            // Harmonic layer
+            const osc2 = this.ctx.createOscillator();
+            const gain2 = this.ctx.createGain();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(200, now);
+            osc2.frequency.exponentialRampToValueAtTime(1600, now + 0.5);
+            osc2.frequency.exponentialRampToValueAtTime(400, now + 1.5);
+
+            gain2.gain.setValueAtTime(0, now);
+            gain2.gain.linearRampToValueAtTime(0.03, now + 0.3);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+            // Noise burst
+            const noiseBuffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.5, this.ctx.sampleRate);
+            const noiseData = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < noiseData.length; i++) {
+                noiseData[i] = (Math.random() * 2 - 1) * 0.3;
+            }
+
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = noiseBuffer;
+
+            const noiseFilter = this.ctx.createBiquadFilter();
+            noiseFilter.type = 'bandpass';
+            noiseFilter.frequency.setValueAtTime(400, now);
+            noiseFilter.frequency.exponentialRampToValueAtTime(2000, now + 0.3);
+            noiseFilter.Q.setValueAtTime(5, now);
+
+            const noiseGain = this.ctx.createGain();
+            noiseGain.gain.setValueAtTime(0, now);
+            noiseGain.gain.linearRampToValueAtTime(0.04, now + 0.1);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+            // Connections
+            osc1.connect(gain1);
+            gain1.connect(this.masterGain);
+
+            osc2.connect(gain2);
+            gain2.connect(this.masterGain);
+
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(this.masterGain);
+
+            // Start all
+            osc1.start(now);
+            osc2.start(now);
+            noise.start(now);
+
+            osc1.stop(now + 1.5);
+            osc2.stop(now + 1.5);
+            noise.stop(now + 0.5);
+
+            console.log('[SoundEngine] Temporal shift audio triggered');
+        } catch (e) { /* silent */ }
+    }
+
     public dispose() {
         try {
             if (this.breathOsc) this.breathOsc.stop();

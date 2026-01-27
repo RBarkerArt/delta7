@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
                 if (role === 'observer') {
                     // IDENTITY_ANCHORING: Link Firebase UID to persistent Visitor ID
-                    console.log('[Delta-7] Syncing identity mapping for observer:', firebaseUser.uid);
+                    if (import.meta.env.DEV) console.log('[Delta-7] Syncing identity mapping for observer:', firebaseUser.uid);
                     const mappingRef = doc(db, 'firebase_uid_mapping', firebaseUser.uid);
 
                     try {
@@ -71,19 +71,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         if (mappingDoc.exists()) {
                             const existingVisitorId = mappingDoc.data().visitorId;
                             if (existingVisitorId !== session.visitorId) {
-                                console.log('[Delta-7] Re-anchoring to known Visitor ID:', existingVisitorId);
+                                if (import.meta.env.DEV) console.log('[Delta-7] Re-anchoring to known Visitor ID:', existingVisitorId);
                                 setVisitorId(existingVisitorId);
                                 setObserverSession(existingVisitorId);
                             }
                         } else {
-                            console.log('[Delta-7] Establishing new identity anchor:', session.visitorId);
-                            await setDoc(mappingRef, {
-                                visitorId: session.visitorId,
-                                lastUpdated: serverTimestamp()
-                            });
+                            if (import.meta.env.DEV) console.log('[Delta-7] Establishing new identity anchor:', session.visitorId);
+                            if (session.visitorId) {
+                                await setDoc(mappingRef, {
+                                    visitorId: session.visitorId,
+                                    lastUpdated: serverTimestamp()
+                                });
+                            } else {
+                                if (import.meta.env.DEV) console.warn('[Delta-7] Skipping identity anchor: visitorId is undefined');
+                            }
                         }
                     } catch (err) {
-                        console.error('[Delta-7] Identity anchoring failure. Progress may not persist.', err);
+                        if (import.meta.env.DEV) console.error('[Delta-7] Identity anchoring failure. Progress may not persist.', err);
                     }
                 }
 
@@ -101,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthorizing(true);
         try {
             if (auth.currentUser?.isAnonymous) {
-                console.log('[Delta-7] Anchoring anonymous session to Email identity...');
+                if (import.meta.env.DEV) console.log('[Delta-7] Anchoring anonymous session to Email identity...');
                 await signInWithEmailAndPassword(auth, email, pass);
             } else {
                 await signInWithEmailAndPassword(auth, email, pass);
@@ -124,7 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthorizing(true);
         try {
             const provider = new GoogleAuthProvider();
-            console.log('[Delta-7] Initiating Google Authentication...');
+            if (import.meta.env.DEV) console.log('[Delta-7] Initiating Google Authentication...');
             await signInWithPopup(auth, provider);
         } finally {
             setIsAuthorizing(false);
@@ -137,21 +141,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             if (method === 'google') {
                 const provider = new GoogleAuthProvider();
-                console.log('[Delta-7] Anchoring: Linking anonymous session to Google...');
+                if (import.meta.env.DEV) console.log('[Delta-7] Anchoring: Linking anonymous session to Google...');
                 await linkWithPopup(auth.currentUser, provider);
             } else if (method === 'email') {
                 const { email, password } = payload;
                 if (!email || !password) throw new Error('Missing credentials');
                 const credential = EmailAuthProvider.credential(email, password);
-                console.log('[Delta-7] Anchoring: Linking anonymous session to Email...');
+                if (import.meta.env.DEV) console.log('[Delta-7] Anchoring: Linking anonymous session to Email...');
                 await linkWithCredential(auth.currentUser, credential);
             }
 
             // Force token refresh
             await auth.currentUser.getIdToken(true);
-            console.log('[Delta-7] Anchoring complete. Identity preserved.');
+            if (import.meta.env.DEV) console.log('[Delta-7] Anchoring complete. Identity preserved.');
         } catch (error: any) {
-            console.error('[Delta-7] Anchoring failed:', error);
+            if (import.meta.env.DEV) console.error('[Delta-7] Anchoring failed:', error);
             if (error.code === 'auth/credential-already-in-use') {
                 throw new Error('This account is already linked. Please sign in (current progress will be replaced).');
             }
@@ -165,20 +169,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthorizing(true);
         try {
             const functions = getFunctions();
-            const recoverSignal = httpsCallable(functions, 'recoverSignal');
+            const recoverSignalFn = httpsCallable(functions, 'recoverSignal');
 
-            console.log(`[Delta-7] Attempting signal recovery: ${code}`);
-            const result = await recoverSignal({ code });
-            const { token } = result.data as { token: string };
+            if (import.meta.env.DEV) console.log(`[Delta-7] Attempting signal recovery: ${code}`);
+            const result = await recoverSignalFn({ code });
+            const { token, visitorId: recoveredVisitorId } = result.data as { token: string; visitorId?: string };
 
             if (token) {
-                console.log('[Delta-7] Signal locked. Re-authenticating...');
+                if (import.meta.env.DEV) console.log('[Delta-7] Signal locked. Re-authenticating...');
+
+                // FIXED: Restore the visitorId from the recovered session
+                if (recoveredVisitorId) {
+                    if (import.meta.env.DEV) console.log(`[Delta-7] Restoring visitorId: ${recoveredVisitorId}`);
+                    setVisitorId(recoveredVisitorId);
+                    setObserverSession(recoveredVisitorId);
+                }
+
                 await signInWithCustomToken(auth, token);
             } else {
                 throw new Error('Signal degraded. timestamp_mismatch.');
             }
         } catch (error: any) {
-            console.error('Recovery failed:', error);
+            if (import.meta.env.DEV) console.error('Recovery failed:', error);
             throw new Error('Signal recovery failed. Frequency invalid.');
         } finally {
             setIsAuthorizing(false);
@@ -189,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthorizing(true);
         try {
             await auth.signOut();
-            console.log('[Delta-7] Soft logout initiated. Reverting to anonymous observer...');
+            if (import.meta.env.DEV) console.log('[Delta-7] Soft logout initiated. Reverting to anonymous observer...');
             await signInAnonymously(auth);
         } finally {
             setIsAuthorizing(false);
