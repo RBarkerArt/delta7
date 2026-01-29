@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import type { AuthUser } from '../context/AuthContext';
+import { db } from '../lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { soundEngine } from '../lib/SoundEngine';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
     LayoutDashboard,
@@ -10,12 +13,12 @@ import {
     ChevronLeft,
     ChevronRight,
     Database,
-    History,
     Activity,
     Menu,
     X,
     Users,
     BookOpen,
+    Zap,
     type LucideIcon
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -138,13 +141,40 @@ export const AdminLayout: React.FC = () => {
         navigate('/');
     };
 
+    // Audio Sync for Admin (Director Mode)
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, 'system', 'settings'), (docSnap) => {
+            if (docSnap.exists()) {
+                const settings = docSnap.data() as any; // Using any to avoid importing schema if not needed, or better import it
+                soundEngine.setGlobalVolume(settings.audioVolume ?? 1.0);
+                soundEngine.setAudioMode(settings.audioMode || 'generative');
+                soundEngine.setBackgroundTrack(settings.backgroundTrackUrl || null);
+                soundEngine.setIsGlobalEnabled(settings.isAudioEnabled ?? true);
+                soundEngine.setHybridTrackVolume(settings.hybridTrackVolume ?? 0.02);
+            }
+        });
+
+        // Ensure audio engine is initialized on any click in admin
+        const enableAudio = () => {
+            if (soundEngine.isReady()) return;
+            soundEngine.init().catch(() => { });
+        };
+        document.addEventListener('click', enableAudio, { once: true });
+
+        return () => {
+            unsub();
+            document.removeEventListener('click', enableAudio);
+        };
+    }, []);
+
     const navItems: NavItem[] = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
         { icon: BookOpen, label: 'Narrative', path: '/admin/narrative' },
         { icon: Users, label: 'Users', path: '/admin/observers' },
-        { icon: Database, label: 'Logs', path: '/admin/logs' },
-        { icon: History, label: 'Prologues', path: '/admin/prologues' },
+        { icon: Database, label: 'Days', path: '/admin/logs' },
+        { icon: BookOpen, label: 'Story Bible', path: '/admin/story-bible' },
         { icon: Activity, label: 'Stats', path: '/admin/stats' },
+        { icon: Zap, label: 'Director', path: '/admin/director' }, // Atmosphere Control
         { icon: Settings, label: 'Settings', path: '/admin/settings' },
     ];
 

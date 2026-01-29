@@ -19,9 +19,11 @@ import { Prologue } from './components/Prologue';
 import { AudioAtmosphere } from './components/AudioAtmosphere';
 import { AuthModal } from './components/AuthModal';
 import { GlitchOverlay } from './components/GlitchOverlay';
+import { AtmosphereManager } from './components/AtmosphereManager';
 import { TuningInterface } from './components/TuningInterface'; // Project Signal
 import { useSound } from './hooks/useSound';
 import { DebugPanel } from './components/DebugPanel';
+import { SystemStatusModal } from './components/SystemStatusModal';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import prologueData from './season1_prologues.json';
 
@@ -30,10 +32,11 @@ const AdminLogin = lazy(() => import('./components/AdminLogin').then(m => ({ def
 const AdminLayout = lazy(() => import('./components/AdminLayout').then(m => ({ default: m.AdminLayout })));
 const DashboardOverview = lazy(() => import('./components/DashboardOverview').then(m => ({ default: m.DashboardOverview })));
 const NarrativeManager = lazy(() => import('./components/NarrativeManager').then(m => ({ default: m.NarrativeManager })));
-const PrologueManager = lazy(() => import('./components/PrologueManager').then(m => ({ default: m.PrologueManager })));
 const ObserverDirectory = lazy(() => import('./components/ObserverDirectory').then(m => ({ default: m.ObserverDirectory })));
 const NarrativeReader = lazy(() => import('./components/NarrativeReader').then(m => ({ default: m.NarrativeReader })));
 const AdminSettings = lazy(() => import('./components/AdminSettings').then(m => ({ default: m.AdminSettings })));
+const StoryBibleEditor = lazy(() => import('./components/StoryBibleEditor').then(m => ({ default: m.StoryBibleEditor })));
+const AtmosphereControl = lazy(() => import('./components/AtmosphereControl').then(m => ({ default: m.AtmosphereControl })));
 
 const AUTO_PROGRESS_DELAY = 4000;
 const TYPING_SPEED = 30;
@@ -68,15 +71,20 @@ const LabInterface: React.FC = () => {
     if (loading) return;
     const fetchPrologue = async () => {
       try {
-        const prologueRef = doc(db, 'season1_prologues', `day_${currentDay}`);
-        const prologueDoc = await getDoc(prologueRef);
+        // Fetch from unified day document
+        const dayRef = doc(db, 'season1_days', `day_${currentDay}`);
+        const dayDoc = await getDoc(dayRef);
 
-        if (prologueDoc.exists()) {
-          const data = prologueDoc.data() as { sentences: string[] };
-          const randomIndex = Math.floor(Math.random() * data.sentences.length);
-          setSelectedPrologue(data.sentences[randomIndex]);
+        if (dayDoc.exists()) {
+          const data = dayDoc.data() as { prologueSentences?: string[] };
+          if (data.prologueSentences && data.prologueSentences.length > 0) {
+            const randomIndex = Math.floor(Math.random() * data.prologueSentences.length);
+            setSelectedPrologue(data.prologueSentences[randomIndex]);
+          } else {
+            throw new Error('No prologue sentences in day document');
+          }
         } else {
-          throw new Error('Firestore document missing');
+          throw new Error('Firestore day document missing');
         }
       } catch (error) {
         if (import.meta.env.DEV) console.warn('Falling back to local prologue data:', error);
@@ -262,11 +270,15 @@ const LabInterface: React.FC = () => {
 
       {isAudioEnabled && <AudioAtmosphere />}
 
+      {/* Atmosphere Control System (Theme, Particles, Blackout) */}
+      <AtmosphereManager coherence={score} />
+
       <div
         className={`relative min-h-screen w-full bg-lab-black text-signal-green font-mono scanlines p-4 sm:p-8 flex flex-col transition-colors duration-1000 overflow-x-hidden ${glitchClass} ${scanlineClass}`}
       >
         <div className="fixed inset-0 z-0 opacity-0 sm:opacity-100" />
         <BackgroundAtmosphere score={score} />
+
         <ScreenEffects flickerLevel={1} driftLevel={1} />
         <GlitchOverlay coherence={score} isGlitching={isGlitching} />
 
@@ -397,12 +409,14 @@ const LabInterface: React.FC = () => {
                   )}
                 </div>
 
-                {dayData?.images && dayData.images.filter(img => !img.placeholder && img.id && img.id.trim() !== '').length > 0 && (
-                  <div className="space-y-6 sm:space-y-8 mt-8 sm:mt-12 animate-in fade-in duration-1000">
+                {isComplete && dayData?.images && dayData.images.filter(img => !img.placeholder && img.id && img.id.trim() !== '').length > 0 && (
+                  <div className="space-y-6 sm:space-y-8 mt-8 sm:mt-12">
                     {dayData.images
                       .filter(img => !img.placeholder && img.id && img.id.trim() !== '')
                       .map((img) => (
-                        <EvidenceViewer key={img.id} image={img} coherenceScore={score} />
+                        <div key={img.id}>
+                          <EvidenceViewer image={img} coherenceScore={score} />
+                        </div>
                       ))}
                   </div>
                 )}
@@ -444,6 +458,7 @@ const LabInterface: React.FC = () => {
       />
 
       <DebugPanel />
+      <SystemStatusModal visible={!isPrologueActive} />
     </>
   );
 };
@@ -496,10 +511,12 @@ function App() {
                 }>
                   <Route index element={<DashboardOverview />} />
                   <Route path="logs" element={<NarrativeManager />} />
-                  <Route path="prologues" element={<PrologueManager />} />
                   <Route path="narrative" element={<NarrativeReader />} />
-                  <Route path="observers" element={<ObserverDirectory />} />
+                  <Route path="users" element={<ObserverDirectory />} />
+                  <Route path="observers" element={<ObserverDirectory />} /> {/* Legacy alias? */}
+                  <Route path="story-bible" element={<StoryBibleEditor />} />
                   <Route path="settings" element={<AdminSettings />} />
+                  <Route path="director" element={<AtmosphereControl />} />
                 </Route>
               </Route>
             </Routes>

@@ -89,7 +89,8 @@ service cloud.firestore {
     }
     // System settings: Admin-only
     match /system/{document=**} {
-      allow read, write: if isAdmin();
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

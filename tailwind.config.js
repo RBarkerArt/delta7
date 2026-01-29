@@ -9,7 +9,7 @@ export default {
       colors: {
         'lab-black': '#050505',
         'lab-gray': '#1a1a1a',
-        'signal-green': '#33ff00',
+        'signal-green': 'rgb(var(--signal-color) / <alpha-value>)', // Dynamic Theme Color
         'signal-amber': '#ffb000',
         'decay-red': '#ff3333',
       },

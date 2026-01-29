@@ -24,3 +24,6 @@ export const db = getFirestore(app);
 
 import { getFunctions } from 'firebase/functions';
 export const functions = getFunctions(app);
+
+import { getStorage } from "firebase/storage";
+export const storage = getStorage(app);

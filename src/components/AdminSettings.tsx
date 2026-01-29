@@ -10,8 +10,7 @@ import {
     Wifi,
     Clock,
     Server,
-    AlertTriangle,
-    Sparkles
+    AlertTriangle
 } from 'lucide-react';
 import type { SystemSettings } from '../types/schema';
 
@@ -292,34 +291,91 @@ export const AdminSettings: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Narrative Engine Rules Card */}
+                {/* Director's Console (Atmosphere) */}
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                     <div className="p-6 border-b border-gray-100 bg-gray-50/50">
                         <h3 className="font-bold text-gray-900 flex items-center gap-2">
-                            <Sparkles size={18} className="text-gray-500" /> Narrative Engine Rules
+                            <Settings size={18} className="text-gray-500" /> Atmosphere Control
                         </h3>
                     </div>
                     <div className="p-6 space-y-6">
+
+                        {/* Theme Selector */}
                         <div>
-                            <h4 className="text-sm font-medium text-gray-900">Core Directives</h4>
-                            <p className="text-xs text-gray-500 mt-1 mb-3">
-                                Detailed instructions for the AI agent regarding tone, lore accuracy, and formatting.
-                            </p>
-                            <textarea
-                                value={currentSettings.aiRules || ''}
-                                onChange={(e) => {
-                                    if (settings) {
-                                        setSettings({ ...settings, aiRules: e.target.value });
-                                    }
-                                }}
-                                onBlur={() => settings && handleSave(settings)}
-                                className="w-full h-48 p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-y text-sm font-mono"
-                                placeholder="Enter system prompts and narrative constraints here..."
-                            />
-                            <p className="text-xs text-gray-400 mt-2">
-                                * Changes are saved automatically when you click outside the text area.
-                            </p>
+                            <h4 className="text-sm font-medium text-gray-900 mb-3">Transmission Color</h4>
+                            <div className="flex gap-3">
+                                {(['green', 'amber', 'red', 'blue', 'white'] as const).map(color => (
+                                    <button
+                                        key={color}
+                                        onClick={() => {
+                                            if (settings) handleSave({ ...settings, theme: color });
+                                        }}
+                                        className={`w-10 h-10 rounded-full border-2 transition-all ${currentSettings.theme === color ? 'border-gray-900 scale-110' : 'border-transparent opacity-70 hover:opacity-100'
+                                            }`}
+                                        style={{ backgroundColor: color === 'green' ? '#33ff00' : color === 'amber' ? '#ffb000' : color === 'red' ? '#ff3333' : color === 'blue' ? '#00ffff' : '#ffffff' }}
+                                        title={color.charAt(0).toUpperCase() + color.slice(1)}
+                                    />
+                                ))}
+                            </div>
                         </div>
+
+                        {/* Particle Effect */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 className="text-sm font-medium text-gray-900 mb-2">Particle System</h4>
+                                <select
+                                    value={currentSettings.particleEffect || 'dust'}
+                                    onChange={(e) => {
+                                        if (settings) handleSave({ ...settings, particleEffect: e.target.value as any });
+                                    }}
+                                    className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                                >
+                                    <option value="dust">Dust (Floating, Evasive)</option>
+                                    <option value="ash">Ash (Falling, Heavy)</option>
+                                    <option value="digital-rain">Digital Rain (Vertical)</option>
+                                    <option value="none">None</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <h4 className="text-sm font-medium text-gray-900 mb-2">Cursor Style</h4>
+                                <select
+                                    value={currentSettings.cursorStyle || 'crosshair'}
+                                    onChange={(e) => {
+                                        if (settings) handleSave({ ...settings, cursorStyle: e.target.value as any });
+                                    }}
+                                    className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                                >
+                                    <option value="crosshair">Crosshair (Precision)</option>
+                                    <option value="default">Default Pointer</option>
+                                    <option value="none">Hidden</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Blackout Toggle */}
+                        <div className="flex items-center justify-between bg-red-50 p-4 rounded-lg border border-red-100">
+                            <div>
+                                <h4 className="text-sm font-bold text-red-900 flex items-center gap-2">
+                                    <AlertTriangle size={16} /> Global Blackout
+                                </h4>
+                                <p className="text-xs text-red-700 mt-1">
+                                    "Pull the plug". Turns screen black for all users.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => toggleSetting('isBlackout')}
+                                disabled={saving}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${currentSettings.isBlackout ? 'bg-red-600' : 'bg-gray-300'
+                                    }`}
+                            >
+                                <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${currentSettings.isBlackout ? 'translate-x-6' : 'translate-x-1'
+                                        }`}
+                                />
+                            </button>
+                        </div>
+
                     </div>
                 </div>
             </div>

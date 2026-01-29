@@ -64,7 +64,8 @@ export const ObserverDirectory: React.FC = () => {
             const obsRef = doc(db, 'observers', editingId);
             await updateDoc(obsRef, {
                 dayProgress: editForm.dayProgress,
-                coherenceScore: editForm.coherenceScore
+                coherenceScore: editForm.coherenceScore,
+                isManualDayProgress: true  // Tells CoherenceContext to respect this value
             });
 
             // Update local state

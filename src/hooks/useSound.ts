@@ -15,5 +15,10 @@ export const useSound = () => {
         setMuted: (muted: boolean) => soundEngine.setMuted(muted),
         isMuted: () => soundEngine.getMuted(),
         isReady: () => soundEngine.isReady(),
+        setGlobalVolume: (vol: number) => soundEngine.setGlobalVolume(vol),
+        setAudioMode: (mode: 'generative' | 'track' | 'hybrid') => soundEngine.setAudioMode(mode),
+        setBackgroundTrack: (url: string | null) => soundEngine.setBackgroundTrack(url),
+        setIsGlobalEnabled: (enabled: boolean) => soundEngine.setIsGlobalEnabled(enabled),
+        setHybridTrackVolume: (vol: number) => soundEngine.setHybridTrackVolume(vol),
     };
 };

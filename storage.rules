@@ -2,7 +2,21 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // All paths: Public read, Admin SDK only for writes
+    
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.role == 'admin' || 
+        request.auth.token.email == 'robert.barker2008@gmail.com'
+      );
+    }
+
+    // Evidence: Public read, Admin write
+    match /evidence/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // All other paths: Public read, no write
     match /{allPaths=**} {
       allow read: if true;
       allow write: if false;

@@ -60,6 +60,9 @@ export const EvidenceViewer: React.FC<EvidenceViewerProps> = ({ image, coherence
             {/* Scanline Effect */}
             <div className="absolute inset-0 pointer-events-none bg-scanlines opacity-[0.15]" />
 
+            {/* Dial-Up Reveal Mask */}
+            <div className="absolute inset-x-0 bottom-0 z-40 w-full bg-zinc-950 animate-dial-up-reveal pointer-events-none" />
+
             {/* Content Overlay */}
             <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent">
                 <div className="flex flex-col gap-2 translate-y-2 group-hover:translate-y-0 transition-transform duration-500">

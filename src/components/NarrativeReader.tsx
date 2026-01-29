@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
-import type { DayLog, PrologueData } from '../types/schema';
+import type { DayLog } from '../types/schema';
 import {
     BookOpen,
     Layers,
@@ -25,7 +25,6 @@ type ReaderTab = 'PROLOGUE' | 'VM_LOG' | 'FRAGMENT' | 'ARC';
 
 export const NarrativeReader: React.FC = () => {
     const [days, setDays] = useState<DayLog[]>([]);
-    const [prologues, setPrologues] = useState<PrologueData[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<ReaderTab>('PROLOGUE');
     const [searchTerm, setSearchTerm] = useState('');
@@ -39,15 +38,8 @@ export const NarrativeReader: React.FC = () => {
         setLoading(true);
         try {
             const daysQuery = query(collection(db, 'season1_days'), orderBy('day', 'asc'));
-            const prologuesQuery = query(collection(db, 'season1_prologues'), orderBy('day', 'asc'));
-
-            const [daysSnapshot, prologuesSnapshot] = await Promise.all([
-                getDocs(daysQuery),
-                getDocs(prologuesQuery)
-            ]);
-
+            const daysSnapshot = await getDocs(daysQuery);
             setDays(daysSnapshot.docs.map(doc => doc.data() as DayLog));
-            setPrologues(prologuesSnapshot.docs.map(doc => doc.data() as PrologueData));
         } catch (error) {
             console.error('Error fetching narrative content:', error);
         } finally {
@@ -67,12 +59,8 @@ export const NarrativeReader: React.FC = () => {
 
     const filteredDays = days.filter(d =>
         d.day.toString().includes(searchTerm) ||
-        d.narrativeSummary?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    const filteredPrologues = prologues.filter(p =>
-        p.day.toString().includes(searchTerm) ||
-        p.sentences.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
+        d.narrativeSummary?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        d.prologueSentences?.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     if (loading) {
@@ -169,10 +157,10 @@ export const NarrativeReader: React.FC = () => {
 
             {/* Content Feed */}
             <div className="max-w-4xl mx-auto space-y-12">
-                {activeTab === 'PROLOGUE' && filteredPrologues.map((p) => (
-                    <section key={p.day} className="relative pl-12 border-l-2 border-zinc-100 last:border-l-0 pb-12">
+                {activeTab === 'PROLOGUE' && filteredDays.map((day) => (
+                    <section key={day.day} className="relative pl-12 border-l-2 border-zinc-100 last:border-l-0 pb-12">
                         <div className="absolute left-0 top-0 -translate-x-1/2 w-8 h-8 rounded-full bg-white border-4 border-zinc-100 flex items-center justify-center text-[10px] font-bold text-zinc-400">
-                            {p.day}
+                            {day.day}
                         </div>
                         <div className="space-y-4">
                             <div className="flex items-center gap-3">
@@ -180,11 +168,15 @@ export const NarrativeReader: React.FC = () => {
                                 <div className="h-px flex-1 bg-zinc-100" />
                             </div>
                             <div className="bg-zinc-50/50 rounded-2xl p-8 border border-zinc-100 space-y-3">
-                                {p.sentences.map((sentence, idx) => (
-                                    <p key={idx} className="text-zinc-700 leading-relaxed font-serif text-lg">
-                                        {sentence}
-                                    </p>
-                                ))}
+                                {(day.prologueSentences && day.prologueSentences.length > 0) ? (
+                                    day.prologueSentences.map((sentence, idx) => (
+                                        <p key={idx} className="text-zinc-700 leading-relaxed font-serif text-lg">
+                                            {sentence}
+                                        </p>
+                                    ))
+                                ) : (
+                                    <p className="text-zinc-400 italic font-mono text-sm">No prologue data initialized for this day.</p>
+                                )}
                             </div>
                         </div>
                     </section>
@@ -260,7 +252,7 @@ export const NarrativeReader: React.FC = () => {
                             <button
                                 onClick={() => {
                                     const arcText = days.map(day => {
-                                        const prologue = prologues.find(p => p.day === day.day)?.sentences[0] || '';
+                                        const prologue = day.prologueSentences?.[0] || '';
                                         const log = getStableVMLog(day);
                                         const frag = getStableFragment(day);
                                         return `DAY ${day.day}\nPROLOGUE: ${prologue}\nLOG: ${log?.body || ''}\nFRAGMENT: ${frag?.body || ''}\n\n`;
@@ -277,7 +269,7 @@ export const NarrativeReader: React.FC = () => {
                         </div>
                         <div className="bg-zinc-900 rounded-3xl p-8 border border-zinc-800 font-mono text-sm text-zinc-300 overflow-auto max-h-[70vh] custom-scrollbar">
                             {days.map((day) => {
-                                const prologue = prologues.find(p => p.day === day.day)?.sentences[0] || '';
+                                const prologue = day.prologueSentences?.[0] || '';
                                 const log = getStableVMLog(day);
                                 const frag = getStableFragment(day);
                                 return (
@@ -306,7 +298,7 @@ export const NarrativeReader: React.FC = () => {
                 )}
 
                 {(activeTab === 'FRAGMENT' || activeTab === 'VM_LOG' || activeTab === 'PROLOGUE' || activeTab === 'ARC') &&
-                    (activeTab === 'PROLOGUE' ? filteredPrologues : filteredDays).length === 0 && (
+                    filteredDays.length === 0 && (
                         <div className="text-center py-20 px-8 bg-zinc-50 rounded-3xl border-2 border-dashed border-zinc-200">
                             <p className="text-zinc-400 font-mono text-sm uppercase tracking-widest">
                                 No matching sequences found for filter: "{searchTerm}"

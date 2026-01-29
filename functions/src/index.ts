@@ -48,18 +48,19 @@ export const generateResizedImage = functions.storage.object().onFinalize(async 
     functions.logger.log("Image downloaded locally to", tmpFilePath);
 
     // Resize image using sharp
-    const thumbFileName = `thumb_${fileName}`;
+    const thumbFileName = `thumb_${fileName.split('.')[0]}.webp`;
     const thumbFilePath = path.join(workingDir, thumbFileName);
 
     await sharp(tmpFilePath)
         .resize(500, 500, { fit: 'inside' })
+        .webp({ quality: 80 })
         .toFile(thumbFilePath);
 
     // Upload the thumbnail to the bucket
     await bucket.upload(thumbFilePath, {
         destination: path.join(path.dirname(filePath), thumbFileName),
         metadata: {
-            contentType: contentType
+            contentType: 'image/webp'
         }
     });
 
@@ -251,37 +252,101 @@ export const generateNarrativeContent = onCall({
         throw new HttpsError("unauthenticated", "User must be logged in.");
     }
 
-    // Role check (assuming custom claims or just checking UID against a known admin list in a real app)
-    // For now, we rely on the client-side Admin check + likely Firestore rules for the actual write.
-    // Ideally, we'd check request.auth.token.admin === true here.
-
-    const { prompt, context, aiRules } = request.data;
+    const { prompt, context, dayNumber } = request.data;
     const apiKey = process.env.GEMINI_API_KEY;
+    const db = admin.firestore();
 
-    // Use variables to avoid lint errors (Mocking usage)
-    console.log(`Generating content (Mock Mode)`);
-    console.log(`Applying AI Rules: ${aiRules ? 'YES' : 'NO'}`);
+    // 2. Auto-fetch story context for continuity
+    let storyBibleContext = "";
+    let previousDaysContext = "";
+    let currentPlotBeat = "";
 
-    // 2. Connector Logic (Real Implementation)
+    try {
+        // Fetch story bible
+        const storyBibleDoc = await db.collection('system').doc('story_bible').get();
+        if (storyBibleDoc.exists) {
+            const bible = storyBibleDoc.data();
+            storyBibleContext = `
+STORY OVERVIEW: ${bible?.overview || 'Not defined'}
+THEMES: ${(bible?.themes || []).join(', ')}
+CHARACTERS: ${(bible?.characters || []).map((c: any) => `${c.name} (${c.role}): ${c.arc}`).join('; ')}
+AI INSTRUCTIONS: ${bible?.aiInstructions || ''}
+            `.trim();
+
+            // Find current plot beat
+            const plotBeats = bible?.plotBeats || [];
+            const currentBeat = plotBeats.find((beat: any) =>
+                dayNumber >= beat.dayStart && dayNumber <= beat.dayEnd
+            );
+            if (currentBeat) {
+                currentPlotBeat = `CURRENT PLOT BEAT (Days ${currentBeat.dayStart}-${currentBeat.dayEnd}): ${currentBeat.title}\n${currentBeat.description}`;
+            }
+        }
+
+        // Fetch previous 5 days for context
+        if (dayNumber > 1) {
+            const startDay = Math.max(1, dayNumber - 5);
+            const prevDaysSnapshot = await db.collection('season1_days')
+                .where('day', '>=', startDay)
+                .where('day', '<', dayNumber)
+                .orderBy('day', 'desc')
+                .limit(5)
+                .get();
+
+            const prevDays = prevDaysSnapshot.docs.map(doc => doc.data());
+            if (prevDays.length > 0) {
+                previousDaysContext = `
+PREVIOUS DAYS CONTEXT (most recent first):
+${prevDays.map(d => `Day ${d.day}: ${d.narrativeSummary}${d.variables?.kaelMood ? ` [Kael: ${d.variables.kaelMood}]` : ''}`).join('\n')}
+                `.trim();
+            }
+        }
+    } catch (contextError) {
+        console.warn("Failed to fetch auto-context:", contextError);
+        // Continue without auto-context
+    }
+
+    // 3. Fetch AI Rules from settings
+    let aiRules = "";
+    try {
+        const settingsDoc = await db.collection('system').doc('settings').get();
+        if (settingsDoc.exists) {
+            aiRules = settingsDoc.data()?.aiRules || "";
+        }
+    } catch (err) {
+        console.warn("Failed to fetch AI rules:", err);
+    }
+
+    console.log(`Generating content for Day ${dayNumber || 'unknown'}`);
+
+    // 4. Connector Logic (Real Implementation)
     const { GoogleGenerativeAI } = await import("@google/generative-ai");
     const genAI = new GoogleGenerativeAI(apiKey || "");
 
-    // Using gemini-1.5-flash as requested (fastest/cheapest for this use case)
     const model = genAI.getGenerativeModel({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.0-flash",
         generationConfig: {
             responseMimeType: "application/json"
         }
     });
 
     const systemInstruction = `
-    Role: You are the Narrative Engine for 'Delta 7', an immersive sci-fi puzzle interface.
-    Task: Generate a JSON object containing a narrative summary, 5 system logs (one for each coherence state), and reality fragments.
+    Role: You are the Narrative Engine for 'Delta 7', an immersive sci-fi puzzle interface spanning 365 days.
+    Task: Generate a JSON object containing a narrative summary, prologue sentences, 5 system logs (one for each coherence state), and reality fragments.
     Constraint: You MUST output valid JSON only. No markdown formatting.
+    
+    CONTINUITY IS CRITICAL: This is a long-form narrative. Reference previous events, maintain character consistency, and build on established story threads.
+    
+    ${storyBibleContext}
+    
+    ${currentPlotBeat}
+    
+    ${previousDaysContext}
     
     Data Schema:
     {
-      "narrativeSummary": "Internal summary of the plot beat (string)",
+      "narrativeSummary": "Internal summary of the plot beat (string, 2-3 sentences)",
+      "prologueSentences": ["First sentence shown to user on entry", "Second sentence", "Optional third"],
       "vm_logs": {
         "FEED_STABLE": { "id": "unique_id", "title": "Log Title", "body": "Log Content" },
         "SYNC_RECOVERING": { "id": "unique_id", "title": "Log Title", "body": "Log Content" },
@@ -291,14 +356,23 @@ export const generateNarrativeContent = onCall({
       },
       "fragments": [
         { "id": "frag_id", "body": "Cryptic text...", "severity": "COHERENCE_STATE" }
-      ]
+      ],
+      "variables": {
+        "kaelMood": "descriptive mood state of Kael",
+        "kaelCoherence": 0-100
+      }
     }
     
-    IMPORTANT: You must provide a log entry for ALL 5 coherence states in the 'vm_logs' object.
+    IMPORTANT: 
+    - Provide ALL 5 coherence state logs in 'vm_logs'
+    - Prologue sentences should be evocative, setting the tone for the day
+    - Include 2-4 reality fragments
+    - Variables track story state for future generation
     `;
 
     const userPrompt = `
-    CONTEXT: ${context}
+    GENERATING: Day ${dayNumber || 'NEW'}
+    USER CONTEXT: ${context || 'No additional context provided'}
     INSTRUCTIONS: ${prompt}
     SYSTEM RULES: ${aiRules}
     `;
@@ -310,9 +384,14 @@ export const generateNarrativeContent = onCall({
         // Parse JSON safely
         const generatedData = JSON.parse(responseText);
 
-        // Sanitize/Validate structure basic check
+        // Validate structure
         if (!generatedData.narrativeSummary || !generatedData.vm_logs) {
             throw new Error("Invalid structure returned from AI");
+        }
+
+        // Ensure prologueSentences exists
+        if (!generatedData.prologueSentences) {
+            generatedData.prologueSentences = [];
         }
 
         return generatedData;
@@ -322,4 +401,59 @@ export const generateNarrativeContent = onCall({
     }
 });
 
+// -------------------------------------------------------------
+// ONE-TIME MIGRATION: Copy prologues to day logs
+// -------------------------------------------------------------
+export const migrateProloguesToDays = onCall({
+    enforceAppCheck: true
+}, async (request) => {
+    // Verify admin
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Must be logged in.");
+    }
+    const userDoc = await admin.firestore().collection("users").doc(request.auth.uid).get();
+    if (!userDoc.exists || userDoc.data()?.role !== "admin") {
+        throw new HttpsError("permission-denied", "Admin access required.");
+    }
 
+    const db = admin.firestore();
+    const prologuesSnapshot = await db.collection("season1_prologues").get();
+
+    const results: { day: number; status: string }[] = [];
+
+    for (const prologueDoc of prologuesSnapshot.docs) {
+        const prologueData = prologueDoc.data();
+        const dayNumber = prologueData.day;
+        const sentences = prologueData.sentences || [];
+
+        const dayDocId = `day_${dayNumber}`;
+        const dayRef = db.collection("season1_days").doc(dayDocId);
+        const dayDoc = await dayRef.get();
+
+        if (dayDoc.exists) {
+            // Update existing day doc with prologueSentences
+            await dayRef.update({
+                prologueSentences: sentences
+            });
+            results.push({ day: dayNumber, status: "updated" });
+        } else {
+            // Create new day doc with just prologueSentences
+            await dayRef.set({
+                day: dayNumber,
+                prologueSentences: sentences,
+                narrativeSummary: "",
+                vm_logs: {},
+                fragments: [],
+                defaultState: "STABLE",
+                variables: {}
+            });
+            results.push({ day: dayNumber, status: "created" });
+        }
+    }
+
+    return {
+        success: true,
+        migrated: results.length,
+        details: results
+    };
+});

@@ -110,8 +110,16 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
                 let finalStartDate = data.startDate;
                 if (!isAdminRole) {
-                    // Logic Loop: If stored day (e.g. manual debug set) is ahead of calc day, respect it by shifting start date
-                    if (storedDay > calculatedDay) {
+                    // PRIORITY: If admin manually set the day, respect it completely
+                    if (data.isManualDayProgress) {
+                        if (import.meta.env.DEV) console.log(`[Delta-7] Manual day override active. Using admin-set day: ${storedDay}`);
+                        calculatedDay = storedDay;
+                        // Shift start date to align with manual day
+                        const newStartMillis = now - (storedDay - 1) * msPerDay;
+                        finalStartDate = Timestamp.fromMillis(newStartMillis);
+                    }
+                    // Legacy: If stored day is ahead of calc day (from debug panel), respect it
+                    else if (storedDay > calculatedDay) {
                         if (import.meta.env.DEV) console.log(`[Delta-7] Day override detected (${storedDay} vs ${calculatedDay}). Realigning temporal origin...`);
                         calculatedDay = storedDay;
                         // Shift start date back to ensure calculation holds
@@ -370,6 +378,30 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'hidden') {
                 syncToFirestore('visibility_hidden');
+            } else if (document.visibilityState === 'visible') {
+                // Recalculate day on tab focus - setTimeout is unreliable for background tabs
+                const startMs = startDateRef.current?.toMillis() || Date.now();
+                const now = Date.now();
+                const msPerDay = 24 * 60 * 60 * 1000;
+
+                // Calculate expected day based on start date
+                const startMidnight = new Date(startMs).setUTCHours(0, 0, 0, 0);
+                const nowMidnight = new Date(now).setUTCHours(0, 0, 0, 0);
+                const expectedDay = Math.floor((nowMidnight - startMidnight) / msPerDay) + 1;
+
+                const currentDayVal = currentDayRef.current;
+
+                if (expectedDay > currentDayVal) {
+                    if (import.meta.env.DEV) console.log(`[Delta-7] Tab visible: Day catch-up ${currentDayVal} → ${expectedDay}`);
+                    // Trigger glitch effect for day advancement
+                    setIsGlitching(true);
+                    setCurrentDayState(expectedDay);
+                    currentDayRef.current = expectedDay;
+                    setTimeout(() => setIsGlitching(false), 1500);
+
+                    // Also sync the new day to Firestore
+                    syncToFirestore('day_catchup');
+                }
             }
         };
 

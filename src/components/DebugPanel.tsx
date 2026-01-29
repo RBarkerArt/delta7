@@ -11,8 +11,11 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 export const DebugPanel: React.FC = () => {
     // Read-only from context - diagnostic displays current state, writers for optimistic updates
     const { score, currentDay, state, setScore, setCurrentDay } = useCoherence();
-    const { user, visitorId } = useAuth();
+    const { user, visitorId, isAdmin } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
+
+    // Only render for admin users
+    if (!isAdmin) return null;
 
     // Local state for sliders (immediate UI feedback)
     const [localScore, setLocalScore] = useState(score);
@@ -79,7 +82,7 @@ export const DebugPanel: React.FC = () => {
     // App will pick up changes on next Firestore sync cycle
 
     return (
-        <div className={`fixed bottom-4 right-4 z-[5000] flex flex-col items-end gap-2 transition-transform duration-500 ${isOpen ? 'translate-y-0' : 'translate-y-[calc(100%-48px)]'}`}>
+        <div className={`fixed bottom-4 left-4 z-[5000] flex flex-col items-start gap-2 transition-transform duration-500 ${isOpen ? 'translate-y-0' : 'translate-y-[calc(100%-48px)]'}`}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center gap-2 px-4 py-3 bg-zinc-900 border border-emerald-900/40 rounded-xl text-emerald-500 hover:bg-zinc-800 transition-all font-mono text-[10px] tracking-widest uppercase shadow-2xl"

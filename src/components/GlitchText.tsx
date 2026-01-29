@@ -54,25 +54,66 @@ export const GlitchText: React.FC<GlitchTextProps> = ({ text, coherenceScore, cl
         };
     }, [coherenceScore]);
 
+    const [hiddenText, setHiddenText] = useState<string | null>(null);
+
+    // Semantic Drift Data
+    const REDACTIONS = ['[REDACTED]', '[DATA_LOST]', '█', '████', '[CORRUPT]'];
+    const WHISPERS = [
+        'they are watching',
+        'do not trust the feed',
+        'signal decay',
+        'it sees you',
+        'run',
+        'not safe',
+        'disconnect',
+        "don't look"
+    ];
+
     // Main glitch effect
     useEffect(() => {
         if (params.substitutionChance === 0) {
             setGlitchedText(text);
+            setHiddenText(null);
             return;
         }
 
         const triggerGlitch = () => {
-            const chars = text.split('');
+            // 1. Semantic Drift (Word Level)
+            let processedText = text;
+            if (coherenceScore < 40) {
+                const words = text.split(' ');
+                processedText = words.map(word => {
+                    // Skip short words
+                    if (word.length < 4) return word;
+
+                    // Chance to Redact (drastically reduced)
+                    // Only happens meaningfully at critical levels (< 20)
+                    const redactChance = coherenceScore < 20 ? 0.03 : 0.005;
+                    if (Math.random() < redactChance) {
+                        return REDACTIONS[Math.floor(Math.random() * REDACTIONS.length)];
+                    }
+
+                    // Chance to Vowel Decay (s_w h_m)
+                    // Still rare, but slightly more common than full redaction
+                    if (Math.random() < redactChance * 2) {
+                        return word.replace(/[aeiou]/gi, '_');
+                    }
+
+                    return word;
+                }).join(' ');
+            }
+
+            // 2. Character Glitch (Char Level)
+            const chars = processedText.split('');
             const newChars = chars.map((char) => {
-                // Preserve whitespace
                 if (char === ' ' || char === '\n') return char;
 
-                // Ghost character substitution (block characters)
-                if (Math.random() < params.ghostChance * 0.3) {
+                // Ghost character (block)
+                if (Math.random() < params.ghostChance * 0.2) { // Scaled back from 0.3
                     return GHOST_CHARS[Math.floor(Math.random() * GHOST_CHARS.length)];
                 }
 
-                // Standard glitch substitution
+                // Standard substitution
                 if (Math.random() < params.substitutionChance) {
                     return GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
                 }
@@ -80,6 +121,14 @@ export const GlitchText: React.FC<GlitchTextProps> = ({ text, coherenceScore, cl
             });
 
             setGlitchedText(newChars.join(''));
+
+            // 3. Hidden Text Injection (Steganography)
+            // Only at very low coherence and rare
+            if (coherenceScore < 30 && Math.random() < 0.08) {
+                setHiddenText(WHISPERS[Math.floor(Math.random() * WHISPERS.length)]);
+            } else {
+                setHiddenText(null);
+            }
 
             // Letter-spacing jitter
             if (params.jitterAmount > 0 && Math.random() < 0.5) {
@@ -103,17 +152,17 @@ export const GlitchText: React.FC<GlitchTextProps> = ({ text, coherenceScore, cl
                 }
             }
 
-            // Settle back to original
-            setTimeout(() => {
-                setGlitchedText(text);
-                setJitterStyle({});
-            }, 60 + Math.random() * 120);
+            // Settle callback (removed to allow continuous semantic drift stability)
+            // If we settle, redactions disappear too quickly. 
+            // We want redactions to persist until next tick.
         };
 
         const interval = setInterval(triggerGlitch, params.interval * (0.7 + Math.random() * 0.6));
+        // Trigger immediately
+        triggerGlitch();
 
         return () => clearInterval(interval);
-    }, [text, params]);
+    }, [text, params, coherenceScore]);
 
     return (
         <span
@@ -127,6 +176,14 @@ export const GlitchText: React.FC<GlitchTextProps> = ({ text, coherenceScore, cl
             }}
         >
             {glitchedText}
+
+            {/* Hidden Text Steganography */}
+            {hiddenText && (
+                <span className="inline-block w-[1px] h-[1em] overflow-hidden whitespace-nowrap text-transparent selection:w-auto selection:h-auto selection:overflow-visible selection:bg-emerald-500 selection:text-black font-bold mx-0.5 align-middle select-text">
+                    {hiddenText}
+                </span>
+            )}
+
             {/* Echo word overlay */}
             {echoWord && (
                 <span

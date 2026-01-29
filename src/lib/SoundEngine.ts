@@ -23,6 +23,14 @@ class SoundEngine {
     private muted = false;
     private currentScore = 100;
 
+    // Background Track System
+    private bgAudio: HTMLAudioElement | null = null;
+    private bgTrackUrl: string | null = null;
+    private globalVolume: number = 1.0;
+    private audioMode: 'generative' | 'track' | 'hybrid' = 'generative';
+    private isGlobalEnabled: boolean = true;
+    private hybridTrackVolume: number = 0.02;
+
     public async init(): Promise<boolean> {
         if (this.initialized && this.ctx?.state === 'running') return true;
 
@@ -31,7 +39,7 @@ class SoundEngine {
                 this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
             }
 
-            if (this.ctx.state === 'suspended') {
+            if (this.ctx.state === 'suspended' && !this.muted) {
                 await this.ctx.resume();
             }
 
@@ -105,15 +113,140 @@ class SoundEngine {
 
     setMuted(muted: boolean) {
         this.muted = muted;
+
+        // Immediate mute/unmute for master gain (generative audio)
         if (this.masterGain && this.ctx) {
-            try {
-                this.masterGain.gain.setTargetAtTime(muted ? 0 : 0.3, this.ctx.currentTime, 0.1);
-            } catch (e) { /* silent */ }
+            const now = this.ctx.currentTime;
+            if (muted) {
+                // Immediate silence
+                this.masterGain.gain.cancelScheduledValues(now);
+                this.masterGain.gain.setValueAtTime(0, now);
+                // Suspend AudioContext to guarantee silence
+                this.ctx.suspend().catch(() => { });
+            } else {
+                // Resume AudioContext first
+                this.ctx.resume().then(() => {
+                    if (this.masterGain && this.ctx) {
+                        // Restore with short ramp
+                        this.masterGain.gain.setTargetAtTime(0.3 * this.globalVolume, this.ctx.currentTime, 0.1);
+                    }
+                }).catch(() => { });
+            }
         }
+
+        // Immediately pause/resume background track
+        if (this.bgAudio) {
+            if (muted) {
+                this.bgAudio.pause();
+            } else if (this.isGlobalEnabled && (this.audioMode === 'track' || this.audioMode === 'hybrid')) {
+                this.bgAudio.play().catch(() => { });
+            }
+        }
+
+        this.updateVolumes();
     }
 
     getMuted(): boolean {
         return this.muted;
+    }
+
+    setGlobalVolume(volume: number) {
+        this.globalVolume = Math.max(0, Math.min(1, volume));
+        this.updateVolumes();
+    }
+
+    setAudioMode(mode: 'generative' | 'track' | 'hybrid') {
+        this.audioMode = mode;
+        this.updateVolumes();
+    }
+
+    setBackgroundTrack(url: string | null) {
+        if (this.bgTrackUrl === url) return;
+
+        this.bgTrackUrl = url;
+
+        if (this.bgAudio) {
+            this.bgAudio.pause();
+            this.bgAudio = null;
+        }
+
+        if (url) {
+            this.bgAudio = new Audio(url);
+            this.bgAudio.loop = true;
+
+            // Debug listeners
+            this.bgAudio.addEventListener('canplay', () => console.log('[SoundEngine] Track loaded and ready to play'));
+            this.bgAudio.addEventListener('playing', () => console.log('[SoundEngine] Track is playing'));
+            this.bgAudio.addEventListener('error', (_e) => {
+                const error = this.bgAudio?.error;
+                console.error('[SoundEngine] Track error:', error?.code, error?.message);
+            });
+
+            console.log('[SoundEngine] Background track set:', url);
+            this.updateVolumes();
+
+            // Attempt to play if allowed
+            if (this.initialized && !this.muted && this.isGlobalEnabled) {
+                const playPromise = this.bgAudio.play();
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => console.log("[SoundEngine] Playback started successfully"))
+                        .catch(e => console.warn("[SoundEngine] Autoplay blocked/failed:", e));
+                }
+            }
+        }
+    }
+
+    setIsGlobalEnabled(enabled: boolean) {
+        this.isGlobalEnabled = enabled;
+
+        // DO NOT override user's mute state. 
+        // Audio plays only if (isGlobalEnabled && !muted).
+        // This decouples the system switch (admin) from the user switch (mute).
+
+        // Handle background track play/pause specifically
+        if (this.bgAudio) {
+            if (enabled && !this.muted && (this.audioMode === 'track' || this.audioMode === 'hybrid')) {
+                this.bgAudio.play().catch(() => { });
+            } else {
+                this.bgAudio.pause();
+            }
+        }
+
+        this.updateVolumes();
+    }
+
+    setHybridTrackVolume(volume: number) {
+        this.hybridTrackVolume = Math.max(0, Math.min(1, volume));
+        this.updateVolumes();
+    }
+
+    private updateVolumes() {
+        const now = this.ctx?.currentTime || 0;
+        const rampTime = 0.5;
+        const isGenActive = (this.audioMode === 'generative' || this.audioMode === 'hybrid') && !this.muted && this.isGlobalEnabled;
+        const isTrackActive = (this.audioMode === 'track' || this.audioMode === 'hybrid') && !this.muted && this.isGlobalEnabled;
+
+        // 1. Update Generative Volume (Master Gain)
+        if (this.masterGain && this.ctx) {
+            // Generative is always base 0.3 gain when active
+            const targetGain = isGenActive ? (0.3 * this.globalVolume) : 0;
+            try {
+                this.masterGain.gain.setTargetAtTime(targetGain, now, rampTime);
+            } catch (e) { }
+        }
+
+        // 2. Update Background Track Volume
+        if (this.bgAudio) {
+            let baseVol = 1.0;
+            if (this.audioMode === 'hybrid') {
+                baseVol = this.hybridTrackVolume; // Use configurable hybrid volume
+            }
+
+            const targetBgVol = isTrackActive ? (baseVol * this.globalVolume) : 0;
+            this.bgAudio.volume = targetBgVol;
+            // console.log(`[SoundEngine] Vol Update: Global=${this.globalVolume}, Mode=${this.audioMode}, BG Target=${targetBgVol.toFixed(4)}`);
+        }
     }
 
     isReady(): boolean {

@@ -50,6 +50,26 @@ export const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ scor
 
     return (
         <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden select-none bg-black">
+            {/* Film Grain Layer - heavily reactive to coherence */}
+            <div
+                className="absolute inset-0 pointer-events-none z-10"
+                style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+                    opacity: 0.03 + (100 - score) * 0.0015, // 0.03 to 0.18
+                    mixBlendMode: 'overlay',
+                }}
+            />
+
+            {/* Scanline Layer - classic CRT feel */}
+            <div
+                className="absolute inset-0 pointer-events-none z-10"
+                style={{
+                    background: 'linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1))',
+                    backgroundSize: '100% 4px',
+                    opacity: 0.15 + (100 - score) * 0.001, // 0.15 to 0.25
+                }}
+            />
+
             {/* The Image Layer */}
             <div
                 className="absolute inset-0 transition-transform duration-[4000ms] linear scale-110"
@@ -57,7 +77,7 @@ export const BackgroundAtmosphere: React.FC<BackgroundAtmosphereProps> = ({ scor
                     backgroundImage: `url('https://firebasestorage.googleapis.com/v0/b/delta7-3fede.firebasestorage.app/o/site%20images%2FScreenshot%202025-12-20%20at%209.50.58%E2%80%AFPM.png?alt=media&token=56908937-e9ad-4e3c-a0ee-2bbab4595af0')`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
-                    filter: `blur(${blurAmount}px)`,
+                    filter: `blur(${blurAmount}px) grayscale(${50 + (100 - score) * 0.5}%)`, // Added grayscale reactivity
                     opacity: 0.8,
                     ...jitterStyle
                 }}
