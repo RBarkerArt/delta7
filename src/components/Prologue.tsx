@@ -8,9 +8,10 @@ interface PrologueProps {
 export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete }) => {
     const [phase, setPhase] = useState<'reveal' | 'hold' | 'fade-out' | 'final-sequence'>('reveal');
 
+
     useEffect(() => {
         if (phase === 'reveal') {
-            const timer = setTimeout(() => setPhase('hold'), 6000);
+            const timer = setTimeout(() => setPhase('hold'), 8000);
             return () => clearTimeout(timer);
         }
 
@@ -33,8 +34,21 @@ export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete }) => {
 
     return (
         <div className="fixed inset-0 bg-lab-black z-[100] flex items-center justify-center p-8 sm:p-24 overflow-hidden">
+            {/* Background Image */}
+            <div
+                className={`
+                    absolute inset-0 z-0 pointer-events-none transition-all duration-[4000ms] ease-out
+                    ${(phase === 'fade-out' || phase === 'final-sequence') ? 'opacity-0 scale-105 blur-sm' : 'animate-prologue-bg-fade'}
+                `}
+                style={{
+                    backgroundImage: `url("https://firebasestorage.googleapis.com/v0/b/delta7-3fede.firebasestorage.app/o/site%20images%2FDELTA_7%20%3E%20PROJECT%20-%201.png?alt=media&token=a4416008-df76-469f-8787-745f747b8e72")`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                }}
+            />
+
             <div className={`
-                max-w-3xl w-full text-center transition-all duration-[4000ms] ease-in-out
+                max-w-3xl w-full text-center transition-all duration-[4000ms] ease-in-out relative z-10
                 ${(phase === 'fade-out' || phase === 'final-sequence') ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100'}
                 animate-memory-float
             `}>
@@ -43,7 +57,7 @@ export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete }) => {
                     ${phase === 'reveal' ? 'prologue-mask-revealing' : 'prologue-mask-visible'}
                 `}>
                     <p
-                        className="font-['EB_Garamond'] italic text-2xl sm:text-4xl text-[#d1d1c7] leading-relaxed tracking-widest select-none"
+                        className="font-['EB_Garamond'] italic text-3xl sm:text-5xl text-[#d1d1c7] leading-relaxed tracking-widest select-none"
                         style={{ textShadow: '0 0 20px rgba(209, 209, 199, 0.15)' }}
                     >
                         {sentence}

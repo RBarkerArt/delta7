@@ -92,11 +92,11 @@ export const NarrativeReader: React.FC = () => {
 
             {/* Navigation & Search */}
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-                <div className="flex items-center p-1 bg-zinc-100 rounded-2xl border border-zinc-200">
+                <div className="flex items-center p-1 bg-zinc-100 rounded-2xl border border-zinc-200 overflow-x-auto custom-scrollbar flex-nowrap hide-scrollbar max-w-full">
                     <button
                         onClick={() => setActiveTab('PROLOGUE')}
                         className={cn(
-                            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold font-mono transition-all",
+                            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold font-mono transition-all whitespace-nowrap",
                             activeTab === 'PROLOGUE'
                                 ? "bg-white text-emerald-600 shadow-sm border border-emerald-100"
                                 : "text-zinc-400 hover:text-zinc-600"
@@ -108,7 +108,7 @@ export const NarrativeReader: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('VM_LOG')}
                         className={cn(
-                            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold font-mono transition-all",
+                            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold font-mono transition-all whitespace-nowrap",
                             activeTab === 'VM_LOG'
                                 ? "bg-white text-emerald-600 shadow-sm border border-emerald-100"
                                 : "text-zinc-400 hover:text-zinc-600"
@@ -120,7 +120,7 @@ export const NarrativeReader: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('FRAGMENT')}
                         className={cn(
-                            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold font-mono transition-all",
+                            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold font-mono transition-all whitespace-nowrap",
                             activeTab === 'FRAGMENT'
                                 ? "bg-white text-emerald-600 shadow-sm border border-emerald-100"
                                 : "text-zinc-400 hover:text-zinc-600"
@@ -132,7 +132,7 @@ export const NarrativeReader: React.FC = () => {
                     <button
                         onClick={() => setActiveTab('ARC')}
                         className={cn(
-                            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold font-mono transition-all",
+                            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold font-mono transition-all whitespace-nowrap",
                             activeTab === 'ARC'
                                 ? "bg-white text-emerald-600 shadow-sm border border-emerald-100"
                                 : "text-zinc-400 hover:text-zinc-600"
@@ -261,32 +261,32 @@ export const NarrativeReader: React.FC = () => {
                                     setCopied(true);
                                     setTimeout(() => setCopied(false), 2000);
                                 }}
-                                className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white rounded-lg text-xs font-mono hover:bg-zinc-800 transition-all"
+                                className="flex items-center gap-2 px-4 py-2 bg-zinc-100 text-zinc-900 border border-zinc-200 rounded-lg text-xs font-mono hover:bg-zinc-200 transition-all font-bold"
                             >
                                 {copied ? <CheckCircle2 size={14} /> : <Clipboard size={14} />}
                                 {copied ? 'COPIED_TO_CLIPBOARD' : 'COPY_NARRATIVE_ARC'}
                             </button>
                         </div>
-                        <div className="bg-zinc-900 rounded-3xl p-8 border border-zinc-800 font-mono text-sm text-zinc-300 overflow-auto max-h-[70vh] custom-scrollbar">
+                        <div className="bg-white rounded-3xl p-8 border border-zinc-200 font-mono text-sm text-zinc-900 overflow-auto max-h-[70vh] custom-scrollbar shadow-sm">
                             {days.map((day) => {
                                 const prologue = day.prologueSentences?.[0] || '';
                                 const log = getStableVMLog(day);
                                 const frag = getStableFragment(day);
                                 return (
                                     <div key={day.day} className="mb-12 last:mb-0 space-y-4">
-                                        <div className="flex items-center gap-4 text-emerald-500 font-bold">
+                                        <div className="flex items-center gap-4 text-emerald-600 font-bold">
                                             <span>[DAY_{day.day}]</span>
-                                            <div className="h-px flex-1 bg-zinc-800" />
+                                            <div className="h-px flex-1 bg-zinc-200" />
                                         </div>
-                                        <div className="space-y-2 pl-4 border-l border-zinc-800">
+                                        <div className="space-y-2 pl-4 border-l border-zinc-200">
                                             <p className="text-zinc-500 text-[10px] uppercase tracking-widest">Temporal_Induction</p>
-                                            <p className="italic text-zinc-400">"{prologue}"</p>
+                                            <p className="italic text-zinc-700">"{prologue}"</p>
                                         </div>
-                                        <div className="space-y-2 pl-4 border-l border-zinc-800 text-xs">
+                                        <div className="space-y-2 pl-4 border-l border-zinc-200 text-xs">
                                             <p className="text-zinc-500 text-[10px] uppercase tracking-widest">Neural_Log_Stable</p>
-                                            <p className="whitespace-pre-wrap">{log?.body}</p>
+                                            <p className="whitespace-pre-wrap text-zinc-800">{log?.body}</p>
                                         </div>
-                                        <div className="space-y-2 pl-4 border-l border-zinc-800 text-xs text-emerald-400/80">
+                                        <div className="space-y-2 pl-4 border-l border-zinc-200 text-xs text-emerald-700">
                                             <p className="text-zinc-500 text-[10px] uppercase tracking-widest">Stable_Neural_Trace</p>
                                             <p>"{frag?.body}"</p>
                                         </div>

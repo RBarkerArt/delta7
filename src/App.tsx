@@ -285,14 +285,14 @@ const LabInterface: React.FC = () => {
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-signal-green/30 pb-4 mb-4 sm:mb-8 select-none relative z-10">
 
           {/* LEFT SIDE: Frequency, User, Audio */}
-          <div className="flex items-center gap-4 w-full sm:w-auto">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-start">
+            <div className="flex items-center gap-2 sm:gap-3">
               {/* 1. Frequency Input/Display (Highlighted & Pulsing) */}
               <button
                 onClick={() => setIsTuningOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-md transition-all duration-300 border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 animate-pulse-gentle group"
+                className="flex items-center gap-2 px-2 sm:px-3 py-2 sm:py-1.5 rounded-md transition-all duration-300 border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 animate-pulse-gentle group min-w-[100px] justify-center"
               >
-                <span className="text-[10px] font-mono tracking-[0.2em] uppercase group-hover:text-emerald-400 transition-colors">
+                <span className="text-[10px] sm:text-[10px] font-mono tracking-[0.2em] uppercase group-hover:text-emerald-400 transition-colors">
                   {accessCode ? `FREQ:${accessCode}` : 'TUNING...'}
                 </span>
               </button>
@@ -330,10 +330,10 @@ const LabInterface: React.FC = () => {
                   setIsAudioEnabled(newState);
                   setMuted(!newState);
                 }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all duration-300 border ${isAudioEnabled
+                className={`flex items-center justify-center w-10 sm:w-auto gap-2 px-2 sm:px-3 py-2 sm:py-1.5 rounded-md transition-all duration-300 border ${isAudioEnabled
                   ? 'border-emerald-900/40 text-emerald-700/60 bg-emerald-900/5'
                   : 'border-white/5 text-white/20 bg-white/5'
-                  } hover:border-emerald-500/30 hover:text-emerald-500/50`}
+                  } hover:border-emerald-500/30 hover:text-emerald-500/50 h-10 sm:h-auto`}
                 aria-label={isAudioEnabled ? "Mute Audio" : "Enable Audio"}
               >
                 {isAudioEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
@@ -345,26 +345,26 @@ const LabInterface: React.FC = () => {
           </div>
 
           {/* RIGHT SIDE: Feed Status (Terminal) + Coherence Bar */}
-          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
             {/* Feed Status Moved Here */}
-            <div className="flex items-center gap-2 order-last sm:order-first">
-              <Terminal size={20} className="text-signal-green shrink-0" />
+            <div className="flex items-center gap-3 order-last sm:order-first">
+              <Terminal size={18} className="text-signal-green shrink-0 sm:size-5" />
               <div className={`text-sm sm:text-base font-bold truncate ${score < 30 ? 'text-decay-red' : 'text-signal-green'}`}>
                 <GlitchText text={state} coherenceScore={score} />
               </div>
             </div>
 
             {/* Coherence Bar Container */}
-            <div className="flex flex-col items-end gap-1 w-full sm:w-64">
+            <div className="flex flex-col items-stretch sm:items-end gap-1 w-full sm:w-64">
               <div className="flex justify-between items-end w-full px-1">
-                <span className={`text-[9px] uppercase tracking-widest animate-pulse ${score < 100 ? 'opacity-40' : 'opacity-0'}`}>
+                <span className={`text-[10px] uppercase tracking-widest animate-pulse ${score < 100 ? 'opacity-40' : 'opacity-0'}`}>
                   {score < 100 ? 'STABILIZING...' : ''}
                 </span>
-                <span className="text-[10px] text-signal-green/50">
+                <span className="text-[10px] sm:text-[10px] text-signal-green/50 font-mono">
                   {(score).toFixed(1)}%
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-lab-gray border border-signal-green/10 rounded-full overflow-hidden">
+              <div className="w-full h-2 sm:h-1.5 bg-lab-gray border border-signal-green/10 rounded-full overflow-hidden">
                 <div
                   className={`h-full transition-all duration-[3000ms] linear ${score > 70 ? 'bg-signal-green' : score > 30 ? 'bg-signal-amber' : 'bg-decay-red'
                     }`}

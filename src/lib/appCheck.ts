@@ -9,7 +9,7 @@ export const initAppCheck = () => {
     }
 
     const appCheck = initializeAppCheck(app, {
-        provider: new ReCaptchaEnterpriseProvider('6LcYX1QsAAAAAMBsK5hQxBGTSv1-YGzr-lsZFk0b'),
+        provider: new ReCaptchaEnterpriseProvider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
         isTokenAutoRefreshEnabled: true
     });
 

@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import type { User } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, Timestamp } from 'firebase/firestore';
+import React, { useEffect, useState, useRef } from 'react';
+
+import { doc, setDoc, updateDoc, Timestamp, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { UserProgress, CoherenceState } from '../types/schema';
 import { useAuth } from '../hooks/useAuth';
@@ -23,21 +23,19 @@ const getCoherenceState = (score: number): CoherenceState => {
     return 'CRITICAL_INTERFERENCE';
 };
 
-const ADMIN_EMAIL = 'robert.barker2008@gmail.com';
 
 export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const { user, loading: authLoading, ensureUser, visitorId } = useAuth();
+    const { user, loading: authLoading, ensureUser, visitorId, isAdmin } = useAuth();
     const [score, setScoreState] = useState<number>(100);
     const [state, setState] = useState<CoherenceState>('FEED_STABLE');
     const [loading, setLoading] = useState(true);
     const [currentDay, setCurrentDayState] = useState<number>(1);
-    const [isAdmin, setIsAdmin] = useState(false);
     const [isAnchored, setIsAnchored] = useState(false);
     const [accessCode, setAccessCode] = useState<string | null>(null);
     const [isGlitching, setIsGlitching] = useState(false); // For day transition animation
 
     const userProgressRef = useRef<UserProgress | null>(null);
-    const initializationLockRef = useRef<string | null>(null);
+
     const lastSyncRef = useRef<{ score: number; day: number; time: number }>({ score: 100, day: 1, time: 0 });
 
     // Stable refs for interval-based logic
@@ -53,82 +51,123 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     useEffect(() => { currentDayRef.current = currentDay; }, [currentDay]);
     useEffect(() => { isAnchoredRef.current = isAnchored; }, [isAnchored]); // Sync isAnchored ref
 
-    const initializeUserProgress = useCallback(async (currentUser: User) => {
-        // Check admin status FIRST before requiring visitorId
-        const idTokenResult = await currentUser.getIdTokenResult();
-        const isAdminRole = idTokenResult.claims.role === 'admin' || currentUser.email === ADMIN_EMAIL;
-        setIsAdmin(isAdminRole);
-
-        // Only require visitorId for non-admin users
-        if (!isAdminRole && !visitorId) {
+    // INITIALIZATION & REAL-TIME SYNC
+    // Modified to listen for Admin updates (fixing the overwrite bug)
+    useEffect(() => {
+        if (authLoading) return;
+        if (!user && !isAdmin) { // If not logged in and not admin (unlikely combo but safe)
             setLoading(false);
             return;
         }
 
-        // FIXED: Include provider count in lock key so linking an account (adding a provider) breaks the lock and triggers a sync
-        const lockKey = `${currentUser.uid}_${visitorId || 'admin'}_${currentUser.providerData.length}`;
-        if (initializationLockRef.current === lockKey) return;
-        initializationLockRef.current = lockKey;
+        // Only require visitorId for non-admin users
+        if (!isAdmin && !visitorId) {
+            setLoading(false);
+            return;
+        }
 
-        try {
-            // PROJECT SIGNAL REFINEMENT:
-            // "Anchored" now means explicitly linked to a provider (Google/Email), NOT just "not anonymous".
-            // Custom Tokens (Access Codes) make isAnonymous=false, but we want to treat them as "Unanchored" for UI purposes until Day 28.
-            const hasProvider = currentUser.providerData.some(p => p.providerId === 'google.com' || p.providerId === 'password');
-            // setIsAnchored(hasProvider); // MOVED: Late-bind this after DB sync to ensure consistency.
+        const collectionName = isAdmin ? 'users' : 'observers';
+        const docId = isAdmin ? user!.uid : visitorId!;
+        const userRef = doc(db, collectionName, docId);
 
-            const collectionName = isAdminRole ? 'users' : 'observers';
-            const docId = isAdminRole ? currentUser.uid : visitorId!;
-            const userRef = doc(db, collectionName, docId);
-            const userDoc = await getDoc(userRef);
+        let initialLoadComplete = false;
 
-            let retrievedCode: string | null = null;
+        const unsubscribe = onSnapshot(userRef, { includeMetadataChanges: true }, async (snapshot) => {
+            // IGNORE LOCAL WRITES: If this snapshot is just us writing to the DB, don't re-process it.
+            // This prevents the "ping-pong" and overwrite of local state during our own saves.
+            if (snapshot.metadata.hasPendingWrites) {
+                return;
+            }
 
-            if (userDoc.exists()) {
-                const data = userDoc.data() as UserProgress & { accessCode?: string };
-                retrievedCode = data.accessCode || null;
+            if (!snapshot.exists()) {
+                // NEW USER CREATION (Only on initial load)
+                if (!initialLoadComplete) {
+                    const hasProvider = user ? user.providerData.some(p => p.providerId === 'google.com' || p.providerId === 'password') : false;
 
-                // Handle decay & temporal progression
+                    const initial: UserProgress = {
+                        coherenceScore: 100,
+                        coherenceState: 'FEED_STABLE',
+                        dayProgress: 1,
+                        visitCount: 1,
+                        startDate: Timestamp.now(),
+                        lastSeenAt: Timestamp.now(),
+                        seenFragments: [],
+                        isAnchored: hasProvider,
+                        email: user?.email || null,
+                        visitorId: isAdmin ? null : visitorId,
+                        anchoredFirebaseUid: (!isAdmin && hasProvider) && user ? user.uid : null
+                    };
+
+                    await setDoc(userRef, initial);
+
+                    // Set State
+                    setScoreState(100);
+                    setState('FEED_STABLE');
+                    setCurrentDayState(1);
+
+                    // Update Refs
+                    scoreRef.current = 100;
+                    stateRef.current = 'FEED_STABLE';
+                    currentDayRef.current = 1;
+                    startDateRef.current = initial.startDate;
+                    userProgressRef.current = initial;
+                    lastSyncRef.current = { score: 100, day: 1, time: Date.now() };
+
+                    // Project Signal: Frequency Assignment
+                    if (!isAdmin) {
+                        try {
+                            const functions = getFunctions();
+                            const assignFrequencyFn = httpsCallable(functions, 'assignFrequency');
+                            const result = await assignFrequencyFn({ visitorId });
+                            const { code } = result.data as { code: string };
+                            if (code) {
+                                setAccessCode(code);
+                                await setDoc(userRef, { accessCode: code }, { merge: true });
+                            }
+                        } catch (err) {
+                            if (import.meta.env.DEV) console.error('[Delta-7] Frequency assignment failed:', err);
+                        }
+                    }
+                }
+                initialLoadComplete = true; // Mark as loaded even if we just created it
+                setLoading(false);
+                return;
+            }
+
+            // EXISTING USER - SYNC & UPDATE
+            const data = snapshot.data() as UserProgress & { accessCode?: string };
+            const now = Date.now();
+
+            // 1. INITIAL LOAD LOGIC (Decay & Calculation)
+            // We only run the aggressive "Decay" logic once per session start to avoid
+            // constantly draining score while the user is active if the admin updates something.
+            if (!initialLoadComplete) {
+                if (data.accessCode) setAccessCode(data.accessCode);
+
                 const lastSeen = (data.lastSeenAt || Timestamp.now()).toMillis();
                 const startDate = (data.startDate || Timestamp.now()).toMillis();
-                const now = Date.now();
 
-                // 1. Calculate Score Decay
+                // Calculate Score Decay
                 const decayUnits = Math.floor((now - lastSeen) / DECAY_MS);
-                const decayPoints = isAdminRole ? 0 : (!currentUser.isAnonymous ? ANCHORED_DECAY : DEFAULT_DECAY);
+                const decayPoints = isAdmin ? 0 : (!user?.isAnonymous ? ANCHORED_DECAY : DEFAULT_DECAY);
                 const totalDecay = decayUnits * decayPoints;
                 const finalScore = Math.max(0, data.coherenceScore - totalDecay);
 
-                // 2. Calculate Temporal Progress (Day) - UTC Midnight Rollover
+                // Calculate Day
                 const storedDay = data.dayProgress || 1;
                 const msPerDay = 24 * 60 * 60 * 1000;
-
-                // Convert timestamps to UTC Midnight to count calendar days
                 const startMidnight = new Date(startDate).setUTCHours(0, 0, 0, 0);
                 const nowMidnight = new Date(now).setUTCHours(0, 0, 0, 0);
                 let calculatedDay = Math.floor((nowMidnight - startMidnight) / msPerDay) + 1;
 
                 let finalStartDate = data.startDate;
-                if (!isAdminRole) {
-                    // PRIORITY: If admin manually set the day, respect it completely
-                    if (data.isManualDayProgress) {
-                        if (import.meta.env.DEV) console.log(`[Delta-7] Manual day override active. Using admin-set day: ${storedDay}`);
-                        calculatedDay = storedDay;
-                        // Shift start date to align with manual day
-                        const newStartMillis = now - (storedDay - 1) * msPerDay;
-                        finalStartDate = Timestamp.fromMillis(newStartMillis);
-                    }
-                    // Legacy: If stored day is ahead of calc day (from debug panel), respect it
-                    else if (storedDay > calculatedDay) {
-                        if (import.meta.env.DEV) console.log(`[Delta-7] Day override detected (${storedDay} vs ${calculatedDay}). Realigning temporal origin...`);
-                        calculatedDay = storedDay;
-                        // Shift start date back to ensure calculation holds
-                        const newStartMillis = now - (storedDay - 1) * msPerDay;
-                        finalStartDate = Timestamp.fromMillis(newStartMillis);
-                    }
 
-                    if (!data.isAnchored) {
-                        calculatedDay = Math.min(calculatedDay, 30);
+                // Day Override Logic
+                if (!isAdmin) {
+                    if (storedDay > calculatedDay) {
+                        calculatedDay = storedDay;
+                        const newStartMillis = now - (storedDay - 1) * msPerDay;
+                        finalStartDate = Timestamp.fromMillis(newStartMillis);
                     }
                 }
 
@@ -142,116 +181,88 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     lastSeenAt: Timestamp.now()
                 };
 
-                // FIX: Bidirectional Sync for Anchored State
-                // The DB might be "poisoned" with isAnchored: true from the previous bug.
-                // We must ensure the DB reflects the TRUE reality of the Auth Providers.
-                if (!isAdminRole) {
+                // Anchoring Sync (Fix for Phantom Anchoring)
+                if (user && !isAdmin) {
+                    const hasProvider = user.providerData.some(p => p.providerId === 'google.com' || p.providerId === 'password');
                     if (hasProvider && !data.isAnchored) {
-                        if (import.meta.env.DEV) console.log('[Delta-7] Syncing anchored identity to persistent record (FALSE -> TRUE)...');
                         updates.isAnchored = true;
-                        updates.anchoredFirebaseUid = currentUser.uid;
-                        updates.email = currentUser.email || null;
+                        updates.anchoredFirebaseUid = user.uid;
+                        updates.email = user.email || null;
                     } else if (!hasProvider && data.isAnchored) {
-                        if (import.meta.env.DEV) console.log('[Delta-7] Correcting persistent anchored record (TRUE -> FALSE)...');
-                        // Fix for users who were accidentally marked as Anchored via Access Code
                         updates.isAnchored = false;
                         updates.anchoredFirebaseUid = null;
                         updates.email = null;
                     }
+                    setIsAnchored(hasProvider);
                 }
 
-                // Debug Log to help trace "Phantom Anchoring"
-                if (import.meta.env.DEV) console.log('[Delta-7] Auth/Anchored State:', {
-                    uid: currentUser.uid,
-                    hasProvider,
-                    dbAnchored: data.isAnchored,
-                    finalAnchored: hasProvider,
-                    providers: currentUser.providerData
-                });
-
-                // Set UI state to match the final calculated reality
-                setIsAnchored(hasProvider);
-
+                // Apply Initial State
                 setScoreState(finalScore);
                 setState(getCoherenceState(finalScore));
                 setCurrentDayState(calculatedDay);
 
+                // Update Refs
                 scoreRef.current = finalScore;
                 stateRef.current = getCoherenceState(finalScore);
                 currentDayRef.current = calculatedDay;
-
                 userProgressRef.current = { ...data, ...updates };
                 lastSyncRef.current = { score: finalScore, day: calculatedDay, time: now };
 
-                await updateDoc(userRef, updates);
+                // Execute the update
+                // Note: This write WILL trigger the listener again, but 'hasPendingWrites' will be true, so it will be ignored block above.
+                await updateDoc(userRef, updates); // Use await here? It's inside a non-async callback wrapper but we can fire and forget or wrap to async IIFE.
+                // Actually the callback passed to onSnapshot can't implementation async directly. 
+                // But since we don't return anything relevant, it's fine.
+
+                initialLoadComplete = true; // MARK LOAD COMPLETE
+                setLoading(false);
+
             } else {
-                // New user: Compute hasProvider BEFORE creating initial record
-                const hasProvider = currentUser.providerData.some(p =>
-                    p.providerId === 'google.com' || p.providerId === 'password'
-                );
+                // 2. REMOTE UPDATE HANDLING (Admin changed something)
+                if (import.meta.env.DEV) console.log('[Delta-7] Remote update received:', data);
 
-                const initial: UserProgress = {
-                    coherenceScore: 100,
-                    coherenceState: 'FEED_STABLE',
-                    dayProgress: 1,
-                    visitCount: 1,
-                    startDate: Timestamp.now(),
-                    lastSeenAt: Timestamp.now(),
-                    seenFragments: [],
-                    isAnchored: hasProvider, // FIXED: Use same logic as existing users
-                    email: currentUser.email || null,
-                    visitorId: isAdminRole ? null : visitorId,
-                    anchoredFirebaseUid: (!isAdminRole && hasProvider) ? currentUser.uid : null // FIXED: Only set if truly anchored
-                };
-                await setDoc(userRef, initial);
-                setScoreState(100);
-                setState('FEED_STABLE');
-                setCurrentDayState(1);
+                let stateChanged = false;
 
-                scoreRef.current = 100;
-                stateRef.current = 'FEED_STABLE';
-                currentDayRef.current = 1;
+                // Handle Day Update
+                if (data.dayProgress !== currentDayRef.current) {
+                    console.log(`[Delta-7] Remote Day Change: ${currentDayRef.current} -> ${data.dayProgress}`);
+                    setCurrentDayState(data.dayProgress);
+                    currentDayRef.current = data.dayProgress;
 
-                userProgressRef.current = initial;
-                startDateRef.current = initial.startDate;
-                lastSyncRef.current = { score: 100, day: 1, time: Date.now() };
-            }
-
-            // PROJECT SIGNAL: Assign Frequency if missing and user is Anonymous or Anchored
-            if (!retrievedCode && !isAdminRole) {
-                try {
-                    const functions = getFunctions();
-                    const assignFrequencyFn = httpsCallable(functions, 'assignFrequency');
-                    if (import.meta.env.DEV) console.log('[Delta-7] Generating signal frequency...');
-                    // FIXED: Pass visitorId so function writes to correct document
-                    const result = await assignFrequencyFn({ visitorId });
-                    const { code } = result.data as { code: string };
-                    if (code) {
-                        retrievedCode = code;
-                        // Optimistic update to avoid refetch
-                        await setDoc(userRef, { accessCode: code }, { merge: true });
+                    // If start date also changed
+                    if (data.startDate && !data.startDate.isEqual(startDateRef.current)) {
+                        startDateRef.current = data.startDate;
                     }
-                } catch (err) {
-                    if (import.meta.env.DEV) console.error('[Delta-7] Frequency assignment failed:', err);
+                    stateChanged = true;
+                }
+
+                // Handle Score Update
+                if (Math.abs(data.coherenceScore - scoreRef.current) > 1) {
+                    console.log(`[Delta-7] Remote Score Change: ${scoreRef.current} -> ${data.coherenceScore}`);
+                    setScoreState(data.coherenceScore);
+                    scoreRef.current = data.coherenceScore;
+
+                    const newState = getCoherenceState(data.coherenceScore);
+                    setState(newState);
+                    stateRef.current = newState;
+                    stateChanged = true;
+                }
+
+                if (stateChanged) {
+                    console.log('[Delta-7] State updated from remote. Resetting sync baseline.');
+                    lastSyncRef.current = {
+                        score: scoreRef.current,
+                        day: currentDayRef.current,
+                        time: Date.now()
+                    };
                 }
             }
+        }, (error) => {
+            console.error('[Delta-7] Real-time sync error:', error);
+        });
 
-            setAccessCode(retrievedCode);
-
-        } finally {
-            setLoading(false);
-        }
-    }, [visitorId]);
-
-    useEffect(() => {
-        if (!authLoading) {
-            if (user) {
-                initializeUserProgress(user);
-            } else {
-                setLoading(false);
-            }
-        }
-    }, [user, authLoading, initializeUserProgress]);
+        return () => unsubscribe();
+    }, [user, isAdmin, visitorId, authLoading]);
 
     // Recovery logic
     // FIXED: Use isAnchoredRef instead of user.isAnonymous to correctly handle Custom Token users
@@ -353,7 +364,7 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
             try {
                 const idTokenResult = await user.getIdTokenResult();
-                const isAdminRole = idTokenResult.claims.role === 'admin' || user.email === ADMIN_EMAIL;
+                const isAdminRole = idTokenResult.claims.role === 'admin';
 
                 const collectionName = isAdminRole ? 'users' : 'observers';
                 const docId = isAdminRole ? user.uid : visitorId;

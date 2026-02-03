@@ -22,7 +22,6 @@ export interface AuthUser extends User {
     role?: 'admin' | 'observer';
 }
 
-const ADMIN_EMAIL = 'robert.barker2008@gmail.com';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<AuthUser | null>(null);
@@ -51,12 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
                 const idTokenResult = await firebaseUser.getIdTokenResult();
-                let role = idTokenResult.claims.role as 'admin' | 'observer' || 'observer';
-
-                // Hardcoded admin override for specific email
-                if (firebaseUser.email === ADMIN_EMAIL) {
-                    role = 'admin';
-                }
+                const role = idTokenResult.claims.role as 'admin' | 'observer' || 'observer';
 
                 const authUser = firebaseUser as AuthUser;
                 authUser.role = role;
@@ -119,6 +113,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAuthorizing(true);
         try {
             await createUserWithEmailAndPassword(auth, email, pass);
+            // Trigger welcome email
+            const functions = getFunctions();
+            const welcomeFn = httpsCallable(functions, 'sendAnchorWelcome');
+            await welcomeFn();
         } finally {
             setIsAuthorizing(false);
         }
@@ -153,6 +151,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             // Force token refresh
             await auth.currentUser.getIdToken(true);
+
+            // Trigger welcome email
+            const functions = getFunctions();
+            const welcomeFn = httpsCallable(functions, 'sendAnchorWelcome');
+            await welcomeFn();
+
             if (import.meta.env.DEV) console.log('[Delta-7] Anchoring complete. Identity preserved.');
         } catch (error: any) {
             if (import.meta.env.DEV) console.error('[Delta-7] Anchoring failed:', error);
@@ -186,15 +190,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
 
                 await signInWithCustomToken(auth, token);
+
+                // FIX: Option B - Page reload to ensure clean state initialization
+                // This eliminates all race conditions between AuthContext and CoherenceContext
+                // The visitorId is now safely stored in LocalStorage, so a reload will pick it up correctly.
+                if (import.meta.env.DEV) console.log('[Delta-7] SIGNAL_LOCKED: Initiating re-synchronization...');
+
+                // Allow a brief moment for the auth state to settle, then reload
+                setTimeout(() => {
+                    window.location.reload();
+                }, 300);
             } else {
                 throw new Error('Signal degraded. timestamp_mismatch.');
             }
         } catch (error: any) {
             if (import.meta.env.DEV) console.error('Recovery failed:', error);
+            setIsAuthorizing(false); // Only reset on failure; success leads to reload
             throw new Error('Signal recovery failed. Frequency invalid.');
-        } finally {
-            setIsAuthorizing(false);
         }
+        // Note: setIsAuthorizing(false) is intentionally NOT called on success
+        // because the page will reload before this would matter.
     }, []);
 
     const logout = async () => {

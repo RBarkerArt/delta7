@@ -62,9 +62,15 @@ export const ObserverDirectory: React.FC = () => {
         setIsSaving(true);
         try {
             const obsRef = doc(db, 'observers', editingId);
+
+            // Calculate new start date to align with manual day progress
+            const msPerDay = 24 * 60 * 60 * 1000;
+            const newStartTime = Date.now() - (editForm.dayProgress - 1) * msPerDay;
+
             await updateDoc(obsRef, {
                 dayProgress: editForm.dayProgress,
                 coherenceScore: editForm.coherenceScore,
+                startDate: Timestamp.fromMillis(newStartTime),
                 isManualDayProgress: true  // Tells CoherenceContext to respect this value
             });
 

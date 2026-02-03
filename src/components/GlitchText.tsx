@@ -166,7 +166,7 @@ export const GlitchText: React.FC<GlitchTextProps> = ({ text, coherenceScore, cl
 
     return (
         <span
-            className={`relative ${className || ''}`}
+            className={`glitch-safe-overflow relative ${className || ''}`}
             style={{
                 ...jitterStyle,
                 textShadow: ghosting

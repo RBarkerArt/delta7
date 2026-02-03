@@ -37,10 +37,21 @@ body {
 body {
   color: rgb(var(--signal-color));
   font-family: 'Courier New', Courier, monospace;
+  font-size: 16px;
+  /* Base size for desktop */
   overflow-y: auto;
   overflow-x: hidden;
   margin: 0;
   padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+    /* Slightly smaller base for mobile but more legible than 12px default */
+  }
 }
 
 /* Custom Scrollbar for Terminal Aesthetic */
@@ -315,20 +326,39 @@ body {
 
 @keyframes reveal-pull {
   0% {
-    mask-position: 150% 0;
+    mask-position: 180% 0;
     opacity: 0;
-    filter: blur(4px);
+    filter: blur(12px);
+    transform: scale(0.97);
   }
 
-  20% {
+  40% {
     opacity: 1;
-    filter: blur(2px);
+    filter: blur(4px);
+    transform: scale(1);
   }
 
   100% {
-    mask-position: -50% 0;
+    mask-position: -100% 0;
     filter: blur(0);
+    transform: scale(1);
   }
+}
+
+@keyframes prologue-bg-fade {
+  0% {
+    opacity: 0;
+    filter: blur(10px) scale(1.1);
+  }
+
+  100% {
+    opacity: 0.08;
+    filter: blur(0px) scale(1);
+  }
+}
+
+.animate-prologue-bg-fade {
+  animation: prologue-bg-fade 6s ease-out forwards;
 }
 
 @keyframes fragment-drift-left {

@@ -15,6 +15,7 @@ interface EvidenceViewerProps {
 
 export const EvidenceViewer: React.FC<EvidenceViewerProps> = ({ image, coherenceScore }) => {
     const [noiseOffset, setNoiseOffset] = useState(0);
+    const [isHovered, setIsHovered] = useState(false);
     // Use lazy initializer for noiseFreq to fix set-state-in-effect and satisfy purity lint
     const [noiseFreq] = useState(() => 0.6 + Math.random() * 0.1);
 
@@ -27,7 +28,8 @@ export const EvidenceViewer: React.FC<EvidenceViewerProps> = ({ image, coherence
 
     // Displacement and degradation calculations
     const degradation = (100 - coherenceScore) / 100;
-    const blurAmount = degradation * 8; // Max 8px blur
+    const focusBlur = isHovered ? 1 : 20; // 20px blur clears to 95% (1px)
+    const totalBlur = focusBlur + (degradation * 8);
     const currentNoise = 0.05 + (degradation * 0.3); // 5% to 35% noise
     const currentBrightness = 1 - (degradation * 0.5); // 1 to 0.5 brightness
     const currentGrayscale = 0.5 + (degradation * 0.5); // Always somewhat grayscale, more at low coherence
@@ -37,13 +39,18 @@ export const EvidenceViewer: React.FC<EvidenceViewerProps> = ({ image, coherence
     }, [noiseFreq]);
 
     return (
-        <div className="relative w-full aspect-video bg-zinc-900 rounded-lg overflow-hidden border border-emerald-900/30 group">
+        <div
+            className="relative w-full aspect-video bg-zinc-900 rounded-lg overflow-hidden border border-emerald-900/30 group cursor-help transition-all duration-300 active:scale-[0.98]"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            onClick={() => setIsHovered(!isHovered)}
+        >
             {/* Base Image with Filters */}
             <div
-                className="absolute inset-0 transition-all duration-500 ease-in-out bg-cover bg-center"
+                className="absolute inset-0 transition-all duration-700 ease-in-out bg-cover bg-center"
                 style={{
                     backgroundImage: `url(${image.url})`,
-                    filter: `blur(${blurAmount}px) brightness(${currentBrightness}) grayscale(${currentGrayscale}) contrast(1.2)`,
+                    filter: `blur(${totalBlur}px) brightness(${currentBrightness}) grayscale(${currentGrayscale}) contrast(1.2)`,
                 }}
             />
 

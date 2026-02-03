@@ -36,18 +36,154 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.migrateProloguesToDays = exports.generateNarrativeContent = exports.recoverSignal = exports.assignFrequency = exports.deleteUserData = exports.generateResizedImage = void 0;
+exports.migrateProloguesToDays = exports.generateNarrativeContent = exports.recoverSignal = exports.assignFrequency = exports.deleteUserData = exports.generateResizedImage = exports.sendAnchorWelcome = exports.onNewVisitor = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const fs = __importStar(require("fs"));
+const nodemailer = __importStar(require("nodemailer"));
+const params_1 = require("firebase-functions/params");
+const https_1 = require("firebase-functions/v2/https");
+const sharp_1 = __importDefault(require("sharp"));
 // Initialize Firebase Admin
 admin.initializeApp();
+// -------------------------------------------------------------
+// EMAIL PROTOCOL: Nodemailer Configuration
+// -------------------------------------------------------------
+const EMAIL_PASSWORD = (0, params_1.defineSecret)("EMAIL_PASSWORD");
+const createTransporter = (password) => {
+    return nodemailer.createTransport({
+        host: "mail.spacemail.com",
+        port: 465,
+        secure: true, // SSL
+        auth: {
+            user: "purpose@delta7project.com",
+            pass: password,
+        },
+    });
+};
+// 1. Admin Notification: New Visitor Observed
+exports.onNewVisitor = functions.runWith({
+    secrets: ["EMAIL_PASSWORD"]
+}).auth.user().onCreate(async (user) => {
+    const password = EMAIL_PASSWORD.value();
+    const transporter = createTransporter(password);
+    const mailOptions = {
+        from: '"Delta-7 Terminal" <purpose@delta7project.com>',
+        to: "purpose@delta7project.com",
+        subject: "PROTOCOL_SIGNAL: New Visitor Observed",
+        text: `A new visitor has been observed.\nUID: ${user.uid}\nTimestamp: ${new Date().toISOString()}`,
+    };
+    try {
+        await transporter.sendMail(mailOptions);
+        functions.logger.log("Admin notification sent for UID:", user.uid);
+    }
+    catch (error) {
+        functions.logger.error("Failed to send admin notification:", error);
+    }
+});
+// 2. User Notification: Anchor Welcome (Styled)
+exports.sendAnchorWelcome = (0, https_1.onCall)({
+    secrets: [EMAIL_PASSWORD],
+    enforceAppCheck: true
+}, async (request) => {
+    if (!request.auth)
+        throw new https_1.HttpsError("unauthenticated", "Auth required");
+    const email = request.auth.token.email;
+    if (!email) {
+        functions.logger.warn("No email found for user during anchoring welcome:", request.auth.uid);
+        return { success: false, reason: "no_email" };
+    }
+    const password = EMAIL_PASSWORD.value();
+    const transporter = createTransporter(password);
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap');
+            body { 
+                background-color: #050505; 
+                margin: 0; 
+                padding: 40px; 
+                display: flex; 
+                justify-content: center;
+            }
+            .container { 
+                max-width: 600px; 
+                width: 100%;
+                background-color: #0a0a0a; 
+                border: 1px solid #10b98133; 
+                padding: 40px; 
+                color: #10b981; 
+                font-family: 'Courier Prime', 'Courier New', Courier, monospace; 
+                line-height: 1.6;
+                box-shadow: 0 0 20px rgba(16, 185, 129, 0.05);
+            }
+            .header {
+                font-weight: bold;
+                margin-bottom: 20px;
+                border-bottom: 1px solid #10b98122;
+                padding-bottom: 10px;
+                font-size: 14px;
+                letter-spacing: 2px;
+            }
+            .body { 
+                font-size: 16px; 
+                white-space: pre-line;
+                margin-bottom: 30px;
+            }
+            .signature {
+                margin-top: 40px;
+                opacity: 0.8;
+                font-style: italic;
+            }
+            .footer {
+                margin-top: 20px;
+                font-size: 10px;
+                color: #10b98144;
+                text-align: right;
+                letter-spacing: 1px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">TRANS_STATUS: ENCRYPTED // OBS_LOG_000</div>
+            <div class="body">
+                ObsLog: 
+                Observer recorded. The coherence began to stabilize. Your presence makes an impact. Purpose is the variable i cannot track. It can only be measured from the presence of you.
+            </div>
+            <div class="signature">
+                Dr. Kael
+                <br>End Transmission
+            </div>
+            <div class="footer">SIGNAL_LOCK_ID: ${request.auth.uid.slice(0, 8)}...</div>
+        </div>
+    </body>
+    </html>
+    `;
+    const mailOptions = {
+        from: '"Delta-7 System" <purpose@delta7project.com>',
+        to: email,
+        subject: "TRANS_SIGNAL: Identity Anchored",
+        text: `ObsLog: Observer recorded. The coherence began to stabilize. Your presence makes an impact. Purpose is the variable i cannot track. It can only be measured from the presence of you.\n\nDr. Kael\nEnd Transmission`,
+        html: htmlContent
+    };
+    try {
+        await transporter.sendMail(mailOptions);
+        functions.logger.log("Welcome email sent to:", email);
+        return { success: true };
+    }
+    catch (error) {
+        functions.logger.error("Failed to send welcome email:", error);
+        throw new https_1.HttpsError("internal", "Failed to send encrypted signal.");
+    }
+});
 // 7.1 Asset Pipeline: Image Resizing
 // Note: 'sharp' dependency is required for this to work in production.
 // Verified it is in package.json.
-const sharp_1 = __importDefault(require("sharp"));
 exports.generateResizedImage = functions.storage.object().onFinalize(async (object) => {
     const fileBucket = object.bucket;
     const filePath = object.name;
@@ -124,7 +260,6 @@ exports.deleteUserData = functions.https.onCall(async (data, context) => {
     }
 });
 // 7.3 AI Narrative Engine
-const https_1 = require("firebase-functions/v2/https");
 // -------------------------------------------------------------
 // PROJECT SIGNAL: Access Code System (v2)
 // -------------------------------------------------------------

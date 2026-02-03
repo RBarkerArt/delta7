@@ -10,10 +10,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.role == 'admin' || 
-        request.auth.token.email == 'robert.barker2008@gmail.com'
-      );
+      return isAuthenticated() && request.auth.token.role == 'admin';
     }
 
     function isVisitorOwner(visitorId) {
@@ -59,7 +56,7 @@ service cloud.firestore {
 
     // New dual-identity observers collection
     match /observers/{visitorId} {
-      allow read: if isAdmin() || isVisitorOwner(visitorId);
+      allow read: if isAdmin() || isVisitorOwner(visitorId) || resource.data.anchoredFirebaseUid == request.auth.uid;
       // Allow write if admin OR (owner AND strictly validated)
       allow write: if isAdmin() || (isVisitorOwner(visitorId) && isValidObserverUpdate());
     }
