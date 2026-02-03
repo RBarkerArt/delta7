@@ -376,9 +376,21 @@ const LabInterface: React.FC = () => {
           </div>
         </header>
 
+        {/* OAuth Compliance: Visible App Name & Purpose Statement */}
+        <div className="max-w-4xl mx-auto w-full mb-6 sm:mb-8 relative z-10">
+          <h1 className="text-lg sm:text-xl font-bold text-signal-green tracking-widest uppercase mb-2">
+            Delta 7 Project
+          </h1>
+          <p className="text-xs sm:text-sm text-signal-green/60 leading-relaxed">
+            An interactive narrative observation platform. Track daily transmissions,
+            explore unfolding storylines, and synchronize your session across devices
+            using secure frequency codes.
+          </p>
+        </div>
+
         <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full relative z-10">
           <div
-            className="mt-8 sm:mt-12 transition-all duration-700"
+            className="transition-all duration-700"
             style={{
               filter: `blur(${blurAmount}px)`,
               opacity: opacityAmount
