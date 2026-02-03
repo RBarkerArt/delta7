@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef, Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { HelmetProvider, Helmet } from 'react-helmet-async';
 import { initAppCheck } from './lib/appCheck';
 import { useCoherence } from './hooks/useCoherence';
@@ -426,11 +426,11 @@ const LabInterface: React.FC = () => {
           </div>
         </main>
 
-        <footer className="relative z-10 w-full max-w-4xl mx-auto mt-12 pb-4 text-center">
+        <footer className="relative z-[60] w-full max-w-4xl mx-auto mt-12 pb-4 text-center">
           <div className="text-[10px] uppercase tracking-[0.2em] opacity-30 hover:opacity-100 transition-opacity duration-500 font-mono text-signal-green">
             SYSTEM_LEGAL:
-            <span className="mx-2">[ <a href="/privacy" className="hover:text-white transition-colors">PRIVACY_DIRECTIVE</a> ]</span>
-            <span className="mx-2">[ <a href="/terms" className="hover:text-white transition-colors">TERMS_OF_OBSERVATION</a> ]</span>
+            <span className="mx-2">[ <Link to="/privacy" className="hover:text-white transition-colors">PRIVACY_DIRECTIVE</Link> ]</span>
+            <span className="mx-2">[ <Link to="/terms" className="hover:text-white transition-colors">TERMS_OF_OBSERVATION</Link> ]</span>
           </div>
         </footer>
       </div>
