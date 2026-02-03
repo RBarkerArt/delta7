@@ -37,6 +37,7 @@ const NarrativeReader = lazy(() => import('./components/NarrativeReader').then(m
 const AdminSettings = lazy(() => import('./components/AdminSettings').then(m => ({ default: m.AdminSettings })));
 const StoryBibleEditor = lazy(() => import('./components/StoryBibleEditor').then(m => ({ default: m.StoryBibleEditor })));
 const AtmosphereControl = lazy(() => import('./components/AtmosphereControl').then(m => ({ default: m.AtmosphereControl })));
+import { PrivacyStatement, TermsAndConditions } from './pages/LegalPage';
 
 const AUTO_PROGRESS_DELAY = 4000;
 const TYPING_SPEED = 30;
@@ -276,7 +277,7 @@ const LabInterface: React.FC = () => {
       <div
         className={`relative min-h-screen w-full bg-lab-black text-signal-green font-mono scanlines p-4 sm:p-8 flex flex-col transition-colors duration-1000 overflow-x-hidden ${glitchClass} ${scanlineClass}`}
       >
-        <div className="fixed inset-0 z-0 opacity-0 sm:opacity-100" />
+        <div className="fixed inset-0 z-0 opacity-0 sm:opacity-100 pointer-events-none" />
         <BackgroundAtmosphere score={score} />
 
         <ScreenEffects flickerLevel={1} driftLevel={1} />
@@ -424,6 +425,14 @@ const LabInterface: React.FC = () => {
             )}
           </div>
         </main>
+
+        <footer className="relative z-10 w-full max-w-4xl mx-auto mt-12 pb-4 text-center">
+          <div className="text-[10px] uppercase tracking-[0.2em] opacity-30 hover:opacity-100 transition-opacity duration-500 font-mono text-signal-green">
+            SYSTEM_LEGAL:
+            <span className="mx-2">[ <a href="/privacy" className="hover:text-white transition-colors">PRIVACY_DIRECTIVE</a> ]</span>
+            <span className="mx-2">[ <a href="/terms" className="hover:text-white transition-colors">TERMS_OF_OBSERVATION</a> ]</span>
+          </div>
+        </footer>
       </div>
 
       <div className="fixed inset-0 pointer-events-none z-[9999]">
@@ -519,6 +528,8 @@ function App() {
                   <Route path="director" element={<AtmosphereControl />} />
                 </Route>
               </Route>
+              <Route path="/privacy" element={<PrivacyStatement />} />
+              <Route path="/terms" element={<TermsAndConditions />} />
             </Routes>
           </BrowserRouter>
         </HelmetProvider>
