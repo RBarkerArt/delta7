@@ -82,17 +82,17 @@ export const DebugPanel: React.FC = () => {
     // App will pick up changes on next Firestore sync cycle
 
     return (
-        <div className={`fixed bottom-4 left-4 z-[5000] flex flex-col items-start gap-2 transition-transform duration-500 ${isOpen ? 'translate-y-0' : 'translate-y-[calc(100%-48px)]'}`}>
+        <div className={`fixed bottom-4 left-4 z-[5000] flex flex-col items-start gap-2 transition-transform duration-500 pointer-events-none ${isOpen ? 'translate-y-0' : 'translate-y-[calc(100%-48px)]'}`}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-4 py-3 bg-zinc-900 border border-emerald-900/40 rounded-xl text-emerald-500 hover:bg-zinc-800 transition-all font-mono text-[10px] tracking-widest uppercase shadow-2xl"
+                className="flex items-center gap-2 px-4 py-3 bg-zinc-900 border border-emerald-900/40 rounded-xl text-emerald-500 hover:bg-zinc-800 transition-all font-mono text-[10px] tracking-widest uppercase shadow-2xl pointer-events-auto"
             >
                 <Hammer size={16} />
                 Nexus_Diagnostic {isOpen ? '[CLOSE]' : '[OPEN]'}
                 {isSyncing && <Database size={12} className="animate-pulse text-amber-500" />}
             </button>
 
-            <div className="w-80 bg-zinc-900 border border-emerald-900/40 rounded-2xl p-6 shadow-2xl space-y-6 backdrop-blur-md">
+            <div className="w-80 bg-zinc-900 border border-emerald-900/40 rounded-2xl p-6 shadow-2xl space-y-6 backdrop-blur-md pointer-events-auto">
                 <div className="space-y-4">
                     <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
                         <span>Metrics_Control</span>

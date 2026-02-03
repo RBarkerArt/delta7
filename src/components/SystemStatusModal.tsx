@@ -11,16 +11,16 @@ export const SystemStatusModal: React.FC<SystemStatusModalProps> = ({ visible })
     if (!visible) return null;
 
     return (
-        <div className={`fixed bottom-4 right-4 left-4 md:left-auto z-[9999] flex flex-col items-end gap-2 transition-all duration-500 ${isOpen ? 'translate-y-0' : 'translate-y-[calc(100%-48px)]'}`}>
+        <div className={`fixed bottom-4 right-4 left-4 md:left-auto z-[9999] flex flex-col items-end gap-2 transition-all duration-500 pointer-events-none ${isOpen ? 'translate-y-0' : 'translate-y-[calc(100%-48px)]'}`}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-4 py-3 bg-zinc-900 border border-emerald-900/40 rounded-xl text-emerald-500 hover:bg-zinc-800 transition-all font-mono text-xs tracking-widest uppercase shadow-2xl"
+                className="flex items-center gap-2 px-4 py-3 bg-zinc-900 border border-emerald-900/40 rounded-xl text-emerald-500 hover:bg-zinc-800 transition-all font-mono text-xs tracking-widest uppercase shadow-2xl pointer-events-auto"
             >
                 <Activity size={16} />
                 System Status {isOpen ? '[CLOSE]' : '[OPEN]'}
             </button>
 
-            <div className="w-full md:w-[90vw] md:max-w-4xl max-h-[85vh] overflow-y-auto bg-zinc-900 border border-emerald-900/40 rounded-2xl p-6 md:p-8 shadow-2xl backdrop-blur-md custom-scrollbar">
+            <div className="w-full md:w-[90vw] md:max-w-4xl max-h-[85vh] overflow-y-auto bg-zinc-900 border border-emerald-900/40 rounded-2xl p-6 md:p-8 shadow-2xl backdrop-blur-md custom-scrollbar pointer-events-auto">
                 <div className="flex items-start justify-between mb-6">
                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
                         System_Status_Feed
