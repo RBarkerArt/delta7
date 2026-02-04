@@ -142,7 +142,27 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             // We only run the aggressive "Decay" logic once per session start to avoid
             // constantly draining score while the user is active if the admin updates something.
             if (!initialLoadComplete) {
-                if (data.accessCode) setAccessCode(data.accessCode);
+                if (data.accessCode) {
+                    setAccessCode(data.accessCode);
+                } else if (!isAdmin) {
+                    // RETRY FREQUENCY ASSIGNMENT: User exists but missed code generation (e.g. closed tab too fast)
+                    console.log('[Delta-7] Missing frequency detected. Retrying assignment...');
+                    try {
+                        const functions = getFunctions();
+                        const assignFrequencyFn = httpsCallable(functions, 'assignFrequency');
+                        // No await needed here, the Cloud Function will update Firestore -> triggers snapshot
+                        assignFrequencyFn({ visitorId }).then((result) => {
+                            const { code } = result.data as { code: string };
+                            if (code) {
+                                console.log('[Delta-7] Frequency restored:', code);
+                                // Optimistic update
+                                setAccessCode(code);
+                            }
+                        });
+                    } catch (err) {
+                        if (import.meta.env.DEV) console.error('[Delta-7] Frequency retry failed:', err);
+                    }
+                }
 
                 const lastSeen = (data.lastSeenAt || Timestamp.now()).toMillis();
                 const startDate = (data.startDate || Timestamp.now()).toMillis();

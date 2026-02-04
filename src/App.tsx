@@ -376,15 +376,13 @@ const LabInterface: React.FC = () => {
           </div>
         </header>
 
-        {/* OAuth Compliance: Visible App Name & Purpose Statement */}
-        <div className="max-w-4xl mx-auto w-full mb-6 sm:mb-8 relative z-10">
-          <h1 className="text-lg sm:text-xl font-bold text-signal-green tracking-widest uppercase mb-2">
+        {/* OAuth Compliance: Visible App Name & Purpose Statement (stealth mode) */}
+        <div className="max-w-4xl mx-auto w-full mb-2 relative z-10 opacity-[0.05] hover:opacity-30 transition-opacity duration-1000 select-none">
+          <h1 className="text-[8px] font-mono text-signal-green tracking-widest uppercase">
             Delta 7 Project
           </h1>
-          <p className="text-xs sm:text-sm text-signal-green/60 leading-relaxed">
-            An interactive narrative observation platform. Track daily transmissions,
-            explore unfolding storylines, and synchronize your session across devices
-            using secure frequency codes.
+          <p className="text-[6px] text-signal-green leading-tight">
+            An interactive narrative observation platform for tracking transmissions and exploring storylines.
           </p>
         </div>
 
