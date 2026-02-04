@@ -10,8 +10,11 @@ import {
     Wifi,
     Clock,
     Server,
-    AlertTriangle
+    AlertTriangle,
+    Trash2
 } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../lib/firebase';
 import type { SystemSettings } from '../types/schema';
 
 // Default settings if document doesn't exist
@@ -27,6 +30,10 @@ export const AdminSettings: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    // Pruning State
+    const [pruneStats, setPruneStats] = useState<any>(null);
+    const [isPruning, setIsPruning] = useState(false);
 
     // System Monitor State
     const [serverTime, setServerTime] = useState<string>('');
@@ -125,6 +132,24 @@ export const AdminSettings: React.FC = () => {
     const handleSliderCommit = () => {
         if (settings) handleSave(settings);
     }
+
+    const handlePrune = async (dryRun: boolean) => {
+        setIsPruning(true);
+        setError(null);
+        try {
+            const pruneFn = httpsCallable(functions, 'pruneStaleUsers');
+            const result = await pruneFn({ dryRun });
+            setPruneStats(result.data);
+            if (!dryRun) {
+                setSuccessMessage(`Action Complete. Removed users.`);
+            }
+        } catch (err: any) {
+            console.error("Prune failed:", err);
+            setError(err.message || "Prune failed.");
+        } finally {
+            setIsPruning(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -376,6 +401,70 @@ export const AdminSettings: React.FC = () => {
                             </button>
                         </div>
 
+                    </div>
+                </div>
+
+                {/* Database Hygiene */}
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+                        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                            <Trash2 size={18} className="text-gray-500" /> Database Hygiene
+                        </h3>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div>
+                            <h4 className="text-sm font-medium text-gray-900">Stale User Pruning</h4>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Identify and remove anonymous "Ghost" users who have not visited in over 90 days.
+                                Anchored users are never affected. Results are logged to console.
+                            </p>
+                        </div>
+
+                        {pruneStats && (
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 font-mono text-sm space-y-1">
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">Found Stale Users:</span>
+                                    <span className="font-bold">{pruneStats.foundStale}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">Eligible (Unanchored):</span>
+                                    <span className="font-bold text-amber-600">{pruneStats.eligibleForDeletion}</span>
+                                </div>
+                                {pruneStats.deleted !== undefined && (
+                                    <div className="flex justify-between pt-2 border-t border-gray-200 mt-2">
+                                        <span className="text-gray-500">Deleted:</span>
+                                        <span className="font-bold text-red-600">{pruneStats.deleted}</span>
+                                    </div>
+                                )}
+                                <div className="text-[10px] text-gray-400 mt-2 text-right">
+                                    Cutoff: {new Date(pruneStats.cutoffDate).toLocaleDateString()}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => handlePrune(true)} // Dry Run
+                                disabled={isPruning}
+                                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 font-medium transition-colors"
+                            >
+                                {isPruning ? <Loader2 className="animate-spin" size={16} /> : 'Scan for Stale Users'}
+                            </button>
+
+                            {pruneStats?.eligibleForDeletion > 0 && (
+                                <button
+                                    onClick={() => {
+                                        if (confirm(`Are you sure you want to permanently delete ${pruneStats.eligibleForDeletion} users? This cannot be undone.`)) {
+                                            handlePrune(false);
+                                        }
+                                    }}
+                                    disabled={isPruning}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:opacity-50 flex items-center gap-2 font-medium transition-colors shadow-sm"
+                                >
+                                    <Trash2 size={16} /> Prune {pruneStats.eligibleForDeletion} Users
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

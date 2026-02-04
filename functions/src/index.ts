@@ -601,3 +601,101 @@ export const migrateProloguesToDays = onCall({
         details: results
     };
 });
+
+// 14. Database Hygiene: Prune Stale Users
+// Deletes anonymous users who haven't visited in >90 days
+export const pruneStaleUsers = onCall({
+    enforceAppCheck: true
+}, async (request) => {
+    // 1. Verify Admin Access
+    if (!request.auth) throw new HttpsError("unauthenticated", "Auth required.");
+
+    // Check role in users collection
+    const userDoc = await admin.firestore().collection("users").doc(request.auth.uid).get();
+    if (!userDoc.exists || userDoc.data()?.role !== "admin") {
+        throw new HttpsError("permission-denied", "Admin access required.");
+    }
+
+    const { dryRun = true } = request.data;
+    const db = admin.firestore();
+    const auth = admin.auth();
+
+    // 2. Define Cutoff (90 Days ago)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const cutoffTimestamp = admin.firestore.Timestamp.fromDate(ninetyDaysAgo);
+
+    console.log(`[Prune] Starting prune process. Cutoff: ${ninetyDaysAgo.toISOString()}. DryRun: ${dryRun}`);
+
+    try {
+        // 3. Query Stale Users
+        // Note: avoiding composite index requirement by filtering isAnchored in memory
+        // Limit to 500 to avoid timeouts
+        const snapshot = await db.collection('observers')
+            .where('lastSeenAt', '<', cutoffTimestamp)
+            .limit(500)
+            .get();
+
+        if (snapshot.empty) {
+            return { count: 0, message: "No stale users found." };
+        }
+
+        let targetCount = 0;
+        let deletedCount = 0;
+        const errors: string[] = [];
+
+        // 4. Process Results
+        const batch = db.batch();
+        const deletionPromises: Promise<any>[] = [];
+
+        for (const doc of snapshot.docs) {
+            const data = doc.data();
+
+            // CRITICAL SAFETY CHECK: Never delete anchored users
+            // Also checking 'email' field as a backup safety
+            if (data.isAnchored === true || data.email) {
+                continue;
+            }
+
+            targetCount++;
+
+            if (!dryRun) {
+                // Scedule Firestore Delete
+                batch.delete(doc.ref);
+
+                // Schedule Auth Delete
+                deletionPromises.push(
+                    auth.deleteUser(doc.id).catch(err => {
+                        // Ignore 'user-not-found', log others
+                        if (err.code !== 'auth/user-not-found') {
+                            console.warn(`[Prune] Failed to delete auth for ${doc.id}:`, err);
+                            errors.push(doc.id);
+                        }
+                    })
+                );
+                deletedCount++;
+            }
+        }
+
+        // 5. Commit Changes
+        if (!dryRun && targetCount > 0) {
+            await batch.commit();
+            await Promise.all(deletionPromises);
+            console.log(`[Prune] Successfully deleted ${deletedCount} stale users.`);
+        }
+
+        return {
+            success: true,
+            dryRun,
+            foundStale: snapshot.size,
+            eligibleForDeletion: targetCount,
+            deleted: deletedCount,
+            cutoffDate: ninetyDaysAgo.toISOString(),
+            errors: errors.length > 0 ? errors : undefined
+        };
+
+    } catch (err) {
+        console.error("Prune failed:", err);
+        throw new HttpsError("internal", "Prune process failed.");
+    }
+});

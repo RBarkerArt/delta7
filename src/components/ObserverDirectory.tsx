@@ -23,6 +23,11 @@ export const ObserverDirectory: React.FC = () => {
     }>({ dayProgress: 1, coherenceScore: 100 });
     const [isSaving, setIsSaving] = useState(false);
 
+    // Filter states
+    const [filterStatus, setFilterStatus] = useState<'all' | 'anchored' | 'ghost'>('all');
+    const [filterCoherence, setFilterCoherence] = useState<'all' | 'stable' | 'fraying' | 'critical'>('all');
+    const [sortOrder, setSortOrder] = useState<'lastSeen' | 'day' | 'coherence'>('lastSeen');
+
     useEffect(() => {
         fetchObservers();
     }, []);
@@ -32,7 +37,8 @@ export const ObserverDirectory: React.FC = () => {
         setError(null);
         try {
             const obsRef = collection(db, 'observers');
-            const q = query(obsRef, orderBy('lastSeenAt', 'desc'), limit(100));
+            // Fetch more to allow for client-side filtering
+            const q = query(obsRef, orderBy('lastSeenAt', 'desc'), limit(200));
             const querySnapshot = await getDocs(q);
 
             const data = querySnapshot.docs.map(doc => ({
@@ -89,10 +95,40 @@ export const ObserverDirectory: React.FC = () => {
         }
     };
 
-    const filteredObservers = observers.filter(obs =>
-        obs.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        obs.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Advanced Filtering Logic
+    const filteredObservers = observers.filter(obs => {
+        // 1. Text Search
+        const matchesSearch =
+            obs.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            obs.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            obs.accessCode?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        // 2. Status Filter
+        const matchesStatus =
+            filterStatus === 'all' ? true :
+                filterStatus === 'anchored' ? obs.isAnchored :
+                    !obs.isAnchored; // ghost
+
+        // 3. Coherence Filter
+        const matchesCoherence =
+            filterCoherence === 'all' ? true :
+                filterCoherence === 'stable' ? obs.coherenceScore >= 80 :
+                    filterCoherence === 'fraying' ? (obs.coherenceScore < 80 && obs.coherenceScore >= 20) :
+                        obs.coherenceScore < 20; // critical
+
+        return matchesSearch && matchesStatus && matchesCoherence;
+    }).sort((a, b) => {
+        // Sorting Logic
+        if (sortOrder === 'lastSeen') {
+            const timeA = a.lastSeenAt?.toMillis() || 0;
+            const timeB = b.lastSeenAt?.toMillis() || 0;
+            return timeB - timeA; // Descending
+        } else if (sortOrder === 'day') {
+            return b.dayProgress - a.dayProgress; // Descending
+        } else {
+            return a.coherenceScore - b.coherenceScore; // Ascending (Critical first)
+        }
+    });
 
     const formatDate = (ts: Timestamp | undefined) => {
         if (!ts) return '-';
@@ -116,20 +152,73 @@ export const ObserverDirectory: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">User Directory</h1>
-                    <p className="text-sm text-gray-500">Manage registered users and their progress states.</p>
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">User Directory</h1>
+                        <p className="text-sm text-gray-500">Manage registered users and their progress states.</p>
+                    </div>
+                    <div className="relative w-full md:w-80">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Search email, ID, or code..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                        />
+                    </div>
                 </div>
-                <div className="relative w-full md:w-80">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <input
-                        type="text"
-                        placeholder="Search email or ID..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                    />
+
+                {/* Filter Toolbar */}
+                <div className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filter:</span>
+                        <select
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value as any)}
+                            className="text-sm border-none bg-gray-50 rounded px-2 py-1 focus:ring-0 cursor-pointer hover:bg-gray-100"
+                        >
+                            <option value="all">All Users</option>
+                            <option value="anchored">Anchored Only</option>
+                            <option value="ghost">Ghosts (Anon)</option>
+                        </select>
+                    </div>
+
+                    <div className="w-px h-4 bg-gray-300 mx-1" />
+
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Coherence:</span>
+                        <select
+                            value={filterCoherence}
+                            onChange={(e) => setFilterCoherence(e.target.value as any)}
+                            className="text-sm border-none bg-gray-50 rounded px-2 py-1 focus:ring-0 cursor-pointer hover:bg-gray-100"
+                        >
+                            <option value="all">Any State</option>
+                            <option value="stable">Stable (80%+)</option>
+                            <option value="fraying">Fraying (20-80%)</option>
+                            <option value="critical">Critical (&lt;20%)</option>
+                        </select>
+                    </div>
+
+                    <div className="w-px h-4 bg-gray-300 mx-1" />
+
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Sort:</span>
+                        <select
+                            value={sortOrder}
+                            onChange={(e) => setSortOrder(e.target.value as any)}
+                            className="text-sm border-none bg-gray-50 rounded px-2 py-1 focus:ring-0 cursor-pointer hover:bg-gray-100"
+                        >
+                            <option value="lastSeen">Last Seen</option>
+                            <option value="day">Day Progress</option>
+                            <option value="coherence">Coherence (Low-High)</option>
+                        </select>
+                    </div>
+
+                    <div className="ml-auto text-xs text-gray-400 font-mono">
+                        Showing {filteredObservers.length} / {observers.length}
+                    </div>
                 </div>
             </div>
 
@@ -165,7 +254,9 @@ export const ObserverDirectory: React.FC = () => {
                                                 <div className="font-medium text-gray-900">
                                                     {obs.email || <span className="text-gray-400 italic">Anonymous</span>}
                                                 </div>
-                                                {/* ID removed to prevent duplication with Code column */}
+                                                <div className="text-[10px] text-gray-400 font-mono truncate max-w-[120px]" title={obs.id}>
+                                                    {obs.id}
+                                                </div>
                                             </div>
                                         </div>
                                     </td>
@@ -267,7 +358,7 @@ export const ObserverDirectory: React.FC = () => {
                     <div className="p-12 text-center">
                         <UserIcon className="mx-auto text-gray-300 mb-3" size={48} />
                         <h3 className="text-gray-900 font-medium">No users found</h3>
-                        <p className="text-gray-500 text-sm mt-1">Try adjusting your search.</p>
+                        <p className="text-gray-500 text-sm mt-1">Try adjusting your filters.</p>
                     </div>
                 )}
             </div>
