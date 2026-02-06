@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db, functions, storage } from '../lib/firebase';
-import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, setDoc, deleteDoc, addDoc, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { DayLog, CoherenceState } from '../types/schema';
 import {
@@ -27,6 +27,7 @@ import {
 import { httpsCallable } from 'firebase/functions';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useAuth } from '../hooks/useAuth';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -41,6 +42,7 @@ const COHERENCE_STATES: CoherenceState[] = [
 ];
 
 export const NarrativeManager: React.FC = () => {
+    const { user } = useAuth();
     const [days, setDays] = useState<DayLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -166,6 +168,13 @@ export const NarrativeManager: React.FC = () => {
             const dayRef = doc(db, 'season1_days', `day_${editingDay.day}`);
             await deleteDoc(dayRef);
 
+            await addDoc(collection(db, 'admin_events'), {
+                action: 'day_delete',
+                day: editingDay.day,
+                actorEmail: user?.email || null,
+                createdAt: Timestamp.now()
+            });
+
             setDays(prev => prev.filter(d => d.day !== editingDay.day));
             setEditingDay(null);
         } catch (error) {
@@ -182,6 +191,13 @@ export const NarrativeManager: React.FC = () => {
         try {
             const dayRef = doc(db, 'season1_days', `day_${editingDay.day}`);
             await setDoc(dayRef, editingDay, { merge: true });
+
+            await addDoc(collection(db, 'admin_events'), {
+                action: isCreatingNew ? 'day_create' : 'day_update',
+                day: editingDay.day,
+                actorEmail: user?.email || null,
+                createdAt: Timestamp.now()
+            });
 
             setDays(prev => {
                 const exists = prev.some(d => d.day === editingDay.day);

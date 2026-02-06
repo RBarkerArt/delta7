@@ -6,7 +6,7 @@ import { useCoherence } from './hooks/useCoherence';
 import { CoherenceProvider } from './context/CoherenceContext';
 import { AuthProvider } from './context/AuthContext';
 import { db } from './lib/firebase';
-import { doc, onSnapshot, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import type { DayLog } from './types/schema';
 import { Activity, Terminal, Volume2, VolumeX, Lock, Shield } from 'lucide-react';
 import { GlitchText } from './components/GlitchText';
@@ -37,6 +37,7 @@ const NarrativeReader = lazy(() => import('./components/NarrativeReader').then(m
 const AdminSettings = lazy(() => import('./components/AdminSettings').then(m => ({ default: m.AdminSettings })));
 const StoryBibleEditor = lazy(() => import('./components/StoryBibleEditor').then(m => ({ default: m.StoryBibleEditor })));
 const AtmosphereControl = lazy(() => import('./components/AtmosphereControl').then(m => ({ default: m.AtmosphereControl })));
+const AdminStats = lazy(() => import('./components/AdminStats').then(m => ({ default: m.AdminStats })));
 import { PrivacyStatement, TermsAndConditions } from './pages/LegalPage';
 
 const AUTO_PROGRESS_DELAY = 4000;
@@ -51,6 +52,7 @@ const LabInterface: React.FC = () => {
   const [selectedPrologue, setSelectedPrologue] = useState<string>('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isTuningOpen, setIsTuningOpen] = useState(false);
+  const [resolvedDay, setResolvedDay] = useState<number>(1);
 
   const [lines, setLines] = useState<string[]>([]);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
@@ -70,10 +72,41 @@ const LabInterface: React.FC = () => {
 
   useEffect(() => {
     if (loading) return;
+    let cancelled = false;
+    const resolveDay = async () => {
+      try {
+        const dayRef = doc(db, 'season1_days', `day_${currentDay}`);
+        const dayDoc = await getDoc(dayRef);
+        if (cancelled) return;
+        if (dayDoc.exists()) {
+          setResolvedDay(currentDay);
+          return;
+        }
+        const latestQuery = query(collection(db, 'season1_days'), orderBy('day', 'desc'), limit(1));
+        const latestSnap = await getDocs(latestQuery);
+        if (!latestSnap.empty) {
+          const latestDay = (latestSnap.docs[0].data() as DayLog).day;
+          setResolvedDay(latestDay || 1);
+        } else {
+          setResolvedDay(1);
+        }
+      } catch (error) {
+        if (import.meta.env.DEV) console.warn('Day resolution failed:', error);
+        setResolvedDay(1);
+      }
+    };
+    resolveDay();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentDay, loading]);
+
+  useEffect(() => {
+    if (loading) return;
     const fetchPrologue = async () => {
       try {
         // Fetch from unified day document
-        const dayRef = doc(db, 'season1_days', `day_${currentDay}`);
+        const dayRef = doc(db, 'season1_days', `day_${resolvedDay}`);
         const dayDoc = await getDoc(dayRef);
 
         if (dayDoc.exists()) {
@@ -89,7 +122,7 @@ const LabInterface: React.FC = () => {
         }
       } catch (error) {
         if (import.meta.env.DEV) console.warn('Falling back to local prologue data:', error);
-        const dayPrologue = prologueData.find(p => p.day === currentDay);
+        const dayPrologue = prologueData.find(p => p.day === resolvedDay);
         if (dayPrologue && dayPrologue.sentences.length > 0) {
           const randomIndex = Math.floor(Math.random() * dayPrologue.sentences.length);
           setSelectedPrologue(dayPrologue.sentences[randomIndex]);
@@ -106,19 +139,21 @@ const LabInterface: React.FC = () => {
     setCurrentLineIndex(0);
     setDisplayedText('');
     setIsComplete(false);
-  }, [currentDay, loading]);
+  }, [resolvedDay, loading]);
 
   useEffect(() => {
     if (isPrologueActive) return;
 
     setDataLoading(true);
-    const dayId = `day_${currentDay}`;
+    const dayId = `day_${resolvedDay}`;
     const dayRef = doc(db, 'season1_days', dayId);
 
     const unsubscribe = onSnapshot(dayRef, (doc) => {
       if (doc.exists()) {
         const data = doc.data() as DayLog;
         setDayData(data);
+      } else {
+        setDayData(null);
       }
       setDataLoading(false);
     }, (error) => {
@@ -127,7 +162,7 @@ const LabInterface: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [currentDay, isPrologueActive]);
+  }, [resolvedDay, isPrologueActive]);
 
   useEffect(() => {
     if (!dayData || isPrologueActive) return;
@@ -396,6 +431,8 @@ const LabInterface: React.FC = () => {
           >
             {dataLoading ? (
               <div className="text-signal-green/50 italic">{">"} ACCESSING ARCHIVE...</div>
+            ) : !dayData ? (
+              <div className="text-signal-green/50 italic">{">"} SIGNAL_PENDING...</div>
             ) : (
               <div className="space-y-6 sm:space-y-8">
                 <div className="flex items-center gap-2 text-signal-amber text-xs border-l-2 border-signal-amber pl-2 select-none">
@@ -534,6 +571,7 @@ function App() {
                   <Route path="users" element={<ObserverDirectory />} />
                   <Route path="observers" element={<ObserverDirectory />} /> {/* Legacy alias? */}
                   <Route path="story-bible" element={<StoryBibleEditor />} />
+                  <Route path="stats" element={<AdminStats />} />
                   <Route path="settings" element={<AdminSettings />} />
                   <Route path="director" element={<AtmosphereControl />} />
                 </Route>

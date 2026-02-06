@@ -63,10 +63,68 @@ const createTransporter = (password) => {
         },
     });
 };
+// -------------------------------------------------------------
+// RATE LIMITS
+// -------------------------------------------------------------
+const RATE_LIMITS_COLLECTION = "function_rate_limits";
+const enforceRateLimit = async (key, limit, windowMs) => {
+    const db = admin.firestore();
+    const ref = db.collection(RATE_LIMITS_COLLECTION).doc(key);
+    const now = Date.now();
+    await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) {
+            tx.set(ref, {
+                count: 1,
+                windowStartMs: now,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+            return;
+        }
+        const data = snap.data() || {};
+        const windowStartMs = typeof data.windowStartMs === "number" ? data.windowStartMs : 0;
+        const count = typeof data.count === "number" ? data.count : 0;
+        if (now - windowStartMs > windowMs) {
+            tx.set(ref, {
+                count: 1,
+                windowStartMs: now,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            return;
+        }
+        if (count >= limit) {
+            throw new https_1.HttpsError("resource-exhausted", "Rate limit exceeded. Please retry later.");
+        }
+        tx.update(ref, {
+            count: count + 1,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+    });
+};
+// -------------------------------------------------------------
+// ADMIN CHECK
+// -------------------------------------------------------------
+const assertAdmin = async (request) => {
+    var _a, _b;
+    if (!request.auth)
+        throw new https_1.HttpsError("unauthenticated", "Auth required");
+    const isAdminClaim = ((_a = request.auth.token) === null || _a === void 0 ? void 0 : _a.role) === "admin";
+    if (isAdminClaim)
+        return;
+    const userDoc = await admin.firestore().collection("users").doc(request.auth.uid).get();
+    if (!userDoc.exists || ((_b = userDoc.data()) === null || _b === void 0 ? void 0 : _b.role) !== "admin") {
+        throw new https_1.HttpsError("permission-denied", "Admin access required.");
+    }
+};
 // 1. Admin Notification: New Visitor Observed
 exports.onNewVisitor = functions.runWith({
     secrets: ["EMAIL_PASSWORD"]
 }).auth.user().onCreate(async (user) => {
+    // Avoid cost spikes from anonymous spam
+    if (!user.email && (!user.providerData || user.providerData.length === 0)) {
+        functions.logger.log("Skipping admin notification for anonymous user:", user.uid);
+        return;
+    }
     const password = EMAIL_PASSWORD.value();
     const transporter = createTransporter(password);
     const mailOptions = {
@@ -88,8 +146,10 @@ exports.sendAnchorWelcome = (0, https_1.onCall)({
     secrets: [EMAIL_PASSWORD],
     enforceAppCheck: true
 }, async (request) => {
+    var _a;
     if (!request.auth)
         throw new https_1.HttpsError("unauthenticated", "Auth required");
+    await enforceRateLimit(`anchorWelcome:${request.auth.uid}`, 2, 24 * 60 * 60 * 1000);
     const email = request.auth.token.email;
     if (!email) {
         functions.logger.warn("No email found for user during anchoring welcome:", request.auth.uid);
@@ -97,6 +157,12 @@ exports.sendAnchorWelcome = (0, https_1.onCall)({
     }
     const password = EMAIL_PASSWORD.value();
     const transporter = createTransporter(password);
+    // Prevent repeat sends
+    const metaRef = admin.firestore().collection("user_meta").doc(request.auth.uid);
+    const metaSnap = await metaRef.get();
+    if (metaSnap.exists && ((_a = metaSnap.data()) === null || _a === void 0 ? void 0 : _a.welcomeSentAt)) {
+        return { success: true, alreadySent: true };
+    }
     const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -174,6 +240,9 @@ exports.sendAnchorWelcome = (0, https_1.onCall)({
     try {
         await transporter.sendMail(mailOptions);
         functions.logger.log("Welcome email sent to:", email);
+        await metaRef.set({
+            welcomeSentAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
         return { success: true };
     }
     catch (error) {
@@ -234,6 +303,9 @@ exports.deleteUserData = functions.https.onCall(async (data, context) => {
     // Protocol 14.2: Rate Discipline/Validation
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'Authentication required to delete account.');
+    }
+    if (!context.app) {
+        throw new functions.https.HttpsError('failed-precondition', 'App Check required.');
     }
     const uid = context.auth.uid;
     console.log(`Initiating erasure for user: ${uid}`);
@@ -342,6 +414,9 @@ exports.recoverSignal = (0, https_1.onCall)({
     enforceAppCheck: true,
     serviceAccount: 'delta7-3fede@appspot.gserviceaccount.com'
 }, async (request) => {
+    var _a;
+    const ip = ((_a = request.rawRequest) === null || _a === void 0 ? void 0 : _a.ip) || "unknown";
+    await enforceRateLimit(`recoverSignal:${ip}`, 5, 10 * 60 * 1000);
     const code = request.data.code;
     if (!code || typeof code !== 'string') {
         throw new https_1.HttpsError('invalid-argument', 'Signal frequency required');
@@ -349,6 +424,10 @@ exports.recoverSignal = (0, https_1.onCall)({
     // Format input (uppercase, handle potential missing dash if user lazy?)
     // Sticking to strict format for now: XXX-XXX
     const formattedCode = code.toUpperCase().trim();
+    const codeRegex = /^[A-HJKMNPQRSTUVWXYZ23456789]{3}-[A-HJKMNPQRSTUVWXYZ23456789]{3}$/;
+    if (!codeRegex.test(formattedCode)) {
+        throw new https_1.HttpsError('invalid-argument', 'Signal frequency format invalid.');
+    }
     try {
         const doc = await admin.firestore().collection('access_codes').doc(formattedCode).get();
         if (!doc.exists) {
@@ -374,12 +453,20 @@ exports.generateNarrativeContent = (0, https_1.onCall)({
 }, async (request) => {
     var _a;
     // 1. Authentication Check
-    if (!request.auth) {
-        throw new https_1.HttpsError("unauthenticated", "User must be logged in.");
-    }
+    await assertAdmin(request);
+    await enforceRateLimit(`generateNarrative:${request.auth.uid}`, 20, 60 * 60 * 1000);
     const { prompt, context, dayNumber } = request.data;
     const apiKey = process.env.GEMINI_API_KEY;
     const db = admin.firestore();
+    if (typeof prompt !== "string" || prompt.length < 1 || prompt.length > 4000) {
+        throw new https_1.HttpsError("invalid-argument", "Prompt must be 1-4000 characters.");
+    }
+    if (context && (typeof context !== "string" || context.length > 8000)) {
+        throw new https_1.HttpsError("invalid-argument", "Context must be <= 8000 characters.");
+    }
+    if (dayNumber && (!Number.isInteger(dayNumber) || dayNumber < 1 || dayNumber > 365)) {
+        throw new https_1.HttpsError("invalid-argument", "dayNumber must be 1-365.");
+    }
     // 2. Auto-fetch story context for continuity
     let storyBibleContext = "";
     let previousDaysContext = "";
@@ -516,15 +603,7 @@ ${prevDays.map(d => { var _a; return `Day ${d.day}: ${d.narrativeSummary}${((_a 
 exports.migrateProloguesToDays = (0, https_1.onCall)({
     enforceAppCheck: true
 }, async (request) => {
-    var _a;
-    // Verify admin
-    if (!request.auth) {
-        throw new https_1.HttpsError("unauthenticated", "Must be logged in.");
-    }
-    const userDoc = await admin.firestore().collection("users").doc(request.auth.uid).get();
-    if (!userDoc.exists || ((_a = userDoc.data()) === null || _a === void 0 ? void 0 : _a.role) !== "admin") {
-        throw new https_1.HttpsError("permission-denied", "Admin access required.");
-    }
+    await assertAdmin(request);
     const db = admin.firestore();
     const prologuesSnapshot = await db.collection("season1_prologues").get();
     const results = [];
@@ -567,15 +646,7 @@ exports.migrateProloguesToDays = (0, https_1.onCall)({
 exports.pruneStaleUsers = (0, https_1.onCall)({
     enforceAppCheck: true
 }, async (request) => {
-    var _a;
-    // 1. Verify Admin Access
-    if (!request.auth)
-        throw new https_1.HttpsError("unauthenticated", "Auth required.");
-    // Check role in users collection
-    const userDoc = await admin.firestore().collection("users").doc(request.auth.uid).get();
-    if (!userDoc.exists || ((_a = userDoc.data()) === null || _a === void 0 ? void 0 : _a.role) !== "admin") {
-        throw new https_1.HttpsError("permission-denied", "Admin access required.");
-    }
+    await assertAdmin(request);
     const { dryRun = true } = request.data;
     const db = admin.firestore();
     const auth = admin.auth();

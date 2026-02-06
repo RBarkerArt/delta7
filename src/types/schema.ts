@@ -87,6 +87,11 @@ export interface SystemSettings {
     particleEffect?: 'dust' | 'ash' | 'digital-rain' | 'none';
     cursorStyle?: 'crosshair' | 'default' | 'none';
     isBlackout?: boolean;
+    particleSize?: number; // 0.4 to 1.6 (scale)
+    particleDensity?: number; // 0.5 to 2.0 (multiplier)
+    particleSpeed?: number; // 0.4 to 1.6 (multiplier)
+    particleOpacity?: number; // 0.3 to 1.2 (multiplier)
+    particleTint?: string; // Hex color override like #33ff00
     // Audio Protocols
     audioVolume?: number; // 0.0 to 1.0
     isAudioEnabled?: boolean;
@@ -96,4 +101,3 @@ export interface SystemSettings {
     aiRules?: string;
     updatedAt?: Timestamp;
 }
-

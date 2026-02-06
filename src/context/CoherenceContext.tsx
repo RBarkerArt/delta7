@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 
-import { doc, setDoc, updateDoc, Timestamp, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, Timestamp, onSnapshot, addDoc, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { UserProgress, CoherenceState } from '../types/schema';
 import { useAuth } from '../hooks/useAuth';
@@ -37,6 +37,7 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const userProgressRef = useRef<UserProgress | null>(null);
 
     const lastSyncRef = useRef<{ score: number; day: number; time: number }>({ score: 100, day: 1, time: 0 });
+    const lastEventRef = useRef<{ reason: string; time: number }>({ reason: '', time: 0 });
 
     // Stable refs for interval-based logic
     const scoreRef = useRef(score);
@@ -44,12 +45,38 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const currentDayRef = useRef(currentDay);
     const isAnchoredRef = useRef(isAnchored); // Track anchored state for intervals
     const startDateRef = useRef<Timestamp>(Timestamp.now());
+    const lastSeenRef = useRef<number>(Date.now());
 
     // Keep refs in sync with state
     useEffect(() => { scoreRef.current = score; }, [score]);
     useEffect(() => { stateRef.current = state; }, [state]);
     useEffect(() => { currentDayRef.current = currentDay; }, [currentDay]);
     useEffect(() => { isAnchoredRef.current = isAnchored; }, [isAnchored]); // Sync isAnchored ref
+
+    const logObserverEvent = async (reason: string) => {
+        if (isAdmin || !visitorId) return;
+        const now = Date.now();
+        if (reason === lastEventRef.current.reason && now - lastEventRef.current.time < 60000) {
+            return;
+        }
+
+        lastEventRef.current = { reason, time: now };
+
+        try {
+            await addDoc(collection(db, 'observer_events'), {
+                observerId: visitorId,
+                email: user?.email || null,
+                isAnchored: isAnchoredRef.current,
+                coherenceScore: scoreRef.current,
+                coherenceState: stateRef.current,
+                dayProgress: currentDayRef.current,
+                reason,
+                createdAt: Timestamp.now()
+            });
+        } catch (err) {
+            if (import.meta.env.DEV) console.warn('[Delta-7] Event log deferred:', err);
+        }
+    };
 
     // INITIALIZATION & REAL-TIME SYNC
     // Modified to listen for Admin updates (fixing the overwrite bug)
@@ -112,6 +139,7 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     startDateRef.current = initial.startDate;
                     userProgressRef.current = initial;
                     lastSyncRef.current = { score: 100, day: 1, time: Date.now() };
+                    lastSeenRef.current = Date.now();
 
                     // Project Signal: Frequency Assignment
                     if (!isAdmin) {
@@ -176,9 +204,8 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 // Calculate Day
                 const storedDay = data.dayProgress || 1;
                 const msPerDay = 24 * 60 * 60 * 1000;
-                const startMidnight = new Date(startDate).setUTCHours(0, 0, 0, 0);
-                const nowMidnight = new Date(now).setUTCHours(0, 0, 0, 0);
-                let calculatedDay = Math.floor((nowMidnight - startMidnight) / msPerDay) + 1;
+                let calculatedDay = Math.floor((now - startDate) / msPerDay) + 1;
+                if (calculatedDay < 1) calculatedDay = 1;
 
                 let finalStartDate = data.startDate;
 
@@ -227,6 +254,7 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 currentDayRef.current = calculatedDay;
                 userProgressRef.current = { ...data, ...updates };
                 lastSyncRef.current = { score: finalScore, day: calculatedDay, time: now };
+                lastSeenRef.current = now;
 
                 // Execute the update
                 // Note: This write WILL trigger the listener again, but 'hasPendingWrites' will be true, so it will be ignored block above.
@@ -275,6 +303,7 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                         day: currentDayRef.current,
                         time: Date.now()
                     };
+                    lastSeenRef.current = Date.now();
                 }
             }
         }, (error) => {
@@ -351,6 +380,7 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                     if (import.meta.env.DEV) console.log(`[Delta-7] Day ${prev} → Day ${nextDay}`);
                     return nextDay;
                 });
+                void logObserverEvent('day_advance');
 
                 // End glitch after animation
                 setTimeout(() => setIsGlitching(false), 1500);
@@ -399,7 +429,12 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 });
 
                 lastSyncRef.current = { score: currentScore, day: currentDayVal, time: Date.now() };
+                lastSeenRef.current = Date.now();
                 if (import.meta.env.DEV) console.log(`[Delta-7] Sync: ${reason} (score: ${currentScore.toFixed(1)}, day: ${currentDayVal})`);
+
+                if (reason === 'session_start' || reason === 'session_end' || reason === 'visibility_visible' || reason === 'visibility_hidden' || reason.startsWith('state_change_')) {
+                    void logObserverEvent(reason);
+                }
             } catch (err) {
                 if (import.meta.env.DEV) console.warn('[Delta-7] Sync deferred:', err);
             }
@@ -416,22 +451,35 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 const msPerDay = 24 * 60 * 60 * 1000;
 
                 // Calculate expected day based on start date
-                const startMidnight = new Date(startMs).setUTCHours(0, 0, 0, 0);
-                const nowMidnight = new Date(now).setUTCHours(0, 0, 0, 0);
-                const expectedDay = Math.floor((nowMidnight - startMidnight) / msPerDay) + 1;
+                let expectedDay = Math.floor((now - startMs) / msPerDay) + 1;
+                if (expectedDay < 1) expectedDay = 1;
 
                 const currentDayVal = currentDayRef.current;
+                const lastSeen = lastSeenRef.current;
+                const decayUnits = Math.floor((now - lastSeen) / DECAY_MS);
+                const decayPoints = isAdmin ? 0 : (isAnchoredRef.current ? ANCHORED_DECAY : DEFAULT_DECAY);
+                const totalDecay = decayUnits * decayPoints;
+                const nextScore = totalDecay > 0 ? Math.max(0, scoreRef.current - totalDecay) : scoreRef.current;
+                const scoreChanged = nextScore !== scoreRef.current;
+                const dayChanged = expectedDay > currentDayVal;
 
-                if (expectedDay > currentDayVal) {
+                if (scoreChanged) {
+                    setScoreState(nextScore);
+                    setState(getCoherenceState(nextScore));
+                    scoreRef.current = nextScore;
+                    stateRef.current = getCoherenceState(nextScore);
+                }
+
+                if (dayChanged) {
                     if (import.meta.env.DEV) console.log(`[Delta-7] Tab visible: Day catch-up ${currentDayVal} → ${expectedDay}`);
                     // Trigger glitch effect for day advancement
                     setIsGlitching(true);
                     setCurrentDayState(expectedDay);
                     currentDayRef.current = expectedDay;
                     setTimeout(() => setIsGlitching(false), 1500);
-
-                    // Also sync the new day to Firestore
-                    syncToFirestore('day_catchup');
+                }
+                if (dayChanged || scoreChanged) {
+                    syncToFirestore('visibility_visible');
                 }
             }
         };
@@ -500,6 +548,7 @@ export const CoherenceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const newStartTime = Date.now() - (val - 1) * msPerDay;
         startDateRef.current = Timestamp.fromMillis(newStartTime);
         console.log(`[Delta-7] Temporal shift: Day ${val} selected. Realigned origin.`);
+        void logObserverEvent('day_override');
     };
 
     const value: CoherenceContextType = {

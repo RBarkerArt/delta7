@@ -16,9 +16,15 @@ service firebase.storage {
       allow write: if isAdmin();
     }
 
-    // All other paths: Public read, no write
-    match /{allPaths=**} {
+    // Site imagery: Public read, Admin write
+    match /site_images/{allPaths=**} {
       allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // All other paths: Admin-only read, no write
+    match /{allPaths=**} {
+      allow read: if isAdmin();
       allow write: if false;
     }
   }

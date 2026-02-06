@@ -27,6 +27,11 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence 
     const particles = settings?.particleEffect || 'dust';
     const cursor = settings?.cursorStyle || 'crosshair';
     const isBlackout = settings?.isBlackout || false;
+    const particleSize = settings?.particleSize ?? 0.85;
+    const particleDensity = settings?.particleDensity ?? 1.0;
+    const particleSpeed = settings?.particleSpeed ?? 1.0;
+    const particleOpacity = settings?.particleOpacity ?? 1.0;
+    const particleTint = settings?.particleTint;
 
     const THEME_COLORS: Record<string, string> = {
         green: '51, 255, 0',
@@ -36,6 +41,23 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence 
         white: '255, 255, 255'
     };
     const activeColor = THEME_COLORS[theme] || THEME_COLORS['green'];
+
+    const hexToRgb = (hex?: string) => {
+        if (!hex) return null;
+        const normalized = hex.trim().replace('#', '');
+        if (!(normalized.length === 6 || normalized.length === 3)) return null;
+        const full = normalized.length === 3
+            ? normalized.split('').map((c) => c + c).join('')
+            : normalized;
+        const r = parseInt(full.slice(0, 2), 16);
+        const g = parseInt(full.slice(2, 4), 16);
+        const b = parseInt(full.slice(4, 6), 16);
+        if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
+        return `${r}, ${g}, ${b}`;
+    };
+
+    const tintColor = hexToRgb(particleTint);
+    const particleColor = tintColor || activeColor;
 
     // Audio Controls
     const { setGlobalVolume, setAudioMode, setBackgroundTrack, setIsGlobalEnabled, setHybridTrackVolume } = useSound();
@@ -84,7 +106,11 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence 
                     key={theme} // Force remount on theme change to read new CSS var
                     coherence={coherence}
                     variant={particles}
-                    color={activeColor}
+                    color={particleColor}
+                    sizeScale={particleSize}
+                    density={particleDensity}
+                    speed={particleSpeed}
+                    opacity={particleOpacity}
                 />
             )}
 

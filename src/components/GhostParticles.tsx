@@ -4,6 +4,10 @@ interface GhostParticlesProps {
     coherence: number;
     variant?: 'dust' | 'ash' | 'digital-rain' | 'none';
     color?: string;
+    sizeScale?: number;
+    density?: number;
+    speed?: number;
+    opacity?: number;
 }
 
 interface Particle {
@@ -16,10 +20,19 @@ interface Particle {
     size: number;
     opacity: number;
     flickerOffset: number;
+    depth: number;
     char?: string; // For matrix/rain
 }
 
-export const GhostParticles: React.FC<GhostParticlesProps> = ({ coherence, variant = 'dust', color = '51, 255, 0' }) => {
+export const GhostParticles: React.FC<GhostParticlesProps> = ({
+    coherence,
+    variant = 'dust',
+    color = '51, 255, 0',
+    sizeScale = 0.85,
+    density = 1,
+    speed = 1,
+    opacity = 1
+}) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const particlesRef = useRef<Particle[]>([]);
     const mouseRef = useRef({ x: -1000, y: -1000 });
@@ -36,17 +49,24 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({ coherence, varia
         // Base config defaults (Dust)
         let c = {
             count: isStable ? 80 : 40,
-            baseOpacity: isStable ? 0.6 : 0.2,
+            baseOpacity: isStable ? 0.55 : 0.18,
             repulsionRadius: isStable ? 120 : 350,
             repulsionForce: isStable ? 0.05 : 0.25,
             flickerIntensity: isStable ? 0.0 : 0.8,
             color, // Use prop
             shape: 'circle',
             gravity: 0,
-            speedMod: 1
+            speedMod: 1,
+            sizeRange: [0.6, 1.8] as [number, number]
         };
 
-        if (variant === 'ash') {
+        if (variant === 'dust') {
+            // Subtle coherence link: more presence when coherence drops, but never dominating.
+            const instability = Math.max(0, Math.min(1, (100 - coherence) / 100));
+            c.count = Math.round(c.count * (1 + instability * 0.18));
+            c.baseOpacity = c.baseOpacity + (instability * 0.08);
+            c.sizeRange = [0.55, 1.7];
+        } else if (variant === 'ash') {
             c.count = 60;
             c.baseOpacity = 0.4; // Softer
             c.shape = 'square';
@@ -59,14 +79,16 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({ coherence, varia
             // So Ash should be theme colored.
             // I will REMOVE the hardcoded ash color and let it inherit 'color' prop.
             // But maybe lower baseOpacity.
-            c.baseOpacity = 0.6;
+            c.baseOpacity = 0.5;
             c.repulsionForce = 0.1;
+            c.sizeRange = [0.8, 2.2];
         } else if (variant === 'digital-rain') {
             c.count = 70; // More rain
             c.shape = 'line'; // Vertical lines
             c.gravity = 12; // Initial speed baseline (will randomise in update?)
             c.repulsionForce = 0; // Rain doesn't care about mouse? Or maybe scatters?
             c.baseOpacity = 0.8; // Brighter
+            c.sizeRange = [0.8, 2.4];
         }
 
         return c;
@@ -77,19 +99,23 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({ coherence, varia
         const particles: Particle[] = [];
         const width = window.innerWidth;
         const height = window.innerHeight;
-        const { count } = config;
+        const { count, sizeRange } = config;
+        const scaledCount = Math.max(10, Math.round(count * density));
 
-        for (let i = 0; i < count; i++) {
+        for (let i = 0; i < scaledCount; i++) {
+            const depth = Math.random();
+            const size = (Math.random() * (sizeRange[1] - sizeRange[0]) + sizeRange[0]) * sizeScale * (0.55 + depth);
             particles.push({
                 x: Math.random() * width,
                 y: Math.random() * height,
-                vx: (Math.random() - 0.5) * 0.3,
-                vy: (Math.random() - 0.5) * 0.3,
+                vx: (Math.random() - 0.5) * 0.35,
+                vy: (Math.random() - 0.5) * 0.35,
                 baseX: Math.random() * width,
                 baseY: Math.random() * height,
-                size: Math.random() * 3 + 1.5,
+                size,
                 opacity: Math.random(),
-                flickerOffset: Math.random() * 100
+                flickerOffset: Math.random() * 100,
+                depth
             });
         }
         particlesRef.current = particles;
@@ -100,7 +126,7 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({ coherence, varia
         window.addEventListener('mousemove', handleMouseMove);
 
         return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, [config.count]); // Re-init on count change
+    }, [config.count, config.sizeRange, density, sizeScale]); // Re-init on count/size change
 
     // Animation Loop
     useEffect(() => {
@@ -117,7 +143,7 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({ coherence, varia
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            const { baseOpacity, repulsionRadius, repulsionForce, flickerIntensity, color, shape, gravity } = config;
+            const { baseOpacity, repulsionRadius, repulsionForce, flickerIntensity, color, shape, gravity, speedMod } = config;
             const mouse = mouseRef.current;
 
             // Recalculate color if CSS var changed (basic check or just rely on render?)
@@ -127,8 +153,15 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({ coherence, varia
 
             particlesRef.current.forEach((p) => {
                 // 1. Movement & Gravity
-                p.x += p.vx;
-                p.y += p.vy + gravity;
+                const depthSpeed = (0.55 + p.depth) * speedMod * speed;
+                p.x += p.vx * depthSpeed;
+                p.y += (p.vy * depthSpeed) + gravity;
+
+                // Subtle drift for a more "mysterious" float
+                const driftX = Math.sin(time * 0.00025 + p.flickerOffset) * 0.12;
+                const driftY = Math.cos(time * 0.0002 + p.flickerOffset) * 0.08;
+                p.x += driftX * (0.4 + p.depth);
+                p.y += driftY * (0.35 + p.depth);
 
                 // Wrap around screen
                 if (p.x < 0) p.x = canvas.width;
@@ -154,22 +187,28 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({ coherence, varia
                 }
 
                 // 3. Opacity
-                let opacity = baseOpacity * p.opacity;
+                let finalOpacity = baseOpacity * p.opacity * (0.35 + p.depth) * opacity;
                 if (flickerIntensity > 0) {
                     const flicker = Math.sin(time * 0.005 + p.flickerOffset) * flickerIntensity;
-                    opacity += flicker * 0.1;
-                    if (Math.random() < 0.05) opacity = 0;
+                    finalOpacity += flicker * 0.1;
+                    if (Math.random() < 0.05) finalOpacity = 0;
                 }
-                opacity = Math.max(0, Math.min(1, opacity));
+                finalOpacity = Math.max(0, Math.min(1, finalOpacity));
 
                 // Draw
-                ctx.fillStyle = `rgba(${color}, ${opacity})`;
+                ctx.fillStyle = `rgba(${color}, ${finalOpacity})`;
+                if (shape === 'circle') {
+                    ctx.shadowColor = `rgba(${color}, ${finalOpacity * 0.6})`;
+                    ctx.shadowBlur = 6 * (0.3 + p.depth);
+                } else {
+                    ctx.shadowBlur = 0;
+                }
                 ctx.beginPath();
 
                 if (shape === 'square') {
                     ctx.rect(p.x, p.y, p.size, p.size);
                 } else if (shape === 'line') {
-                    ctx.rect(p.x, p.y, 2, p.size * 6); // Thicker (2px), Longer (x6)
+                    ctx.rect(p.x, p.y, 1.5, p.size * 6); // Thin streaks
                 } else {
                     ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
                 }
@@ -184,7 +223,7 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({ coherence, varia
         return () => {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
-    }, [config]);
+    }, [config, speed, opacity]);
 
     return (
         <canvas

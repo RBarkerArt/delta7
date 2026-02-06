@@ -21,7 +21,15 @@ import type { SystemSettings } from '../types/schema';
 const DEFAULT_SETTINGS: SystemSettings = {
     maintenanceMode: false,
     registrationOpen: true,
-    glitchIntensity: 1.0
+    glitchIntensity: 1.0,
+    theme: 'green',
+    particleEffect: 'dust',
+    cursorStyle: 'crosshair',
+    isBlackout: false,
+    particleSize: 0.85,
+    particleDensity: 1.0,
+    particleSpeed: 1.0,
+    particleOpacity: 1.0
 };
 
 export const AdminSettings: React.FC = () => {
@@ -160,6 +168,14 @@ export const AdminSettings: React.FC = () => {
     }
 
     const currentSettings = settings || DEFAULT_SETTINGS;
+    const THEME_HEX: Record<string, string> = {
+        green: '#33ff00',
+        amber: '#ffb000',
+        red: '#ff3333',
+        blue: '#00ffff',
+        white: '#ffffff'
+    };
+    const themeHex = THEME_HEX[currentSettings.theme || 'green'];
 
     return (
         <div className="space-y-8 max-w-4xl">
@@ -375,6 +391,113 @@ export const AdminSettings: React.FC = () => {
                                     <option value="default">Default Pointer</option>
                                     <option value="none">Hidden</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        {/* Particle Tuning */}
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+                            <h4 className="text-sm font-bold text-gray-900">Particle Tuning</h4>
+
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Dust Size</label>
+                                <input
+                                    type="range"
+                                    min="0.5"
+                                    max="1.4"
+                                    step="0.05"
+                                    value={currentSettings.particleSize ?? 0.85}
+                                    onChange={(e) => {
+                                        if (settings) handleSave({ ...settings, particleSize: parseFloat(e.target.value) });
+                                    }}
+                                    className="w-full accent-emerald-500"
+                                />
+                                <div className="flex justify-between text-[10px] text-gray-400">
+                                    <span>Fine</span>
+                                    <span>{(currentSettings.particleSize ?? 0.85).toFixed(2)}</span>
+                                    <span>Thick</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Density</label>
+                                <input
+                                    type="range"
+                                    min="0.6"
+                                    max="1.8"
+                                    step="0.05"
+                                    value={currentSettings.particleDensity ?? 1.0}
+                                    onChange={(e) => {
+                                        if (settings) handleSave({ ...settings, particleDensity: parseFloat(e.target.value) });
+                                    }}
+                                    className="w-full accent-emerald-500"
+                                />
+                                <div className="flex justify-between text-[10px] text-gray-400">
+                                    <span>Sparse</span>
+                                    <span>{(currentSettings.particleDensity ?? 1.0).toFixed(2)}</span>
+                                    <span>Dense</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Drift Speed</label>
+                                <input
+                                    type="range"
+                                    min="0.5"
+                                    max="1.6"
+                                    step="0.05"
+                                    value={currentSettings.particleSpeed ?? 1.0}
+                                    onChange={(e) => {
+                                        if (settings) handleSave({ ...settings, particleSpeed: parseFloat(e.target.value) });
+                                    }}
+                                    className="w-full accent-emerald-500"
+                                />
+                                <div className="flex justify-between text-[10px] text-gray-400">
+                                    <span>Still</span>
+                                    <span>{(currentSettings.particleSpeed ?? 1.0).toFixed(2)}</span>
+                                    <span>Restless</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Opacity</label>
+                                <input
+                                    type="range"
+                                    min="0.4"
+                                    max="1.2"
+                                    step="0.05"
+                                    value={currentSettings.particleOpacity ?? 1.0}
+                                    onChange={(e) => {
+                                        if (settings) handleSave({ ...settings, particleOpacity: parseFloat(e.target.value) });
+                                    }}
+                                    className="w-full accent-emerald-500"
+                                />
+                                <div className="flex justify-between text-[10px] text-gray-400">
+                                    <span>Ghostly</span>
+                                    <span>{(currentSettings.particleOpacity ?? 1.0).toFixed(2)}</span>
+                                    <span>Bright</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Particle Tint</label>
+                                    <input
+                                        type="color"
+                                        value={currentSettings.particleTint || themeHex}
+                                        onChange={(e) => {
+                                            if (settings) handleSave({ ...settings, particleTint: e.target.value });
+                                        }}
+                                        className="h-9 w-full rounded border border-gray-300 bg-white"
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        if (settings) handleSave({ ...settings, particleTint: '' });
+                                    }}
+                                    className="mt-6 px-3 py-2 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded transition-colors"
+                                >
+                                    Use Theme
+                                </button>
                             </div>
                         </div>
 

@@ -25,15 +25,58 @@ service cloud.firestore {
 
     // --- VALIDATION FUNCTIONS (Protocol 1.1) ---
 
+    function isValidCoherenceState(state) {
+      return state in [
+        'FEED_STABLE',
+        'SYNC_RECOVERING',
+        'COHERENCE_FRAYING',
+        'SIGNAL_FRAGMENTED',
+        'CRITICAL_INTERFERENCE'
+      ];
+    }
+
     // Validate Observer Update
-    function isValidObserverUpdate() {
+    function isValidObserverUpdate(visitorId) {
        let data = request.resource.data;
-       // Ensure mandatory fields have correct types if present
+       let allowedKeys = [
+         'coherenceScore',
+         'coherenceState',
+         'dayProgress',
+         'visitCount',
+         'startDate',
+         'lastSeenAt',
+         'seenFragments',
+         'isAnchored',
+         'email',
+         'visitorId',
+         'anchoredFirebaseUid',
+         'accessCode'
+       ];
+
        return (
-         (!('coherenceScore' in data) || data.coherenceScore is number) &&
-         (!('dayProgress' in data) || data.dayProgress is int) &&
+         data.keys().hasOnly(allowedKeys) &&
+         (!('coherenceScore' in data) || (data.coherenceScore is number && data.coherenceScore >= 0 && data.coherenceScore <= 100)) &&
+         (!('coherenceState' in data) || (data.coherenceState is string && isValidCoherenceState(data.coherenceState))) &&
+         (!('dayProgress' in data) || (data.dayProgress is int && data.dayProgress >= 1 && data.dayProgress <= 365)) &&
+         (!('visitCount' in data) || (data.visitCount is int && data.visitCount >= 1)) &&
+         (!('startDate' in data) || data.startDate is timestamp) &&
          (!('lastSeenAt' in data) || data.lastSeenAt is timestamp) &&
-         (!('isAnchored' in data) || data.isAnchored is bool)
+         (!('seenFragments' in data) || data.seenFragments is list) &&
+         (!('isAnchored' in data) || data.isAnchored is bool) &&
+         (!('email' in data) || (data.email is string && request.auth.token.email == data.email)) &&
+         (!('visitorId' in data) || (data.visitorId is string && data.visitorId == visitorId)) &&
+         (!('anchoredFirebaseUid' in data) || (
+           data.anchoredFirebaseUid is string &&
+           data.anchoredFirebaseUid == request.auth.uid &&
+           (resource == null || data.anchoredFirebaseUid == resource.data.anchoredFirebaseUid)
+         )) &&
+         (!('accessCode' in data) || (
+           resource != null && resource.data.accessCode is string && data.accessCode == resource.data.accessCode
+         )) &&
+         (!('isAnchored' in data) || (
+           data.isAnchored == false ||
+           request.auth.token.firebase.sign_in_provider in ['google.com', 'password']
+         ))
        );
     }
     
@@ -41,9 +84,28 @@ service cloud.firestore {
     function isValidUserUpdate() {
         let data = request.resource.data;
         return (
-            (!('email' in data) || data.email is string) &&
+            data.keys().hasOnly(['email', 'displayName']) &&
+            (!('email' in data) || (data.email is string && request.auth.token.email == data.email)) &&
             (!('displayName' in data) || data.displayName is string)
         );
+    }
+
+    function isValidMappingCreate() {
+      let data = request.resource.data;
+      return (
+        data.keys().hasOnly(['visitorId', 'lastUpdated']) &&
+        data.visitorId is string &&
+        (!('lastUpdated' in data) || data.lastUpdated is timestamp)
+      );
+    }
+
+    function isValidMappingUpdate() {
+      let data = request.resource.data;
+      return (
+        data.keys().hasOnly(['visitorId', 'lastUpdated']) &&
+        data.visitorId == resource.data.visitorId &&
+        (!('lastUpdated' in data) || data.lastUpdated is timestamp)
+      );
     }
 
     // --- RULES ---
@@ -58,14 +120,15 @@ service cloud.firestore {
     match /observers/{visitorId} {
       allow read: if isAdmin() || isVisitorOwner(visitorId) || resource.data.anchoredFirebaseUid == request.auth.uid;
       // Allow write if admin OR (owner AND strictly validated)
-      allow write: if isAdmin() || (isVisitorOwner(visitorId) && isValidObserverUpdate());
+      allow write: if isAdmin() || (isVisitorOwner(visitorId) && isValidObserverUpdate(visitorId));
     }
 
     // Lookup table for mapping Firebase UID to Visitor ID
     match /firebase_uid_mapping/{firebaseUid} {
       allow read: if isAdmin() || isOwner(firebaseUid);
-      // Only allow creation/update if user owns the mapping
-      allow write: if isAdmin() || isOwner(firebaseUid); 
+      allow create: if isAdmin() || (isOwner(firebaseUid) && isValidMappingCreate() && !exists(/databases/$(database)/documents/firebase_uid_mapping/$(firebaseUid)));
+      allow update: if isAdmin() || (isOwner(firebaseUid) && isValidMappingUpdate());
+      allow delete: if isAdmin();
     }
     
     // Narrative content: Public read, Admin write
@@ -88,6 +151,25 @@ service cloud.firestore {
     match /system/{document=**} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // Observer event stream: observers write, admins read
+    match /observer_events/{eventId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() || (
+        isAuthenticated() &&
+        request.resource.data.keys().hasAll(['observerId', 'reason', 'createdAt']) &&
+        request.resource.data.observerId is string &&
+        request.resource.data.reason is string &&
+        request.resource.data.createdAt is timestamp &&
+        isVisitorOwner(request.resource.data.observerId)
+      );
+      allow update, delete: if isAdmin();
+    }
+
+    // Admin audit log
+    match /admin_events/{eventId} {
+      allow read, write: if isAdmin();
     }
   }
 }

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
-import { collection, query, orderBy, getDocs, Timestamp, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, Timestamp, limit, doc, updateDoc, addDoc } from 'firebase/firestore';
 import type { UserProgress } from '../types/schema';
 import { Search, Loader2, User as UserIcon, CheckCircle, Edit2, Save, X } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 interface ObserverWithId extends Omit<UserProgress, 'email'> {
     id: string;
@@ -10,6 +11,7 @@ interface ObserverWithId extends Omit<UserProgress, 'email'> {
 }
 
 export const ObserverDirectory: React.FC = () => {
+    const { user } = useAuth();
     const [observers, setObservers] = useState<ObserverWithId[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -78,6 +80,17 @@ export const ObserverDirectory: React.FC = () => {
                 coherenceScore: editForm.coherenceScore,
                 startDate: Timestamp.fromMillis(newStartTime),
                 isManualDayProgress: true  // Tells CoherenceContext to respect this value
+            });
+
+            await addDoc(collection(db, 'admin_events'), {
+                action: 'observer_update',
+                observerId: editingId,
+                changes: {
+                    dayProgress: editForm.dayProgress,
+                    coherenceScore: editForm.coherenceScore
+                },
+                actorEmail: user?.email || null,
+                createdAt: Timestamp.now()
             });
 
             // Update local state
@@ -228,7 +241,119 @@ export const ObserverDirectory: React.FC = () => {
                 </div>
             )}
 
-            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div className="md:hidden space-y-3">
+                {filteredObservers.map((obs) => (
+                    <div key={obs.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                                    <UserIcon size={16} />
+                                </div>
+                                <div>
+                                    <div className="font-medium text-gray-900">
+                                        {obs.email || <span className="text-gray-400 italic">Anonymous</span>}
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 font-mono truncate max-w-[180px]" title={obs.id}>
+                                        {obs.id}
+                                    </div>
+                                </div>
+                            </div>
+                            {obs.isAnchored ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
+                                    <CheckCircle size={12} /> Anchored
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-medium">
+                                    Ghost
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                            <span className="font-mono bg-gray-50 border border-gray-200 rounded px-2 py-1">{obs.accessCode || '-'}</span>
+                            <span>{formatDate(obs.lastSeenAt)}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-700">
+                                {editingId === obs.id ? (
+                                    <input
+                                        type="number"
+                                        className="w-20 border rounded px-2 py-1 text-sm"
+                                        value={editForm.dayProgress}
+                                        onChange={(e) => setEditForm({ ...editForm, dayProgress: parseInt(e.target.value) || 1 })}
+                                    />
+                                ) : (
+                                    <span className="font-medium text-gray-900">Day {obs.dayProgress}</span>
+                                )}
+                            </div>
+                            {editingId === obs.id ? (
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="range"
+                                        min="0" max="100"
+                                        value={editForm.coherenceScore}
+                                        onChange={(e) => setEditForm({ ...editForm, coherenceScore: parseInt(e.target.value) })}
+                                        className="w-28 accent-emerald-600"
+                                    />
+                                    <span className="text-xs w-8">{editForm.coherenceScore}%</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full rounded-full ${obs.coherenceScore > 80 ? 'bg-emerald-500' :
+                                                obs.coherenceScore > 40 ? 'bg-amber-500' : 'bg-red-500'
+                                                }`}
+                                            style={{ width: `${obs.coherenceScore}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-xs text-gray-600">{Math.round(obs.coherenceScore)}%</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2">
+                            {editingId === obs.id ? (
+                                <>
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={isSaving}
+                                        className="px-3 py-1.5 text-xs font-medium text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50"
+                                        title="Save"
+                                    >
+                                        Save
+                                    </button>
+                                    <button
+                                        onClick={() => setEditingId(null)}
+                                        className="px-3 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+                                        title="Cancel"
+                                    >
+                                        Cancel
+                                    </button>
+                                </>
+                            ) : (
+                                <button
+                                    onClick={() => handleEditStart(obs)}
+                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+                                    title="Edit User"
+                                >
+                                    Edit
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ))}
+                {filteredObservers.length === 0 && !loading && (
+                    <div className="p-8 text-center bg-white border border-gray-200 rounded-xl">
+                        <UserIcon className="mx-auto text-gray-300 mb-3" size={36} />
+                        <h3 className="text-gray-900 font-medium">No users found</h3>
+                        <p className="text-gray-500 text-sm mt-1">Try adjusting your filters.</p>
+                    </div>
+                )}
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden hidden md:block">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm min-w-[800px]">
                         <thead className="bg-gray-50 border-b border-gray-100">
