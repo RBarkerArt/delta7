@@ -32,11 +32,33 @@ export interface RoomHotspotOverride {
   hidden?: boolean;
 }
 
+/** Padded painting region (UV, v-up, 0..1) where a video feed shows through. */
+export interface DepthRoomWindowRect {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** Admin overrides for the depth-parallax renderer, merged over built-ins. */
+export interface DepthRoomOverrideConfig {
+  /** false disables the depth renderer for the room (legacy plates render). */
+  enabled?: boolean;
+  stableUrl?: string;
+  decayedUrl?: string;
+  depthUrl?: string;
+  glowUrl?: string;
+  /** Explicit null removes the built-in window; undefined keeps it. */
+  windowRect?: DepthRoomWindowRect | null;
+}
+
 export interface RoomOverrideConfig {
   /** Per-hotspot tweaks keyed by hotspot id. */
   hotspots?: Record<string, RoomHotspotOverride>;
   /** Admin-authored hotspots (actionId 'lore') appended to the room. */
   customHotspots?: RoomHotspotDefinition[];
+  /** Depth-parallax renderer asset overrides and kill switch. */
+  depth?: DepthRoomOverrideConfig;
 }
 
 /** Shape of the Firestore doc at config/rooms, keyed by room scene id. */

@@ -1,4 +1,5 @@
 import type { DepthRoomAssets } from '../components/DepthRoomCanvas';
+import type { DepthRoomOverrideConfig } from './roomDefinitions';
 import type { RoomSceneId } from './roomManifest';
 
 /**
@@ -35,3 +36,32 @@ const DEPTH_ROOM_ASSETS: Partial<Record<RoomSceneId, DepthRoomAssets>> = {
 
 export const getDepthRoomAssets = (roomId: RoomSceneId): DepthRoomAssets | null =>
   DEPTH_ROOM_ASSETS[roomId] ?? null;
+
+/**
+ * Merge admin overrides (config/rooms -> depth) over the built-in assets.
+ * Returns null when the renderer is disabled or the required textures
+ * (stable, decayed, depth map) cannot be assembled.
+ */
+export const resolveDepthRoomAssets = (
+  roomId: RoomSceneId,
+  override?: DepthRoomOverrideConfig | null,
+): DepthRoomAssets | null => {
+  const base = DEPTH_ROOM_ASSETS[roomId] ?? null;
+  if (!override) return base;
+  if (override.enabled === false) return null;
+
+  const stableUrl = override.stableUrl ?? base?.stableUrl;
+  const decayedUrl = override.decayedUrl ?? base?.decayedUrl;
+  const depthUrl = override.depthUrl ?? base?.depthUrl;
+  if (!stableUrl || !decayedUrl || !depthUrl) return null;
+
+  return {
+    stableUrl,
+    decayedUrl,
+    depthUrl,
+    glowUrl: override.glowUrl ?? base?.glowUrl,
+    windowRect: override.windowRect === null
+      ? undefined
+      : override.windowRect ?? base?.windowRect,
+  };
+};

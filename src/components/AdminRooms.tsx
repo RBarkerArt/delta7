@@ -1,18 +1,30 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Timestamp, addDoc, collection, doc, getDoc, setDoc } from 'firebase/firestore';
-import { Loader2, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
-import { db } from '../lib/firebase';
+import { getDownloadURL, ref as storageRef, uploadBytes } from 'firebase/storage';
+import { Loader2, Plus, RotateCcw, Save, Trash2, Upload } from 'lucide-react';
+import { db, storage } from '../lib/firebase';
 import { useAuth } from '../hooks/useAuth';
 import { getRoomAssetPaths, getRoomLayerManifest, type RoomSceneId } from '../lib/roomManifest';
 import {
   ROOM_HOTSPOTS,
   getRoomHotspots,
+  type DepthRoomOverrideConfig,
   type RoomHotspotDefinition,
   type RoomHotspotOverride,
   type RoomOverrideConfig,
   type RoomsOverrideDocument,
 } from '../lib/roomDefinitions';
+import { getDepthRoomAssets, resolveDepthRoomAssets } from '../lib/depthRoomAssets';
 import type { SignalIconName } from './SignalIcon';
+
+type DepthSlot = 'stable' | 'decayed' | 'depth' | 'glow';
+
+const DEPTH_SLOTS: { slot: DepthSlot; label: string; hint: string }[] = [
+  { slot: 'stable', label: 'Stable painting', hint: 'clean room, 2048x1152' },
+  { slot: 'decayed', label: 'Decayed painting', hint: 'dirty room, same framing' },
+  { slot: 'depth', label: 'Depth map', hint: 'grayscale, white = near' },
+  { slot: 'glow', label: 'Light glow', hint: 'lamps on black (optional)' },
+];
 
 const ROOM_LABELS: Record<RoomSceneId, string> = {
   lab: 'Observation Cell',
@@ -44,6 +56,7 @@ export const AdminRooms: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [uploadingSlot, setUploadingSlot] = useState<DepthSlot | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const draggingIdRef = useRef<string | null>(null);
 
@@ -89,6 +102,41 @@ export const AdminRooms: React.FC = () => {
       ...prev,
       [activeRoom]: mutate(prev[activeRoom] ?? emptyRoomConfig()),
     }));
+  };
+
+  // ---- depth renderer admin ------------------------------------------------
+  const depthOverride = roomConfig.depth ?? {};
+  const builtInDepth = getDepthRoomAssets(activeRoom);
+  const effectiveDepth = resolveDepthRoomAssets(activeRoom, depthOverride);
+  const depthEnabled = depthOverride.enabled !== false;
+
+  const patchDepth = (patch: Partial<DepthRoomOverrideConfig>) => {
+    updateRoomConfig((config) => ({ ...config, depth: { ...(config.depth ?? {}), ...patch } }));
+  };
+
+  const resetDepth = () => {
+    updateRoomConfig((config) => {
+      const next = { ...config };
+      delete next.depth;
+      return next;
+    });
+  };
+
+  const uploadDepthAsset = async (slot: DepthSlot, file: File) => {
+    setUploadingSlot(slot);
+    setError(null);
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const path = `rooms/${activeRoom}/depth/${slot}-${Date.now()}.${ext}`;
+      const fileRef = storageRef(storage, path);
+      await uploadBytes(fileRef, file, { contentType: file.type || 'image/png' });
+      const url = await getDownloadURL(fileRef);
+      patchDepth({ [`${slot}Url`]: url } as Partial<DepthRoomOverrideConfig>);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setUploadingSlot(null);
+    }
   };
 
   const patchHotspot = (id: string, patch: Partial<RoomHotspotOverride & RoomHotspotDefinition>) => {
@@ -290,6 +338,125 @@ export const AdminRooms: React.FC = () => {
 
         {/* Inspector */}
         <div className="space-y-4">
+          {/* Depth renderer */}
+          <div className="space-y-3 rounded border border-stone-700 bg-stone-900/70 p-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-stone-200">Depth renderer</h2>
+              <div className="flex items-center gap-3">
+                {roomConfig.depth && (
+                  <button
+                    onClick={resetDepth}
+                    title="Clear depth overrides (revert to built-in assets)"
+                    className="text-stone-400 transition hover:text-amber-300"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </button>
+                )}
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-stone-300">
+                  <input
+                    type="checkbox"
+                    checked={depthEnabled}
+                    onChange={(e) => patchDepth({ enabled: e.target.checked })}
+                    className="accent-emerald-500"
+                  />
+                  Enabled
+                </label>
+              </div>
+            </div>
+
+            <p className="text-[11px] leading-relaxed text-stone-500">
+              {effectiveDepth
+                ? builtInDepth
+                  ? 'Active. Uploads below replace the built-in textures for this room.'
+                  : 'Active via uploaded textures.'
+                : depthEnabled
+                  ? 'Inactive: needs stable + decayed paintings and a depth map (white = near).'
+                  : 'Disabled: observers see the legacy layered plates.'}
+            </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              {DEPTH_SLOTS.map(({ slot, label, hint }) => {
+                const overrideUrl = depthOverride[`${slot}Url` as const];
+                const hasBuiltIn = Boolean(builtInDepth?.[`${slot}Url` as const]);
+                return (
+                  <label
+                    key={slot}
+                    title={hint}
+                    className="flex cursor-pointer items-center justify-between gap-2 rounded border border-stone-700 bg-black/40 px-2.5 py-2 text-xs text-stone-300 transition hover:border-emerald-400/50"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate">{label}</span>
+                      <span className="block text-[10px] text-stone-500">
+                        {overrideUrl ? 'custom upload' : hasBuiltIn ? 'built-in' : 'not set'}
+                      </span>
+                    </span>
+                    {uploadingSlot === slot
+                      ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-emerald-300" />
+                      : <Upload className="h-3.5 w-3.5 shrink-0 text-stone-500" />}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      disabled={uploadingSlot !== null}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void uploadDepthAsset(slot, file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                );
+              })}
+            </div>
+
+            <details className="text-xs text-stone-400">
+              <summary className="cursor-pointer select-none text-[11px] text-stone-500">
+                Window feed region (video behind transparent glass)
+              </summary>
+              <div className="mt-2 space-y-2">
+                {effectiveDepth?.windowRect ? (
+                  <>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {(['minX', 'minY', 'maxX', 'maxY'] as const).map((edge) => (
+                        <label key={edge} className="block text-[10px] uppercase text-stone-500">
+                          {edge}
+                          <input
+                            type="number" step="0.01" min="0" max="1"
+                            value={effectiveDepth.windowRect?.[edge] ?? 0}
+                            onChange={(e) => patchDepth({
+                              windowRect: {
+                                ...(effectiveDepth.windowRect ?? { minX: 0, minY: 0, maxX: 1, maxY: 1 }),
+                                [edge]: Math.max(0, Math.min(1, Number(e.target.value))),
+                              },
+                            })}
+                            className="mt-0.5 w-full rounded border border-stone-700 bg-black/40 px-1.5 py-1 text-xs text-stone-200"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => patchDepth({ windowRect: null })}
+                      className="text-[11px] text-stone-500 transition hover:text-red-400"
+                    >
+                      Remove window (no video feed)
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => patchDepth({ windowRect: { minX: 0.3, minY: 0.45, maxX: 0.7, maxY: 0.9 } })}
+                    className="text-[11px] text-stone-400 transition hover:text-emerald-300"
+                  >
+                    Add window region
+                  </button>
+                )}
+                <p className="text-[10px] leading-relaxed text-stone-600">
+                  Coordinates are fractions of the painting, measured from the bottom-left,
+                  padded slightly beyond the visible glass so parallax never shows an edge.
+                </p>
+              </div>
+            </details>
+          </div>
+
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium text-stone-200">Hotspots</h2>
             <button

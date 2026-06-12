@@ -9,7 +9,7 @@ import { getRoomAssetPaths, getRoomLayerManifest, type RoomAssetProfile, type Ro
 import { getRoomHotspots, type RoomHotspotDefinition, type RoomsOverrideDocument } from '../lib/roomDefinitions';
 import { ThreeRoomAtmosphere } from './ThreeRoomAtmosphere';
 import { DepthRoomCanvas } from './DepthRoomCanvas';
-import { getDepthRoomAssets } from '../lib/depthRoomAssets';
+import { resolveDepthRoomAssets } from '../lib/depthRoomAssets';
 import { InlineAutoplayVideo } from './InlineAutoplayVideo';
 import { SignalIconFilters } from './SignalIcon';
 import { HotspotButton } from './HotspotButton';
@@ -452,10 +452,6 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
   const isBreakRoom = roomId === 'break-room';
   const isSignalCartography = roomId === 'signal-cartography';
   const roomLayerManifest = useMemo(() => getRoomLayerManifest(roomId), [roomId]);
-  // Depth-parallax renderer: one painting + depth map per state in a single
-  // WebGL canvas, replacing the layered plates for rooms that have assets.
-  const depthRoomAssets = useMemo(() => getDepthRoomAssets(roomId), [roomId]);
-  const useDepthRenderer = depthRoomAssets !== null;
   const roomCacheKey = getRoomSceneCacheKey(roomId, null, roomAssetProfile);
 
   useEffect(() => {
@@ -703,6 +699,15 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
     () => getRoomHotspots(roomId, roomOverrides?.[roomId] ?? null),
     [roomId, roomOverrides]
   );
+
+  // Depth-parallax renderer: one painting + depth map per state in a single
+  // WebGL canvas, replacing the layered plates for rooms that have assets.
+  // Admin overrides (config/rooms -> depth) merge over the built-in set live.
+  const depthRoomAssets = useMemo(
+    () => resolveDepthRoomAssets(roomId, roomOverrides?.[roomId]?.depth ?? null),
+    [roomId, roomOverrides]
+  );
+  const useDepthRenderer = depthRoomAssets !== null;
 
   const renderHotspots = (plane: RoomHotspotDefinition['plane']) => (
     !isZoomed &&
