@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>DELTA-7 // DEPTH PARALLAX POC — Observation Room</title>
+<style>
+  html, body { margin:0; height:100%; background:#050505; overflow:hidden; font-family:'SF Mono', Menlo, monospace; }
+  #gl { position:fixed; inset:0; width:100%; height:100%; display:block; cursor:crosshair; touch-action:none; }
+  #hud {
+    position:fixed; left:16px; bottom:16px; z-index:3; color:#7dd87d; font-size:11px;
+    background:rgba(5,8,5,.72); border:1px solid #2a4a2a; padding:12px 14px; border-radius:4px;
+    user-select:none; backdrop-filter:blur(4px); max-width:340px;
+  }
+  #hud label { display:block; letter-spacing:.12em; margin-bottom:6px; }
+  #coh { width:280px; max-width:70vw; accent-color:#4caf50; }
+  #state { color:#cfe8cf; }
+  #feed { color:#9fc4e8; letter-spacing:.1em; margin-top:6px; }
+  #action { color:#e8d49f; letter-spacing:.08em; margin-top:4px; min-height:13px; }
+  #hint { color:#577d57; margin-top:8px; font-size:10px; line-height:1.5; }
+  #motion {
+    display:none; margin-top:8px; background:#11331a; color:#9fe8a8; border:1px solid #2a4a2a;
+    font:inherit; font-size:10px; letter-spacing:.1em; padding:6px 10px; border-radius:3px; cursor:pointer;
+  }
+  #hotspots { position:fixed; inset:0; z-index:2; pointer-events:none; }
+  .hs {
+    position:absolute; transform:translate(-50%,-50%); pointer-events:auto; cursor:pointer;
+    width:34px; height:34px; border-radius:50%; border:1px solid rgba(125,216,125,.55);
+    background:radial-gradient(circle, rgba(125,216,125,.18) 0%, rgba(125,216,125,.04) 65%, transparent 70%);
+    display:flex; align-items:center; justify-content:center;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .hs::after { content:''; width:6px; height:6px; border-radius:50%; background:#7dd87d;
+    animation:pulse 2.4s ease-in-out infinite; }
+  .hs:hover { border-color:#b8f0b8; box-shadow:0 0 14px rgba(125,216,125,.35); }
+  .hs .lbl {
+    position:absolute; top:42px; left:50%; transform:translateX(-50%); white-space:nowrap;
+    color:rgba(255,247,223,.9); font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    background:#0c0c0a; border:1px solid rgba(216,210,189,.3); padding:6px 12px;
+    box-shadow:0 4px 20px rgba(0,0,0,.98); opacity:0; transition:opacity .25s; pointer-events:none;
+  }
+  .hs:hover .lbl, .hs:focus-visible .lbl { opacity:1; }
+  @keyframes pulse { 0%,100% { opacity:.4; transform:scale(.8);} 50% { opacity:1; transform:scale(1.15);} }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="hotspots"></div>
+<div id="hud">
+  <label>COHERENCE <span id="pct">92%</span> — <span id="state">FEED_STABLE</span></label>
+  <input id="coh" type="range" min="0" max="100" value="92">
+  <div id="feed">WINDOW_FEED: —</div>
+  <div id="action"></div>
+  <div id="hint">Mouse: move to look around. Touch: drag to look.<br>
+  Stay present: the window feed shifts the longer you observe.</div>
+  <button id="motion">ENABLE TILT CONTROL</button>
+</div>
+<script>
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl', { antialias:false })
+        || canvas.getContext('experimental-webgl', { antialias:false });
+
+// no WebGL (or blocked): fall back to the flat painting, no crash
+if (!gl) {
+  canvas.remove();
+  document.body.insertAdjacentHTML('afterbegin',
+    '<img src="room.png" style="position:fixed;inset:0;width:100%;height:100%;object-fit:cover" alt="Observation room">');
+  throw new Error('WebGL unavailable — static fallback shown');
+}
+// mobile GPUs can evict the context (backgrounding, memory pressure)
+canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); location.reload(); });
+
+const VERT = `
+attribute vec2 aPos;
+varying vec2 vUv;
+void main(){ vUv = aPos*0.5+0.5; gl_Position = vec4(aPos,0.,1.); }`;
+
+const FRAG = `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D uRoom, uDepth, uGlow, uStable, uWillowA, uWillowB;
+uniform vec2 uRes, uOff, uPan;
+uniform float uTime, uCoh, uWillowMix;
+
+const float FOCUS = 0.45;   // depth value that stays pinned in place
+const float TEX_ASPECT = 2048.0/1152.0;
+// window region of the painting (uv, v-up), padded for parallax travel
+const vec2 WIN_MIN = vec2(0.2427, 0.463);
+const vec2 WIN_MAX = vec2(0.6777, 0.932);
+
+float rand(vec2 co){ return fract(sin(dot(co, vec2(12.9898,78.233))) * 43758.5453); }
+
+vec2 coverUv(vec2 uv){
+  float screenAspect = uRes.x / uRes.y;
+  vec2 scale = (screenAspect > TEX_ASPECT)
+    ? vec2(1.0, TEX_ASPECT/screenAspect)
+    : vec2(screenAspect/TEX_ASPECT, 1.0);
+  return (uv - 0.5) * scale + 0.5;
+}
+
+// iterative depth-refined parallax: converge on the surface the ray hits
+vec2 parallax(vec2 uv, vec2 off){
+  vec2 p = uv;
+  for(int i=0;i<6;i++){
+    float d = texture2D(uDepth, p).r;
+    p = uv + off * (d - FOCUS);
+  }
+  return p;
+}
+
+vec3 screenBlend(vec3 a, vec3 b){ return 1.0 - (1.0-a)*(1.0-b); }
+
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  f = f*f*(3.0-2.0*f);
+  return mix(mix(rand(i), rand(i+vec2(1,0)), f.x),
+             mix(rand(i+vec2(0,1)), rand(i+vec2(1,1)), f.x), f.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  for(int i=0;i<4;i++){ v += a*vnoise(p); p = p*2.13 + 17.0; a *= 0.5; }
+  return v;
+}
+
+// the willow feed: video mapped into the window region, far beyond the glass
+vec3 willowAt(vec2 uv){
+  vec2 wuv = uv + uOff * (-0.10 - FOCUS) + vec2(sin(uTime*0.05)*0.003, 0.0);
+  vec2 vuv = (wuv - WIN_MIN) / (WIN_MAX - WIN_MIN);
+  // cover-fit the 16:9 video over the (wider-padded) window rect
+  vuv.x = 0.5 + (vuv.x - 0.5) * 0.93;
+  vec3 a = texture2D(uWillowA, vuv).rgb;
+  vec3 b = texture2D(uWillowB, vuv).rgb;
+  return mix(a, b, uWillowMix);
+}
+
+// one plane of drifting dust motes at depth di, occluded by nearer scene
+float dustLayer(vec2 uv, float di, float seed, float sceneD, float t){
+  vec2 luv = uv + uOff * (di - FOCUS);
+  luv += vec2(t*0.006*(0.6+seed*0.6), -t*0.0035);
+  float cells = 22.0 + seed*12.0;
+  vec2 g = luv * cells;
+  vec2 id = floor(g), f = fract(g);
+  if (rand(id + seed) < 0.62) return 0.0;
+  vec2 rp = 0.2 + 0.6*vec2(rand(id+seed+1.0), rand(id+seed+7.0));
+  rp += 0.07*vec2(sin(t*1.2 + rp.x*23.0), cos(t*0.9 + rp.y*19.0));
+  float d = length(f - rp);
+  float spark = 0.45 + 0.55*sin(t*2.2 + rand(id+seed+3.0)*40.0);
+  float p = smoothstep(0.075, 0.0, d) * spark;
+  float vis = 1.0 - smoothstep(di, di + 0.10, sceneD);
+  return p * vis;
+}
+
+void main(){
+  // pan slides the cropped viewport across the full painting (mobile portrait)
+  vec2 uv = coverUv(vUv) + uPan;
+  float s = 1.0 - uCoh;            // instability
+
+  // glitch: short random bursts, scaling with instability (never constant)
+  float slot = floor(uTime*3.0);
+  float burst = step(1.0 - (0.015 + 0.28*s), rand(vec2(slot, 1.0)));
+  float bandSeed = floor(uv.y*42.0) + slot*61.0;
+  float bandOn = burst * step(0.55, rand(vec2(bandSeed, 4.7)));
+  uv.x += bandOn * (rand(vec2(bandSeed, 9.1)) - 0.5) * 0.022 * (0.4 + 0.6*s);
+
+  vec2 p = parallax(uv, uOff);
+  float sceneD = texture2D(uDepth, p).r;
+
+  // chromatic aberration: subtle, grows as the signal frays
+  vec2 ca = uOff*0.012 + vec2(0.0004 + 0.0025*s, 0.0);
+  vec4 roomC = texture2D(uRoom, p);
+  vec3 room = vec3(texture2D(uRoom, p+ca).r, roomC.g, texture2D(uRoom, p-ca).b);
+
+  vec3 willow = willowAt(uv);
+  willow = mix(willow, vec3(0.92), s*0.45*(0.85+0.15*sin(uTime*2.3)));
+
+  // decayed scene: dirty room with the willow visible through the broken window
+  vec3 decayed = mix(willow, room, roomC.a);
+
+  // stable scene: clean room, willow behind intact semi-transparent glass.
+  // even at full coherence a whisper of the decayed feed bleeds through.
+  float decay = 0.12 + 0.88*smoothstep(0.05, 0.8, s);
+  vec4 stableC = texture2D(uStable, p);
+  vec3 stable = mix(willow*0.95, stableC.rgb, stableC.a);
+  vec3 col = mix(stable, decayed, decay);
+
+  // procedural fog: deep bank drifting behind the desk (occluded), near veil
+  float fogD = 0.36;
+  vec2 fuv = uv + uOff*(fogD - FOCUS);
+  float fogVis = 1.0 - smoothstep(fogD, fogD + 0.14, sceneD);
+  float bank = fbm(fuv*vec2(3.0,4.5) + vec2(uTime*0.05, sin(uTime*0.10)*0.15));
+  bank = smoothstep(0.42, 0.95, bank);
+  col = screenBlend(col, vec3(0.42,0.46,0.44) * bank * fogVis * (0.30 + 0.45*s));
+  vec2 nuv = uv + uOff*(0.62 - FOCUS);
+  float veil = fbm(nuv*vec2(1.6,2.4) - vec2(uTime*0.03, uTime*0.012));
+  veil = smoothstep(0.35, 1.0, veil);
+  col = screenBlend(col, vec3(0.36,0.39,0.37) * veil * (0.10 + 0.30*s));
+
+  // dust motes: three depth planes, always faintly present, thicker when frayed
+  float dust = dustLayer(uv, 0.58, 0.0, sceneD, uTime) * 0.55
+             + dustLayer(uv, 0.42, 3.1, sceneD, uTime) * 0.4
+             + dustLayer(uv, 0.27, 6.7, sceneD, uTime) * 0.28;
+  col += dust * vec3(0.85, 0.88, 0.78) * (0.30 + 0.35*s);
+
+  // lamp glow flicker
+  float flick = 0.78 + 0.22*sin(uTime*13.0 + sin(uTime*7.3)*2.0)
+              * (0.5 + 0.5*rand(vec2(floor(uTime*24.0), 2.0)));
+  vec3 glow = texture2D(uGlow, p).rgb;
+  col = screenBlend(col, glow * flick * (0.85 - 0.25*s));
+
+  // scanlines + grain: always whisper-present, lean at worst
+  col -= (0.012 + 0.05*s) * (0.5 + 0.5*sin(vUv.y*uRes.y*3.1415));
+  col += (rand(vUv*vec2(uTime,uTime+13.0)) - 0.5) * (0.035 + 0.09*s);
+
+  // vignette
+  vec2 vq = vUv - 0.5;
+  col *= 1.0 - dot(vq,vq)*0.85;
+
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+function compile(type, src){
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src); gl.compileShader(sh);
+  if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+  return sh;
+}
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+gl.linkProgram(prog); gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog, 'aPos');
+gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+const U = n => gl.getUniformLocation(prog, n);
+
+function texParams(){
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+}
+
+function loadTex(unit, url){
+  return new Promise(res => {
+    const t = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([20,20,20,255]));
+    const img = new Image();
+    img.onload = () => {
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      texParams();
+      res(true);
+    };
+    img.onerror = () => res(false);
+    img.src = url + '?v=' + Date.now();
+  });
+}
+
+// ---- willow video feed: storm -> night -> day as presence accrues ----
+const FEED_NAMES = ['STORM', 'NIGHT', 'DAY'];
+const FEED_FILES = ['/rooms/willow_storm.mp4', '/rooms/willow_night.mp4', '/rooms/willow_day.mp4'];
+const STAGE_SECONDS = parseFloat(new URLSearchParams(location.search).get('stage') ?? 25); // demo pacing; production would be minutes
+const FADE_SECONDS = 3;
+const vids = FEED_FILES.map(srcUrl => {
+  const v = document.createElement('video');
+  v.src = srcUrl; v.muted = true; v.loop = true; v.playsInline = true; v.preload = 'auto';
+  return v;
+});
+const vidTex = [null, null];
+function makeVideoTex(unit){
+  const t = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([10,14,16,255]));
+  texParams();
+  return t;
+}
+function uploadVideo(unit, tex, video){
+  if (video.readyState < 2) return;
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+}
+let feedCur = 0, feedNext = 0, fadeT = 1;   // fadeT >= 1 means not fading
+function requestFeed(i){
+  if (i === feedCur && fadeT >= 1) return;
+  if (fadeT < 1) return;                     // already fading, let it finish
+  feedNext = i; fadeT = 0;
+  vids[feedNext].play().catch(()=>{});
+  feedEl.textContent = 'WINDOW_FEED: ' + FEED_NAMES[feedCur] + ' → ' + FEED_NAMES[feedNext];
+}
+
+// ---- hotspots: real observation-room definitions from roomDefinitions.ts ----
+const HOTSPOTS = [
+  { id:'observation-window', label:'OBSERVATION_PORT',   plane:'room', x:47.2, y:34,   actionId:'window' },
+  { id:'archive-shelf',      label:'ARCHIVE_SHELF',      plane:'room', x:23.5, y:42,   actionId:'archive' },
+  { id:'blackboard',         label:'SYSTEM_STATUS',      plane:'room', x:70.5, y:34,   actionId:'blackboard' },
+  { id:'desk-drawer',        label:'CLIPBOARD_ARCHIVE',  plane:'item', x:50.5, y:55.2, actionId:'drawer' },
+  { id:'prologue-viewer',    label:'PROLOGUE_VIEWER',    plane:'item', x:43.2, y:54,   actionId:'prologue' },
+  { id:'continuity-relay',   label:'CONTINUITY_RELAY',   plane:'room', x:15.7, y:44,   actionId:'support' },
+  { id:'door-right',         label:'SECURITY_GATEWAY',   plane:'room', x:79.1, y:35,   actionId:'security' },
+  { id:'room-signal-door',   label:'ROOM_SIGNAL_DOOR',   plane:'room', x:82.2, y:47.4, actionId:'room-signal' },
+];
+const PLANE_DEPTH = { room: 0.28, item: 0.62 };  // matches depth-map planes
+const hsLayer = document.getElementById('hotspots');
+const actionEl = document.getElementById('action');
+const feedEl = document.getElementById('feed');
+let actionTimer = null;
+for (const h of HOTSPOTS) {
+  const b = document.createElement('button');
+  b.className = 'hs';
+  b.innerHTML = '<span class="lbl">' + h.label + '</span>';
+  b.addEventListener('click', () => {
+    actionEl.textContent = '▸ ACTIVATE: ' + h.label + ' [' + h.actionId + ']';
+    clearTimeout(actionTimer);
+    actionTimer = setTimeout(() => actionEl.textContent = '', 2500);
+    if (h.actionId === 'window') requestFeed((feedCur + 1) % FEED_NAMES.length);
+  });
+  hsLayer.appendChild(b);
+  h.el = b;
+}
+
+const qs = new URLSearchParams(location.search);
+let target = { x: parseFloat(qs.get('ox') ?? 0), y: parseFloat(qs.get('oy') ?? 0) };
+let cur = { x: target.x, y: target.y };
+const pinned = qs.has('ox') || qs.has('oy');
+
+function look(e){
+  target.x = (e.clientX / innerWidth) * 2 - 1;
+  target.y = (e.clientY / innerHeight) * 2 - 1;
+}
+addEventListener('pointermove', e => {
+  if (e.pointerType === 'mouse' || e.buttons > 0) look(e);
+});
+canvas.addEventListener('pointerdown', e => {
+  look(e);
+  vids[fadeT < 1 ? feedNext : feedCur].play().catch(()=>{}); // autoplay unlock
+});
+
+function onTilt(e){
+  if (e.gamma == null) return;
+  const landscape = Math.abs(window.orientation ?? 0) === 90 ||
+    (screen.orientation && screen.orientation.type.startsWith('landscape'));
+  const tx = landscape ? (e.beta ?? 0) / 20 : (e.gamma ?? 0) / 20;
+  const ty = landscape ? -(e.gamma ?? 0) / 25 : ((e.beta ?? 45) - 45) / 25;
+  target.x = Math.max(-1, Math.min(1, tx));
+  target.y = Math.max(-1, Math.min(1, ty));
+}
+const motionBtn = document.getElementById('motion');
+if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+  motionBtn.style.display = 'inline-block';
+  motionBtn.addEventListener('click', async () => {
+    try {
+      if (await DeviceOrientationEvent.requestPermission() === 'granted') {
+        addEventListener('deviceorientation', onTilt);
+        motionBtn.style.display = 'none';
+      }
+    } catch (_) {}
+  });
+} else {
+  addEventListener('deviceorientation', onTilt);
+}
+
+const STATES = [
+  [90, 'FEED_STABLE'], [70, 'SYNC_RECOVERING'], [45, 'COHERENCE_FRAYING'],
+  [20, 'SIGNAL_FRAGMENTED'], [0, 'CRITICAL_INTERFERENCE'],
+];
+const slider = document.getElementById('coh');
+if (qs.has('c')) slider.value = qs.get('c');
+function stateFor(v){ for (const [t, n] of STATES) if (v >= t) return n; return 'CRITICAL_INTERFERENCE'; }
+function hud(){
+  document.getElementById('pct').textContent = slider.value + '%';
+  document.getElementById('state').textContent = stateFor(+slider.value);
+}
+slider.addEventListener('input', hud); hud();
+
+function resize(){
+  let dpr = Math.min(devicePixelRatio, 2);
+  // budget ~2.6MP of fragments so older phones keep a smooth frame rate
+  const px = innerWidth * innerHeight * dpr * dpr;
+  if (px > 2.6e6) dpr *= Math.sqrt(2.6e6 / px);
+  canvas.width = Math.max(1, Math.round(innerWidth * dpr));
+  canvas.height = Math.max(1, Math.round(innerHeight * dpr));
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+addEventListener('resize', resize); resize();
+
+const FOCUS = 0.45;
+function coverScale(){
+  const sa = (innerWidth || 1) / (innerHeight || 1), ta = 2048 / 1152;
+  return sa > ta ? [1, ta / sa] : [sa / ta, 1];
+}
+
+Promise.all([
+  loadTex(0, 'room.png'), loadTex(1, 'depth.png'),
+  loadTex(2, 'glow.jpg'), loadTex(3, 'room_stable.png'),
+]).then(() => {
+  vidTex[0] = makeVideoTex(4); vidTex[1] = makeVideoTex(5);
+  vids[0].play().catch(()=>{});
+  feedEl.textContent = 'WINDOW_FEED: ' + FEED_NAMES[0];
+  gl.uniform1i(U('uRoom'), 0); gl.uniform1i(U('uDepth'), 1);
+  gl.uniform1i(U('uGlow'), 2); gl.uniform1i(U('uStable'), 3);
+  gl.uniform1i(U('uWillowA'), 4); gl.uniform1i(U('uWillowB'), 5);
+  const t0 = performance.now();
+  let lastT = 0, presenceT = 0, lastKick = -10;
+  (function frame(){
+    const t = (performance.now() - t0) / 1000;
+    const dt = Math.min(t - lastT, 0.1); lastT = t;
+
+    // presence clock: accrues only while the room is actually observed
+    presenceT += dt;
+    const wanted = Math.min(2, Math.floor(presenceT / STAGE_SECONDS));
+    // some browsers block muted autoplay until a gesture: keep nudging
+    const active = fadeT < 1 ? feedNext : feedCur;
+    if (vids[active].paused && t - lastKick > 2) {
+      lastKick = t;
+      vids[active].play().catch(()=>{});
+    }
+    if (wanted !== feedCur && fadeT >= 1) requestFeed(wanted);
+    if (fadeT < 1) {
+      fadeT = Math.min(1, fadeT + dt / FADE_SECONDS);
+      if (fadeT >= 1) {
+        vids[feedCur].pause();
+        feedCur = feedNext;
+        feedEl.textContent = 'WINDOW_FEED: ' + FEED_NAMES[feedCur];
+      }
+    }
+    uploadVideo(4, vidTex[0], vids[feedCur]);
+    if (fadeT < 1) uploadVideo(5, vidTex[1], vids[feedNext]);
+
+    const idle = pinned ? {x:0, y:0} : { x: Math.sin(t*0.21)*0.22, y: Math.cos(t*0.16)*0.14 };
+    cur.x += (target.x + idle.x - cur.x) * 0.06;
+    cur.y += (target.y + idle.y - cur.y) * 0.06;
+
+    const off = [cur.x * -0.075, cur.y * 0.038];
+    const [sx, sy] = coverScale();
+    const pan = [cur.x * (1 - sx) * 0.46, -cur.y * (1 - sy) * 0.46];
+
+    gl.uniform2f(U('uRes'), canvas.width, canvas.height);
+    gl.uniform2f(U('uOff'), off[0], off[1]);
+    gl.uniform2f(U('uPan'), pan[0], pan[1]);
+    gl.uniform1f(U('uTime'), t);
+    gl.uniform1f(U('uCoh'), slider.value / 100);
+    gl.uniform1f(U('uWillowMix'), fadeT < 1 ? fadeT*fadeT*(3-2*fadeT) : 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+    // project hotspots: painting position -> screen, riding their depth plane
+    for (const h of HOTSPOTS) {
+      const d = PLANE_DEPTH[h.plane] ?? 0.4;
+      const u = h.x / 100, v = 1 - h.y / 100;
+      const su = ((u - off[0] * (d - FOCUS) - pan[0]) - 0.5) / sx + 0.5;
+      const sv = ((v - off[1] * (d - FOCUS) - pan[1]) - 0.5) / sy + 0.5;
+      const visible = su > 0.02 && su < 0.98 && sv > 0.05 && sv < 0.98;
+      h.el.style.display = visible ? 'flex' : 'none';
+      if (visible) {
+        h.el.style.left = (su * 100) + '%';
+        h.el.style.top = ((1 - sv) * 100) + '%';
+      }
+    }
+    requestAnimationFrame(frame);
+  })();
+});
+</script>
+</body>
+</html>
