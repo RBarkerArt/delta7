@@ -8,6 +8,8 @@ import { getWillowRestorationState, isVideoSource, selectAvailableWillowState, t
 import { getRoomAssetPaths, getRoomLayerManifest, type RoomAssetProfile, type RoomImageConfig, type RoomLayerPlane, type RoomSceneId } from '../lib/roomManifest';
 import { getRoomHotspots, type RoomHotspotDefinition, type RoomsOverrideDocument } from '../lib/roomDefinitions';
 import { ThreeRoomAtmosphere } from './ThreeRoomAtmosphere';
+import { DepthRoomCanvas } from './DepthRoomCanvas';
+import { getDepthRoomAssets } from '../lib/depthRoomAssets';
 import { InlineAutoplayVideo } from './InlineAutoplayVideo';
 import { SignalIconFilters } from './SignalIcon';
 import { HotspotButton } from './HotspotButton';
@@ -450,6 +452,10 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
   const isBreakRoom = roomId === 'break-room';
   const isSignalCartography = roomId === 'signal-cartography';
   const roomLayerManifest = useMemo(() => getRoomLayerManifest(roomId), [roomId]);
+  // Depth-parallax renderer: one painting + depth map per state in a single
+  // WebGL canvas, replacing the layered plates for rooms that have assets.
+  const depthRoomAssets = useMemo(() => getDepthRoomAssets(roomId), [roomId]);
+  const useDepthRenderer = depthRoomAssets !== null;
   const roomCacheKey = getRoomSceneCacheKey(roomId, null, roomAssetProfile);
 
   useEffect(() => {
@@ -845,7 +851,7 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
   const roomSupportsThreeVisuals = !isSignalCartography;
   const threeRoomStatus = threeRoomState.key === threeRoomKey ? threeRoomState.status : 'loading';
   const shouldStartThreeRoom = threeStartKey === threeRoomKey;
-  const canStartThreeRoom = roomSupportsThreeVisuals && isLoaded && shouldStartThreeRoom && !useLightweightRoom;
+  const canStartThreeRoom = roomSupportsThreeVisuals && isLoaded && shouldStartThreeRoom && !useLightweightRoom && !useDepthRenderer;
   const showThreeVisuals = canStartThreeRoom && threeRoomStatus === 'ready';
   const isSceneReady = isLoaded && (!roomSupportsThreeVisuals || useLightweightRoom || threeRoomStatus === 'ready' || threeRoomStatus === 'unavailable');
 
@@ -857,7 +863,7 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
   }, [isSceneReady, onSceneReady, threeRoomKey]);
 
   const renderRoomPlane = (plane: RoomLayerPlane, baseZIndex: number) => {
-    if (showThreeVisuals) return null;
+    if (showThreeVisuals || useDepthRenderer) return null;
 
     const planeLayers = roomLayerManifest.filter(layer => layer.plane === plane);
     if (planeLayers.length === 0) return null;
@@ -1193,8 +1199,35 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
           />
         )}
 
+        {/* Depth-parallax renderer: single canvas plate replaces all painted
+            layers; hotspot plates above continue to pan/zoom unchanged. */}
+        {useDepthRenderer && depthRoomAssets && (
+          <div
+            ref={registerPlane('room')}
+            style={{
+              width: layout.width,
+              height: layout.height,
+              left: layout.left,
+              top: layout.top,
+              transformOrigin: zoomOrigin,
+              zIndex: 10,
+              transition: isZoomed
+                ? 'transform 1.6s cubic-bezier(0.3, 0.8, 0.1, 1)'
+                : 'none',
+            }}
+            className="room-layer-gpu absolute pointer-events-none select-none"
+          >
+            <DepthRoomCanvas
+              assets={depthRoomAssets}
+              coherence={score}
+              parallaxSource={pointerTiltRef}
+              windowVideoUrl={isVideoSource(activeBackgroundSource) ? activeBackgroundSource : null}
+            />
+          </div>
+        )}
+
         {/* Layer 1: Willow Background */}
-        {!isBreakRoom && !isSignalCartography && (!showThreeVisuals || isVideoSource(activeBackgroundSource)) && (
+        {!useDepthRenderer && !isBreakRoom && !isSignalCartography && (!showThreeVisuals || isVideoSource(activeBackgroundSource)) && (
           <div
             ref={registerPlane('background')}
             style={{
@@ -1233,7 +1266,7 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
         )}
 
         {/* Break Room TV feed, masked behind the TV glass and locked to the room plate. */}
-        {isBreakRoom && activeBackgroundSource && !showThreeVisuals && (
+        {!useDepthRenderer && isBreakRoom && activeBackgroundSource && !showThreeVisuals && (
           <div
             ref={registerPlane('room')}
             style={{
@@ -1290,8 +1323,8 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
         {renderRoomPlane('item', 30)}
         {renderRoomPlane('foreground', 40)}
 
-        {/* Layer 7: Visible floating dust motes, shared across Three and lightweight modes */}
-        {!isZoomed && (
+        {/* Layer 7: Visible floating dust motes (depth renderer draws its own) */}
+        {!isZoomed && !useDepthRenderer && (
           <div className={`absolute inset-0 w-full h-full pointer-events-none overflow-hidden z-[14] ${layerAccelerationClass}`}>
             {visibleDustParticles.map(p => (
               <div

@@ -51,38 +51,44 @@ export const HotspotButton: React.FC<HotspotButtonProps> = ({
     return label;
   }, [label, state]);
 
-  // Styling and state configs
+  // Styling and state configs. Open ring + pulsing core dot; the icon fades
+  // in over the dot on hover so the resting room stays diegetic and quiet.
   const buttonStyles = useMemo(() => {
     switch (state) {
       case 'used':
         return {
-          inner: 'border-[#d8d2bd]/30 text-[#d8d2bd]/50 bg-black/75 shadow-none opacity-70 group-hover:opacity-100 group-hover:border-[#d8d2bd]/60 group-hover:text-[#d8d2bd]/85',
+          inner: 'border-[#d8d2bd]/30 text-[#d8d2bd]/60 bg-[radial-gradient(circle,rgba(216,210,189,0.10)_0%,rgba(216,210,189,0.03)_65%,transparent_70%)] opacity-70 group-hover:opacity-100 group-hover:border-[#d8d2bd]/60 group-hover:shadow-[0_0_10px_rgba(216,210,189,0.2)]',
+          dot: 'bg-[#d8d2bd]/50',
           glow: 'filter drop-shadow-[0_0_1.5px_rgba(216,210,189,0.22)]',
           flicker: '',
         };
       case 'locked':
         return {
-          inner: 'border-dashed border-stone-500/50 text-stone-400 bg-stone-950/70 shadow-none cursor-not-allowed group-hover:border-stone-400 group-hover:text-stone-300',
+          inner: 'border-dashed border-stone-500/50 text-stone-400 bg-[radial-gradient(circle,rgba(120,113,108,0.12)_0%,transparent_70%)] cursor-not-allowed group-hover:border-stone-400 group-hover:text-stone-300',
+          dot: 'bg-stone-500/70',
           glow: '',
           flicker: '',
         };
       case 'new':
         return {
-          inner: 'border-amber-500/60 text-amber-400 bg-black/80 shadow-[0_0_14px_rgba(245,158,11,0.2)] group-hover:border-amber-300 group-hover:text-amber-100',
+          inner: 'border-amber-400/60 text-amber-200 bg-[radial-gradient(circle,rgba(245,158,11,0.18)_0%,rgba(245,158,11,0.04)_65%,transparent_70%)] group-hover:border-amber-300 group-hover:shadow-[0_0_14px_rgba(245,158,11,0.35)]',
+          dot: 'bg-amber-400 shadow-[0_0_6px_#f59e0b]',
           glow: 'filter drop-shadow-[0_0_3px_rgba(245,158,11,0.45)]',
           flicker: 'animate-flicker-subtle',
         };
       case 'corrupted':
         return {
-          inner: 'border-red-500/60 text-red-400 bg-black/80 shadow-[0_0_16px_rgba(239,68,68,0.3)] group-hover:border-red-400 group-hover:text-red-100',
+          inner: 'border-red-500/60 text-red-300 bg-[radial-gradient(circle,rgba(239,68,68,0.18)_0%,rgba(239,68,68,0.04)_65%,transparent_70%)] group-hover:border-red-400 group-hover:shadow-[0_0_16px_rgba(239,68,68,0.4)]',
+          dot: 'bg-red-500 shadow-[0_0_6px_#ef4444]',
           glow: 'filter drop-shadow-[0_0_3.5px_rgba(239,68,68,0.55)]',
           flicker: 'animate-flicker-fast',
         };
       case 'available':
       default:
         return {
-          inner: 'border-[#fff7df]/35 text-[#fff7df]/90 bg-black/85 shadow-[0_0_14px_rgba(255,247,223,0.18)] group-hover:border-emerald-300 group-hover:text-emerald-50 group-hover:scale-105 group-hover:animate-pulse-micro',
-          glow: 'filter drop-shadow-[0_0_2.5px_rgba(255,247,223,0.3)]',
+          inner: 'border-emerald-300/50 text-emerald-50 bg-[radial-gradient(circle,rgba(125,216,125,0.16)_0%,rgba(125,216,125,0.04)_65%,transparent_70%)] group-hover:border-emerald-200 group-hover:shadow-[0_0_14px_rgba(125,216,125,0.35)] group-hover:scale-105',
+          dot: 'bg-emerald-300/90',
+          glow: 'filter drop-shadow-[0_0_2.5px_rgba(167,243,208,0.4)]',
           flicker: '',
         };
     }
@@ -115,9 +121,15 @@ export const HotspotButton: React.FC<HotspotButtonProps> = ({
     >
       <div className={`relative flex items-center justify-center rounded-full border transition-all duration-300 ${buttonStyles.inner} ${buttonStyles.flicker}`}
            style={{ width: size, height: size }}>
-        
-        {/* Render primary custom line icon */}
-        <SignalIcon name={iconName} size={size * 0.55} strokeWidth={1.45} className={buttonStyles.glow} />
+
+        {/* Resting state: pulsing core dot; hover swaps it for the line icon */}
+        <span className={`absolute h-1.5 w-1.5 rounded-full animate-pulse transition-opacity duration-200 group-hover:opacity-0 ${buttonStyles.dot}`} />
+        <SignalIcon
+          name={iconName}
+          size={size * 0.55}
+          strokeWidth={1.45}
+          className={`${buttonStyles.glow} opacity-0 transition-opacity duration-200 group-hover:opacity-100`}
+        />
 
         {/* Used state: Render RECORDED stamp */}
         {state === 'used' && (
