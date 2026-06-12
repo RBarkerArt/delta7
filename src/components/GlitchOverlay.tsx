@@ -4,59 +4,73 @@ import { useSound } from '../hooks/useSound';
 interface GlitchOverlayProps {
     coherence: number;
     isGlitching?: boolean; // From day transition
+    ambientDisabled?: boolean;
 }
 
 /**
  * GlitchOverlay - Creates random coherence-reactive visual glitches
  * The lower the coherence, the more frequent and intense the glitches
  */
-export const GlitchOverlay: React.FC<GlitchOverlayProps> = ({ coherence, isGlitching = false }) => {
+export const GlitchOverlay: React.FC<GlitchOverlayProps> = ({ coherence, isGlitching = false, ambientDisabled = false }) => {
     const [activeGlitch, setActiveGlitch] = useState<'none' | 'micro' | 'medium' | 'heavy' | 'critical'>('none');
     const [rgbShift, setRgbShift] = useState(false);
     const [scanlineGlitch, setScanlineGlitch] = useState(false);
+    const [scanlineTop, setScanlineTop] = useState(50);
     const [invertFlash, setInvertFlash] = useState(false);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const { playSignalNoise, playTemporalShift } = useSound();
+
+    useEffect(() => {
+        if (!ambientDisabled) return;
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+        }
+        setActiveGlitch('none');
+        setRgbShift(false);
+        setScanlineGlitch(false);
+        setInvertFlash(false);
+    }, [ambientDisabled]);
 
     // Calculate glitch parameters based on coherence
     const getGlitchParams = useCallback(() => {
         if (coherence >= 80) {
             // Stable: Very rare, very subtle
             return {
-                chance: 0.02,
-                interval: 30000,
+                chance: 0.01,
+                interval: 45000,
                 types: ['micro'] as const,
                 duration: 80
             };
         } else if (coherence >= 60) {
             // Recovering: Occasional micro-glitches
             return {
-                chance: 0.08,
-                interval: 15000,
+                chance: 0.04,
+                interval: 22000,
                 types: ['micro', 'micro', 'medium'] as const,
                 duration: 120
             };
         } else if (coherence >= 40) {
             // Fraying: More frequent, RGB shift possible
             return {
-                chance: 0.15,
-                interval: 8000,
+                chance: 0.08,
+                interval: 12000,
                 types: ['micro', 'medium', 'medium', 'heavy'] as const,
                 duration: 200
             };
         } else if (coherence >= 20) {
             // Fragmented: Heavy glitches
             return {
-                chance: 0.25,
-                interval: 4000,
+                chance: 0.14,
+                interval: 7000,
                 types: ['medium', 'heavy', 'heavy', 'critical'] as const,
                 duration: 300
             };
         } else {
             // Critical: Intense, frequent
             return {
-                chance: 0.4,
-                interval: 2000,
+                chance: 0.22,
+                interval: 4500,
                 types: ['heavy', 'critical', 'critical'] as const,
                 duration: 500
             };
@@ -65,6 +79,8 @@ export const GlitchOverlay: React.FC<GlitchOverlayProps> = ({ coherence, isGlitc
 
     // Random glitch trigger
     useEffect(() => {
+        if (ambientDisabled) return undefined;
+
         const scheduleNextGlitch = () => {
             const params = getGlitchParams();
             const nextInterval = params.interval * (0.5 + Math.random());
@@ -86,6 +102,7 @@ export const GlitchOverlay: React.FC<GlitchOverlayProps> = ({ coherence, isGlitc
 
                     // Scanline disruption for heavy glitches
                     if ((glitchType === 'heavy' || glitchType === 'critical') && Math.random() < 0.4) {
+                        setScanlineTop(20 + Math.random() * 60);
                         setScanlineGlitch(true);
                     }
 
@@ -112,17 +129,28 @@ export const GlitchOverlay: React.FC<GlitchOverlayProps> = ({ coherence, isGlitc
         return () => {
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
-    }, [getGlitchParams, playSignalNoise]);
+    }, [ambientDisabled, getGlitchParams, playSignalNoise]);
 
     // Force glitch when isGlitching (day transition)
     useEffect(() => {
-        if (isGlitching) {
+        if (!isGlitching) return;
+
+        const timer = window.setTimeout(() => {
             setActiveGlitch('critical');
             setRgbShift(true);
+            setScanlineTop(20 + Math.random() * 60);
             setScanlineGlitch(true);
             // Play the day transition sound
             playTemporalShift();
-        }
+            window.setTimeout(() => {
+                setActiveGlitch('none');
+                setRgbShift(false);
+                setScanlineGlitch(false);
+                setInvertFlash(false);
+            }, 520);
+        }, 0);
+
+        return () => window.clearTimeout(timer);
     }, [isGlitching, playTemporalShift]);
 
     // No visual if stable
@@ -149,13 +177,13 @@ export const GlitchOverlay: React.FC<GlitchOverlayProps> = ({ coherence, isGlitc
             {/* Scanline disruption */}
             {scanlineGlitch && (
                 <div className="fixed pointer-events-none z-[102] glitch-scanline-tear"
-                    style={{ top: `${20 + Math.random() * 60}%` }}
+                    style={{ top: `${scanlineTop}%` }}
                 />
             )}
 
             {/* Invert flash */}
             {invertFlash && (
-                <div className="fixed inset-0 pointer-events-none z-[103] bg-white mix-blend-difference opacity-80" />
+                <div className="fixed inset-0 pointer-events-none z-[103] bg-black opacity-45" />
             )}
         </>
     );

@@ -8,10 +8,33 @@ import type { SystemSettings } from '../types/schema';
 
 interface AtmosphereManagerProps {
     coherence: number;
+    roomRestoration?: number;
+    suspendParticles?: boolean;
 }
 
-export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence }) => {
+const isMobileOrTabletDevice = () => {
+    if (typeof window === 'undefined') return false;
+    const userAgent = navigator.userAgent || '';
+    const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+    const isIPadDesktopMode = /Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1;
+    const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+    const shortestSide = Math.min(window.innerWidth, window.innerHeight);
+
+    return isMobileUserAgent || isIPadDesktopMode || isCoarse || shortestSide <= 820;
+};
+
+const shouldUseReducedAtmosphere = () => {
+    if (typeof window === 'undefined') return false;
+
+    return (
+        isMobileOrTabletDevice() ||
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+};
+
+export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence, roomRestoration = 1, suspendParticles = false }) => {
     const [settings, setSettings] = useState<SystemSettings | null>(null);
+    const [reducedAtmosphere, setReducedAtmosphere] = useState(() => shouldUseReducedAtmosphere());
 
     // Sync with Global Settings
     useEffect(() => {
@@ -23,6 +46,23 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence 
         return () => unsub();
     }, []);
 
+    useEffect(() => {
+        const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const pointerQuery = window.matchMedia('(pointer: coarse)');
+        const updatePreference = () => setReducedAtmosphere(shouldUseReducedAtmosphere());
+
+        motionQuery.addEventListener('change', updatePreference);
+        pointerQuery.addEventListener('change', updatePreference);
+        window.addEventListener('resize', updatePreference);
+        updatePreference();
+
+        return () => {
+            motionQuery.removeEventListener('change', updatePreference);
+            pointerQuery.removeEventListener('change', updatePreference);
+            window.removeEventListener('resize', updatePreference);
+        };
+    }, []);
+
     const theme = settings?.theme || 'green';
     const particles = settings?.particleEffect || 'dust';
     const cursor = settings?.cursorStyle || 'crosshair';
@@ -32,6 +72,7 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence 
     const particleSpeed = settings?.particleSpeed ?? 1.0;
     const particleOpacity = settings?.particleOpacity ?? 1.0;
     const particleTint = settings?.particleTint;
+    const runtimeParticleScale = reducedAtmosphere ? 0.28 : 1;
 
     const THEME_COLORS: Record<string, string> = {
         green: '51, 255, 0',
@@ -57,7 +98,7 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence 
     };
 
     const tintColor = hexToRgb(particleTint);
-    const particleColor = tintColor || activeColor;
+    const particleColor = tintColor || (particles === 'dust' ? '222, 221, 216' : activeColor);
 
     // Audio Controls
     const { setGlobalVolume, setAudioMode, setBackgroundTrack, setIsGlobalEnabled, setHybridTrackVolume } = useSound();
@@ -101,16 +142,16 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence 
     return (
         <>
             {/* Particle System */}
-            {!isBlackout && (
+            {!isBlackout && !suspendParticles && !reducedAtmosphere && (
                 <GhostParticles
                     key={theme} // Force remount on theme change to read new CSS var
                     coherence={coherence}
                     variant={particles}
                     color={particleColor}
                     sizeScale={particleSize}
-                    density={particleDensity}
-                    speed={particleSpeed}
-                    opacity={particleOpacity}
+                    density={particleDensity * (1.15 - roomRestoration * 0.35) * runtimeParticleScale}
+                    speed={particleSpeed * (1.1 - roomRestoration * 0.25) * (reducedAtmosphere ? 0.75 : 1)}
+                    opacity={particleOpacity * (0.45 + (1 - roomRestoration) * 0.45) * (reducedAtmosphere ? 0.55 : 1)}
                 />
             )}
 

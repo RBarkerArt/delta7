@@ -13,7 +13,7 @@ export const AudioAtmosphere: React.FC = () => {
         const handleUserInteraction = async () => {
             if (initAttemptedRef.current) return;
 
-            const success = await soundEngine.init();
+            const success = await soundEngine.init({ ambience: true });
             if (success) {
                 initAttemptedRef.current = true;
                 document.removeEventListener('click', handleUserInteraction);

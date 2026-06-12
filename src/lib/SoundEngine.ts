@@ -1,3 +1,7 @@
+interface WindowWithWebkitAudio extends Window {
+    webkitAudioContext?: typeof AudioContext;
+}
+
 /**
  * SoundEngine handles all audio synthesis for the Delta-7 atmosphere.
  * Designed to represent a living, breathing machine.
@@ -31,12 +35,21 @@ class SoundEngine {
     private isGlobalEnabled: boolean = true;
     private hybridTrackVolume: number = 0.02;
 
-    public async init(): Promise<boolean> {
-        if (this.initialized && this.ctx?.state === 'running') return true;
+    public async init(options: { ambience?: boolean } = {}): Promise<boolean> {
+        const shouldRunAmbience = options.ambience ?? false;
+
+        if (this.initialized && this.ctx?.state === 'running') {
+            if (shouldRunAmbience && !this.breathOsc) {
+                this.setupBreathSystem();
+            }
+            return true;
+        }
 
         try {
             if (!this.ctx) {
-                this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const AudioContextCtor = window.AudioContext || (window as WindowWithWebkitAudio).webkitAudioContext;
+                if (!AudioContextCtor) throw new Error('Web Audio API unavailable');
+                this.ctx = new AudioContextCtor();
             }
 
             if (this.ctx.state === 'suspended' && !this.muted) {
@@ -49,12 +62,14 @@ class SoundEngine {
                 this.masterGain.gain.setValueAtTime(this.muted ? 0 : 0.3, this.ctx.currentTime);
             }
 
-            this.setupBreathSystem();
+            if (shouldRunAmbience) {
+                this.setupBreathSystem();
+            }
             this.initialized = true;
-            console.log('[SoundEngine] Living nexus audio link established.');
+            console.log('[SoundEngine] Audio link established.');
             return true;
         } catch (err) {
-            console.warn('[SoundEngine] Nexus audio failure:', err);
+            console.warn('[SoundEngine] Audio failure:', err);
             return false;
         }
     }
@@ -106,7 +121,7 @@ class SoundEngine {
             this.breathOsc.start();
             this.harmonicOsc.start();
             this.lfoOsc.start();
-        } catch (e) {
+        } catch {
             // Silent fail
         }
     }
@@ -122,7 +137,7 @@ class SoundEngine {
                 this.masterGain.gain.cancelScheduledValues(now);
                 this.masterGain.gain.setValueAtTime(0, now);
                 // Suspend AudioContext to guarantee silence
-                this.ctx.suspend().catch(() => { });
+                this.ctx.suspend().catch(() => { /* best effort */ });
             } else {
                 // Resume AudioContext first
                 this.ctx.resume().then(() => {
@@ -130,7 +145,7 @@ class SoundEngine {
                         // Restore with short ramp
                         this.masterGain.gain.setTargetAtTime(0.3 * this.globalVolume, this.ctx.currentTime, 0.1);
                     }
-                }).catch(() => { });
+                }).catch(() => { /* best effort */ });
             }
         }
 
@@ -139,7 +154,7 @@ class SoundEngine {
             if (muted) {
                 this.bgAudio.pause();
             } else if (this.isGlobalEnabled && (this.audioMode === 'track' || this.audioMode === 'hybrid')) {
-                this.bgAudio.play().catch(() => { });
+                this.bgAudio.play().catch(() => { /* best effort */ });
             }
         }
 
@@ -177,7 +192,7 @@ class SoundEngine {
             // Debug listeners
             this.bgAudio.addEventListener('canplay', () => console.log('[SoundEngine] Track loaded and ready to play'));
             this.bgAudio.addEventListener('playing', () => console.log('[SoundEngine] Track is playing'));
-            this.bgAudio.addEventListener('error', (_e) => {
+            this.bgAudio.addEventListener('error', () => {
                 const error = this.bgAudio?.error;
                 console.error('[SoundEngine] Track error:', error?.code, error?.message);
             });
@@ -207,7 +222,7 @@ class SoundEngine {
         // Handle background track play/pause specifically
         if (this.bgAudio) {
             if (enabled && !this.muted && (this.audioMode === 'track' || this.audioMode === 'hybrid')) {
-                this.bgAudio.play().catch(() => { });
+                this.bgAudio.play().catch(() => { /* best effort */ });
             } else {
                 this.bgAudio.pause();
             }
@@ -233,7 +248,7 @@ class SoundEngine {
             const targetGain = isGenActive ? (0.3 * this.globalVolume) : 0;
             try {
                 this.masterGain.gain.setTargetAtTime(targetGain, now, rampTime);
-            } catch (e) { }
+            } catch { /* best effort */ }
         }
 
         // 2. Update Background Track Volume
@@ -295,7 +310,7 @@ class SoundEngine {
                 this.lfoGain.gain.setTargetAtTime(0.004 - withdrawal * 0.003, now, t);
                 this.lfoOsc.frequency.setTargetAtTime(0.08, now, t);
             }
-        } catch (e) { /* silent */ }
+        } catch { /* silent */ }
     }
 
     public playBreathSurge(): void {
@@ -338,7 +353,7 @@ class SoundEngine {
 
             noise.start(now);
             noise.stop(now + 0.3);
-        } catch (e) { /* silent */ }
+        } catch { /* silent */ }
     }
 
     playGlitch() {
@@ -404,7 +419,7 @@ class SoundEngine {
 
             osc.start(now);
             osc.stop(now + 0.05);
-        } catch (e) { /* silent */ }
+        } catch { /* silent */ }
     }
 
     /**
@@ -445,7 +460,7 @@ class SoundEngine {
 
             noise.start(now);
             noise.stop(now + duration);
-        } catch (e) { /* silent */ }
+        } catch { /* silent */ }
     }
 
     /**
@@ -475,7 +490,7 @@ class SoundEngine {
 
             osc.start(now);
             osc.stop(now + 0.15);
-        } catch (e) { /* silent */ }
+        } catch { /* silent */ }
     }
 
     /**
@@ -554,7 +569,7 @@ class SoundEngine {
             noise.stop(now + 0.5);
 
             console.log('[SoundEngine] Temporal shift audio triggered');
-        } catch (e) { /* silent */ }
+        } catch { /* silent */ }
     }
 
     public dispose() {
@@ -564,7 +579,7 @@ class SoundEngine {
             if (this.lfoOsc) this.lfoOsc.stop();
             if (this.ctx) this.ctx.close();
             this.initialized = false;
-        } catch (e) { /* silent */ }
+        } catch { /* silent */ }
     }
 }
 

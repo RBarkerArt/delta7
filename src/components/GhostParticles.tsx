@@ -37,9 +37,7 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
     const particlesRef = useRef<Particle[]>([]);
     const mouseRef = useRef({ x: -1000, y: -1000 });
     const requestRef = useRef<number | null>(null);
-
-    // Render nothing if disabled
-    if (variant === 'none') return null;
+    const isDisabled = variant === 'none';
 
     // Configuration based on coherence and variant
     const config = useMemo(() => {
@@ -47,25 +45,24 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
         // Color is now passed as prop
 
         // Base config defaults (Dust)
-        let c = {
-            count: isStable ? 80 : 40,
-            baseOpacity: isStable ? 0.55 : 0.18,
-            repulsionRadius: isStable ? 120 : 350,
-            repulsionForce: isStable ? 0.05 : 0.25,
-            flickerIntensity: isStable ? 0.0 : 0.8,
+        const c = {
+            count: isStable ? 190 : 140,
+            baseOpacity: isStable ? 0.34 : 0.24,
+            repulsionRadius: 0,
+            repulsionForce: 0,
+            flickerIntensity: 0,
             color, // Use prop
             shape: 'circle',
             gravity: 0,
-            speedMod: 1,
-            sizeRange: [0.6, 1.8] as [number, number]
+            speedMod: 0.42,
+            sizeRange: [0.65, 1.55] as [number, number]
         };
 
         if (variant === 'dust') {
-            // Subtle coherence link: more presence when coherence drops, but never dominating.
             const instability = Math.max(0, Math.min(1, (100 - coherence) / 100));
-            c.count = Math.round(c.count * (1 + instability * 0.18));
-            c.baseOpacity = c.baseOpacity + (instability * 0.08);
-            c.sizeRange = [0.55, 1.7];
+            c.count = Math.round(c.count * (1 + instability * 0.28));
+            c.baseOpacity = c.baseOpacity + (instability * 0.07);
+            c.sizeRange = [0.55, 1.45];
         } else if (variant === 'ash') {
             c.count = 60;
             c.baseOpacity = 0.4; // Softer
@@ -96,6 +93,8 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
 
     // Initialize Particles
     useEffect(() => {
+        if (isDisabled) return undefined;
+
         const particles: Particle[] = [];
         const width = window.innerWidth;
         const height = window.innerHeight;
@@ -126,10 +125,12 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
         window.addEventListener('mousemove', handleMouseMove);
 
         return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, [config.count, config.sizeRange, density, sizeScale]); // Re-init on count/size change
+    }, [config, density, isDisabled, sizeScale]);
 
     // Animation Loop
     useEffect(() => {
+        if (isDisabled) return undefined;
+
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -157,9 +158,8 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
                 p.x += p.vx * depthSpeed;
                 p.y += (p.vy * depthSpeed) + gravity;
 
-                // Subtle drift for a more "mysterious" float
-                const driftX = Math.sin(time * 0.00025 + p.flickerOffset) * 0.12;
-                const driftY = Math.cos(time * 0.0002 + p.flickerOffset) * 0.08;
+                const driftX = Math.sin(time * 0.00014 + p.flickerOffset) * 0.09;
+                const driftY = Math.cos(time * 0.00011 + p.flickerOffset) * 0.06;
                 p.x += driftX * (0.4 + p.depth);
                 p.y += driftY * (0.35 + p.depth);
 
@@ -198,8 +198,8 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
                 // Draw
                 ctx.fillStyle = `rgba(${color}, ${finalOpacity})`;
                 if (shape === 'circle') {
-                    ctx.shadowColor = `rgba(${color}, ${finalOpacity * 0.6})`;
-                    ctx.shadowBlur = 6 * (0.3 + p.depth);
+                    ctx.shadowColor = `rgba(${color}, ${finalOpacity * 0.18})`;
+                    ctx.shadowBlur = 2 * (0.3 + p.depth);
                 } else {
                     ctx.shadowBlur = 0;
                 }
@@ -223,12 +223,14 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
         return () => {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
-    }, [config, speed, opacity]);
+    }, [config, isDisabled, speed, opacity]);
+
+    if (isDisabled) return null;
 
     return (
         <canvas
             ref={canvasRef}
-            className="fixed inset-0 pointer-events-none z-[5]"
+            className="fixed inset-0 pointer-events-none z-[4]"
             style={{ mixBlendMode: 'screen' }}
         />
     );

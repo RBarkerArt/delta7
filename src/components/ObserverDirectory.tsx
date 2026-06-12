@@ -22,7 +22,8 @@ export const ObserverDirectory: React.FC = () => {
     const [editForm, setEditForm] = useState<{
         dayProgress: number;
         coherenceScore: number;
-    }>({ dayProgress: 1, coherenceScore: 100 });
+        milligrams: number;
+    }>({ dayProgress: 1, coherenceScore: 100, milligrams: 0 });
     const [isSaving, setIsSaving] = useState(false);
 
     // Filter states
@@ -61,7 +62,8 @@ export const ObserverDirectory: React.FC = () => {
         setEditingId(obs.id);
         setEditForm({
             dayProgress: obs.dayProgress,
-            coherenceScore: Math.round(obs.coherenceScore)
+            coherenceScore: Math.round(obs.coherenceScore),
+            milligrams: Math.max(0, Math.round(obs.milligrams || 0))
         });
     };
 
@@ -78,6 +80,7 @@ export const ObserverDirectory: React.FC = () => {
             await updateDoc(obsRef, {
                 dayProgress: editForm.dayProgress,
                 coherenceScore: editForm.coherenceScore,
+                milligrams: Math.max(0, Math.round(editForm.milligrams)),
                 startDate: Timestamp.fromMillis(newStartTime),
                 isManualDayProgress: true  // Tells CoherenceContext to respect this value
             });
@@ -87,7 +90,8 @@ export const ObserverDirectory: React.FC = () => {
                 observerId: editingId,
                 changes: {
                     dayProgress: editForm.dayProgress,
-                    coherenceScore: editForm.coherenceScore
+                    coherenceScore: editForm.coherenceScore,
+                    milligrams: Math.max(0, Math.round(editForm.milligrams))
                 },
                 actorEmail: user?.email || null,
                 createdAt: Timestamp.now()
@@ -96,7 +100,7 @@ export const ObserverDirectory: React.FC = () => {
             // Update local state
             setObservers(prev => prev.map(o =>
                 o.id === editingId
-                    ? { ...o, dayProgress: editForm.dayProgress, coherenceScore: editForm.coherenceScore }
+                    ? { ...o, dayProgress: editForm.dayProgress, coherenceScore: editForm.coherenceScore, milligrams: Math.max(0, Math.round(editForm.milligrams)) }
                     : o
             ));
             setEditingId(null);
@@ -313,6 +317,21 @@ export const ObserverDirectory: React.FC = () => {
                             )}
                         </div>
 
+                        <div className="flex items-center justify-between text-sm text-gray-700">
+                            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Milligrams</span>
+                            {editingId === obs.id ? (
+                                <input
+                                    type="number"
+                                    min="0"
+                                    className="w-24 border rounded px-2 py-1 text-sm text-right"
+                                    value={editForm.milligrams}
+                                    onChange={(e) => setEditForm({ ...editForm, milligrams: parseInt(e.target.value) || 0 })}
+                                />
+                            ) : (
+                                <span className="font-medium text-gray-900">{obs.milligrams || 0}</span>
+                            )}
+                        </div>
+
                         <div className="flex items-center justify-end gap-2">
                             {editingId === obs.id ? (
                                 <>
@@ -355,7 +374,7 @@ export const ObserverDirectory: React.FC = () => {
 
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden hidden md:block">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm min-w-[800px]">
+                    <table className="w-full text-left text-sm min-w-[900px]">
                         <thead className="bg-gray-50 border-b border-gray-100">
                             <tr>
                                 <th className="px-6 py-4 font-semibold text-gray-900">User / Identity</th>
@@ -363,6 +382,7 @@ export const ObserverDirectory: React.FC = () => {
                                 <th className="px-6 py-4 font-semibold text-gray-900">Status</th>
                                 <th className="px-6 py-4 font-semibold text-gray-900">Day Progress</th>
                                 <th className="px-6 py-4 font-semibold text-gray-900">Coherence</th>
+                                <th className="px-6 py-4 font-semibold text-gray-900">Milligrams</th>
                                 <th className="px-6 py-4 font-semibold text-gray-900">Last Seen</th>
                                 <th className="px-6 py-4 font-semibold text-gray-900 text-right">Actions</th>
                             </tr>
@@ -439,6 +459,19 @@ export const ObserverDirectory: React.FC = () => {
                                                 </div>
                                                 <span className="text-xs text-gray-600">{Math.round(obs.coherenceScore)}%</span>
                                             </div>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {editingId === obs.id ? (
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                className="w-24 border rounded px-2 py-1 text-sm"
+                                                value={editForm.milligrams}
+                                                onChange={(e) => setEditForm({ ...editForm, milligrams: parseInt(e.target.value) || 0 })}
+                                            />
+                                        ) : (
+                                            <span className="font-medium text-gray-900">{obs.milligrams || 0}</span>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-gray-500 text-xs">

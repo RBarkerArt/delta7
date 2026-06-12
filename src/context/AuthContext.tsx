@@ -4,12 +4,15 @@ import {
     signInAnonymously,
     GoogleAuthProvider,
     signInWithPopup,
+    signInWithRedirect,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
     linkWithPopup,
+    linkWithRedirect,
     linkWithCredential,
     signInWithCustomToken,
     EmailAuthProvider,
+    getRedirectResult,
     type User
 } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
@@ -22,6 +25,29 @@ export interface AuthUser extends User {
     role?: 'admin' | 'observer';
 }
 
+const getErrorCode = (error: unknown): string | undefined => {
+    if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : undefined;
+};
+
+const createGoogleProvider = () => new GoogleAuthProvider();
+
+const shouldUseRedirectForGoogleAuth = () => {
+    const userAgent = navigator.userAgent || '';
+    const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+    const isIPadDesktopMode = /Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1;
+
+    return isMobileUserAgent || isIPadDesktopMode;
+};
+
+const shouldFallbackToRedirect = (error: unknown) => {
+    const code = getErrorCode(error);
+
+    return code === 'auth/popup-blocked' ||
+        code === 'auth/cancelled-popup-request' ||
+        code === 'auth/operation-not-supported-in-this-environment';
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<AuthUser | null>(null);
@@ -32,20 +58,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const clearMigration = () => setMigrationPayload(null);
 
+    const ensureVisitorMapping = useCallback(async (firebaseUser: User) => {
+        const session = getObserverSession();
+        if (!session.visitorId) return;
+
+        setVisitorId(session.visitorId);
+        const mappingRef = doc(db, 'firebase_uid_mapping', firebaseUser.uid);
+        await setDoc(mappingRef, {
+            visitorId: session.visitorId,
+            lastUpdated: serverTimestamp()
+        }, { merge: true });
+    }, []);
+
     const ensureUser = useCallback(async (): Promise<AuthUser> => {
-        if (auth.currentUser) return auth.currentUser as AuthUser;
+        if (auth.currentUser) {
+            await ensureVisitorMapping(auth.currentUser);
+            return auth.currentUser as AuthUser;
+        }
         setIsAuthorizing(true);
         try {
             const result = await signInAnonymously(auth);
+            await ensureVisitorMapping(result.user);
             return result.user as AuthUser;
         } finally {
             setIsAuthorizing(false);
         }
-    }, []);
+    }, [ensureVisitorMapping]);
 
     useEffect(() => {
         const session = getObserverSession();
         setVisitorId(session.visitorId);
+
+        void getRedirectResult(auth)
+            .then(async (result) => {
+                if (!result?.user) return;
+
+                await result.user.getIdToken(true);
+
+                if (result.operationType === 'link' && result.providerId === GoogleAuthProvider.PROVIDER_ID) {
+                    const functions = getFunctions();
+                    const welcomeFn = httpsCallable(functions, 'sendAnchorWelcome');
+                    await welcomeFn();
+                }
+            })
+            .catch((error: unknown) => {
+                if (import.meta.env.DEV) console.error('[Delta-7] Redirect authentication failed:', error);
+            });
 
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
@@ -98,12 +156,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const login = async (email: string, pass: string) => {
         setIsAuthorizing(true);
         try {
-            if (auth.currentUser?.isAnonymous) {
-                if (import.meta.env.DEV) console.log('[Delta-7] Anchoring anonymous session to Email identity...');
-                await signInWithEmailAndPassword(auth, email, pass);
-            } else {
-                await signInWithEmailAndPassword(auth, email, pass);
-            }
+            await signInWithEmailAndPassword(auth, email, pass);
         } finally {
             setIsAuthorizing(false);
         }
@@ -125,25 +178,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const loginWithGoogle = async () => {
         setIsAuthorizing(true);
         try {
-            const provider = new GoogleAuthProvider();
+            const provider = createGoogleProvider();
             if (import.meta.env.DEV) console.log('[Delta-7] Initiating Google Authentication...');
-            await signInWithPopup(auth, provider);
+            if (shouldUseRedirectForGoogleAuth()) {
+                await signInWithRedirect(auth, provider);
+                return;
+            }
+
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error: unknown) {
+                if (!shouldFallbackToRedirect(error)) throw error;
+                await signInWithRedirect(auth, provider);
+            }
         } finally {
             setIsAuthorizing(false);
         }
     };
 
-    const anchorIdentity = useCallback(async (method: 'google' | 'email', payload?: any) => {
+    const anchorIdentity = useCallback(async (method: 'google' | 'email', payload?: { email: string; password: string }) => {
         if (!auth.currentUser) throw new Error('No active session to anchor');
         setIsAuthorizing(true);
         try {
             if (method === 'google') {
-                const provider = new GoogleAuthProvider();
+                const provider = createGoogleProvider();
                 if (import.meta.env.DEV) console.log('[Delta-7] Anchoring: Linking anonymous session to Google...');
-                await linkWithPopup(auth.currentUser, provider);
+                if (shouldUseRedirectForGoogleAuth()) {
+                    await linkWithRedirect(auth.currentUser, provider);
+                    return;
+                }
+
+                try {
+                    await linkWithPopup(auth.currentUser, provider);
+                } catch (error: unknown) {
+                    if (!shouldFallbackToRedirect(error)) throw error;
+                    await linkWithRedirect(auth.currentUser, provider);
+                    return;
+                }
             } else if (method === 'email') {
+                if (!payload?.email || !payload.password) throw new Error('Missing credentials');
                 const { email, password } = payload;
-                if (!email || !password) throw new Error('Missing credentials');
                 const credential = EmailAuthProvider.credential(email, password);
                 if (import.meta.env.DEV) console.log('[Delta-7] Anchoring: Linking anonymous session to Email...');
                 await linkWithCredential(auth.currentUser, credential);
@@ -158,9 +232,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await welcomeFn();
 
             if (import.meta.env.DEV) console.log('[Delta-7] Anchoring complete. Identity preserved.');
-        } catch (error: any) {
+        } catch (error: unknown) {
             if (import.meta.env.DEV) console.error('[Delta-7] Anchoring failed:', error);
-            if (error.code === 'auth/credential-already-in-use') {
+            if (getErrorCode(error) === 'auth/credential-already-in-use') {
                 throw new Error('This account is already linked. Please sign in (current progress will be replaced).');
             }
             throw error;
@@ -203,7 +277,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else {
                 throw new Error('Signal degraded. timestamp_mismatch.');
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             if (import.meta.env.DEV) console.error('Recovery failed:', error);
             setIsAuthorizing(false); // Only reset on failure; success leads to reload
             throw new Error('Signal recovery failed. Frequency invalid.');

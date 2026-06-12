@@ -46,11 +46,18 @@ service cloud.firestore {
          'startDate',
          'lastSeenAt',
          'seenFragments',
+         'recoveredItems',
          'isAnchored',
          'email',
          'visitorId',
          'anchoredFirebaseUid',
-         'accessCode'
+         'accessCode',
+         'milligrams',
+         'lastCoffeeSignalDay',
+         'lastCoffeeClaimedAt',
+         'lastFridgeSignalDay',
+         'lastFridgeClaimedAt',
+         'lastFridgeOutcome'
        ];
 
        return (
@@ -62,6 +69,7 @@ service cloud.firestore {
          (!('startDate' in data) || data.startDate is timestamp) &&
          (!('lastSeenAt' in data) || data.lastSeenAt is timestamp) &&
          (!('seenFragments' in data) || data.seenFragments is list) &&
+         (!('recoveredItems' in data) || data.recoveredItems is list) &&
          (!('isAnchored' in data) || data.isAnchored is bool) &&
          (!('email' in data) || (data.email is string && request.auth.token.email == data.email)) &&
          (!('visitorId' in data) || (data.visitorId is string && data.visitorId == visitorId)) &&
@@ -72,6 +80,24 @@ service cloud.firestore {
          )) &&
          (!('accessCode' in data) || (
            resource != null && resource.data.accessCode is string && data.accessCode == resource.data.accessCode
+         )) &&
+         (!('milligrams' in data) || (
+           resource != null && data.milligrams == resource.data.milligrams
+         )) &&
+         (!('lastCoffeeSignalDay' in data) || (
+           resource != null && data.lastCoffeeSignalDay == resource.data.lastCoffeeSignalDay
+         )) &&
+         (!('lastCoffeeClaimedAt' in data) || (
+           resource != null && data.lastCoffeeClaimedAt == resource.data.lastCoffeeClaimedAt
+         )) &&
+         (!('lastFridgeSignalDay' in data) || (
+           resource != null && data.lastFridgeSignalDay == resource.data.lastFridgeSignalDay
+         )) &&
+         (!('lastFridgeClaimedAt' in data) || (
+           resource != null && data.lastFridgeClaimedAt == resource.data.lastFridgeClaimedAt
+         )) &&
+         (!('lastFridgeOutcome' in data) || (
+           resource != null && data.lastFridgeOutcome == resource.data.lastFridgeOutcome
          )) &&
          (!('isAnchored' in data) || (
            data.isAnchored == false ||
@@ -97,6 +123,16 @@ service cloud.firestore {
         data.visitorId is string &&
         (!('lastUpdated' in data) || data.lastUpdated is timestamp)
       );
+    }
+
+    // A visitorId may only be claimed if its observer record does not exist yet,
+    // is not anchored, or is anchored to the requesting Firebase account. This
+    // stops a signed-in user from mapping themselves onto another observer's
+    // progress just by learning their visitorId.
+    function canClaimVisitorId(visitorId) {
+      return !exists(/databases/$(database)/documents/observers/$(visitorId)) ||
+        get(/databases/$(database)/documents/observers/$(visitorId)).data.get('anchoredFirebaseUid', null) == null ||
+        get(/databases/$(database)/documents/observers/$(visitorId)).data.anchoredFirebaseUid == request.auth.uid;
     }
 
     function isValidMappingUpdate() {
@@ -126,7 +162,12 @@ service cloud.firestore {
     // Lookup table for mapping Firebase UID to Visitor ID
     match /firebase_uid_mapping/{firebaseUid} {
       allow read: if isAdmin() || isOwner(firebaseUid);
-      allow create: if isAdmin() || (isOwner(firebaseUid) && isValidMappingCreate() && !exists(/databases/$(database)/documents/firebase_uid_mapping/$(firebaseUid)));
+      allow create: if isAdmin() || (
+        isOwner(firebaseUid) &&
+        isValidMappingCreate() &&
+        !exists(/databases/$(database)/documents/firebase_uid_mapping/$(firebaseUid)) &&
+        canClaimVisitorId(request.resource.data.visitorId)
+      );
       allow update: if isAdmin() || (isOwner(firebaseUid) && isValidMappingUpdate());
       allow delete: if isAdmin();
     }
@@ -139,6 +180,23 @@ service cloud.firestore {
 
     match /season1_prologues/{prologueId} {
       allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Public room media + hotspot configuration; paths only, no private observer data
+    match /config/{configId} {
+      allow read: if configId in ['room_images', 'rooms'];
+      allow write: if isAdmin();
+    }
+
+    // Break Room public config and project/lore updates
+    match /break_room_config/{configId} {
+      allow read: if configId == 'main';
+      allow write: if isAdmin();
+    }
+
+    match /break_room_updates/{updateId} {
+      allow read: if isAdmin() || resource.data.published == true;
       allow write: if isAdmin();
     }
 
@@ -165,6 +223,12 @@ service cloud.firestore {
         isVisitorOwner(request.resource.data.observerId)
       );
       allow update, delete: if isAdmin();
+    }
+
+    // Tuning logs: Owner read, Admin/Backend write
+    match /observer_tuning_logs/{logId} {
+      allow read: if isAdmin() || (isAuthenticated() && isVisitorOwner(resource.data.observerId));
+      allow write: if isAdmin();
     }
 
     // Admin audit log

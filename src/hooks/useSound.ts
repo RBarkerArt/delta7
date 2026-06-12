@@ -6,7 +6,7 @@ import { soundEngine } from '../lib/SoundEngine';
  */
 export const useSound = () => {
     return {
-        initializeAudio: () => soundEngine.init(),
+        initializeAudio: (ambience = false) => soundEngine.init({ ambience }),
         playClick: () => soundEngine.playClick(),
         playBreathSurge: () => soundEngine.playBreathSurge(),
         playSignalNoise: (intensity?: number) => soundEngine.playSignalNoise(intensity),

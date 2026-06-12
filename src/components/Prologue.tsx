@@ -1,61 +1,94 @@
 import React, { useState, useEffect } from 'react';
+import { ThreePrologueAtmosphere } from './ThreePrologueAtmosphere';
+
+// The WebGL atmosphere costs a ~730KB three.js download plus a GL context on
+// the very first screen. Phones and tablets get a cheap CSS glow instead so
+// the prologue loads fast and never pressures mobile browser memory.
+const shouldUseThreeAtmosphere = () => {
+    if (typeof window === 'undefined') return false;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    if (window.matchMedia('(pointer: coarse)').matches) return false;
+    const userAgent = navigator.userAgent || '';
+    if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)) return false;
+    if (/Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1) return false;
+    return true;
+};
 
 interface PrologueProps {
     sentence: string;
     onComplete: () => void;
+    eyebrow?: string;
+    actionLabel?: string;
+    coherence?: number;
 }
 
-export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete }) => {
-    const [phase, setPhase] = useState<'reveal' | 'hold' | 'fade-out' | 'final-sequence'>('reveal');
+export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete, eyebrow, actionLabel = 'Enter Room', coherence = 70 }) => {
+    const [phase, setPhase] = useState<'reveal' | 'hold' | 'fade-out'>('reveal');
+    const [canEnter, setCanEnter] = useState(false);
+    const [useThreeAtmosphere] = useState(() => shouldUseThreeAtmosphere());
 
+    const enterRoom = () => {
+        if (phase === 'fade-out') return;
+        setPhase('fade-out');
+    };
 
     useEffect(() => {
         if (phase === 'reveal') {
-            const timer = setTimeout(() => setPhase('hold'), 8000);
-            return () => clearTimeout(timer);
+            const enterTimer = setTimeout(() => setCanEnter(true), 1200);
+            const phaseTimer = setTimeout(() => setPhase('hold'), 5200);
+            return () => {
+                clearTimeout(enterTimer);
+                clearTimeout(phaseTimer);
+            };
         }
 
         if (phase === 'hold') {
-            const timer = setTimeout(() => setPhase('fade-out'), 3000);
+            const timer = setTimeout(() => setPhase('fade-out'), 1100);
             return () => clearTimeout(timer);
         }
 
         if (phase === 'fade-out') {
-            const timer = setTimeout(() => setPhase('final-sequence'), 3000);
-            return () => clearTimeout(timer);
-        }
-
-        if (phase === 'final-sequence') {
-            // Show both texts for 3 seconds, then complete
-            const timer = setTimeout(onComplete, 3000);
+            const timer = setTimeout(onComplete, 850);
             return () => clearTimeout(timer);
         }
     }, [phase, onComplete]);
 
     return (
         <div className="fixed inset-0 bg-lab-black z-[100] flex items-center justify-center p-8 sm:p-24 overflow-hidden">
-            {/* Background Image */}
             <div
                 className={`
-                    absolute inset-0 z-0 pointer-events-none transition-all duration-[4000ms] ease-out
-                    ${(phase === 'fade-out' || phase === 'final-sequence') ? 'opacity-0 scale-105 blur-sm' : 'animate-prologue-bg-fade'}
+                    absolute inset-0 z-0 pointer-events-none bg-lab-black transition-all duration-[4000ms] ease-out
+                    ${phase === 'fade-out' ? 'opacity-0 scale-105 blur-sm' : 'opacity-100'}
                 `}
-                style={{
-                    backgroundImage: `url("https://firebasestorage.googleapis.com/v0/b/delta7-3fede.firebasestorage.app/o/site%20images%2FDELTA_7%20%3E%20PROJECT%20-%201.png?alt=media&token=a4416008-df76-469f-8787-745f747b8e72")`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                }}
             />
+
+            {useThreeAtmosphere ? (
+                <ThreePrologueAtmosphere phase={phase} coherence={coherence} />
+            ) : (
+                <div
+                    aria-hidden="true"
+                    className={`absolute inset-0 z-0 pointer-events-none transition-opacity duration-[3000ms] ${phase === 'fade-out' ? 'opacity-0' : 'opacity-100'}`}
+                    style={{
+                        background:
+                            'radial-gradient(ellipse at 50% 42%, rgba(242,234,208,0.10), transparent 55%), radial-gradient(ellipse at 48% 55%, rgba(16,185,129,0.06), transparent 62%)',
+                    }}
+                />
+            )}
 
             <div className={`
                 max-w-3xl w-full text-center transition-all duration-[4000ms] ease-in-out relative z-10
-                ${(phase === 'fade-out' || phase === 'final-sequence') ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100'}
+                ${phase === 'fade-out' ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100'}
                 animate-memory-float
             `}>
                 <div className={`
                     relative transition-all duration-[6000ms] ease-out
                     ${phase === 'reveal' ? 'prologue-mask-revealing' : 'prologue-mask-visible'}
                 `}>
+                    {eyebrow && (
+                        <div className="mb-6 font-mono text-[10px] uppercase tracking-[0.28em] text-[#d8d2bd]/42">
+                            {eyebrow}
+                        </div>
+                    )}
                     <p
                         className="font-['EB_Garamond'] italic text-3xl sm:text-5xl text-[#d1d1c7] leading-relaxed tracking-widest select-none"
                         style={{ textShadow: '0 0 20px rgba(209, 209, 199, 0.15)' }}
@@ -63,18 +96,17 @@ export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete }) => {
                         {sentence}
                     </p>
                 </div>
-            </div>
 
-            {phase === 'final-sequence' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                    <div className="font-mono text-emerald-500 text-sm sm:text-base animate-pulse tracking-widest">
-                        FREQUENCY FOUND?: TUNING...
-                    </div>
-                    <div className="font-mono text-signal-green text-sm sm:text-base animate-pulse">
-                        {">"} INITIALIZING SCREEN...
-                    </div>
-                </div>
-            )}
+                <button
+                    onClick={enterRoom}
+                    className={`
+                        mt-10 border border-[#d8d2bd]/20 bg-black/20 px-5 py-3 font-mono text-[10px] uppercase tracking-[0.24em] text-[#d8d2bd]/60 transition-all duration-700
+                        ${canEnter ? 'opacity-100 hover:border-emerald-200/35 hover:text-[#f2ead0]' : 'pointer-events-none opacity-0'}
+                    `}
+                >
+                    {actionLabel}
+                </button>
+            </div>
         </div>
     );
 };

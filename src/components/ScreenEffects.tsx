@@ -42,7 +42,7 @@ export const ScreenEffects: React.FC<ScreenEffectsProps> = ({ flickerLevel, drif
         <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
             {/* Screen Flare Overlay */}
             <div
-                className="absolute inset-0 bg-white transition-opacity duration-100 mix-blend-overlay"
+                className="absolute inset-0 bg-black transition-opacity duration-100"
                 style={{ opacity: flareOpacity }}
             />
 

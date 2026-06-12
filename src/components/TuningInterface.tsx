@@ -33,75 +33,91 @@ export const TuningInterface: React.FC<TuningInterfaceProps> = ({ isOpen, onClos
             setTimeout(() => {
                 window.location.reload(); // Hard reload to ensure clean session state
             }, 1500);
-        } catch (err: any) {
-            setError(err.message || 'Signal lost. Frequency invalid.');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Signal lost. Frequency invalid.');
         }
     };
 
     return (
         <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[10000] animate-fade-in" />
-                <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm bg-black border-2 border-emerald-900/50 p-8 rounded-none shadow-[0_0_50px_rgba(16,185,129,0.1)] z-[10001] focus:outline-none animate-scale-in font-mono">
+                <Dialog.Overlay className="fixed inset-0 z-[12000] bg-black/70 backdrop-blur-[3px] animate-fade-in" />
+                <Dialog.Content className="fixed left-1/2 top-3 z-[12001] flex max-h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-sm -translate-x-1/2 flex-col overflow-hidden border border-[#f2ead0]/20 bg-[#1b1a15]/95 font-mono shadow-[0_24px_80px_rgba(0,0,0,0.72)] focus:outline-none animate-scale-in sm:top-1/2 sm:-translate-y-1/2">
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_0%,rgba(255,247,223,0.10),transparent_42%),linear-gradient(135deg,rgba(16,185,129,0.07),transparent_48%)]" />
 
-                    <Dialog.Title className="text-xl text-emerald-500 uppercase tracking-widest flex items-center gap-3 mb-6">
-                        <Radio size={20} className={isAuthorizing ? "animate-pulse" : ""} />
-                        Signal_Tuning
-                    </Dialog.Title>
-
-                    <Dialog.Description className="text-[10px] text-emerald-900/50 uppercase tracking-widest font-mono mb-6 sr-only">
-                        Enter a frequency code to recover an existing session.
-                    </Dialog.Description>
-
-                    {success ? (
-                        <div className="text-center space-y-4 py-8">
-                            <RefreshCw size={48} className="mx-auto text-emerald-500 animate-spin" />
-                            <p className="text-emerald-500 tracking-widest uppercase text-sm">Signal Locked. Realigning...</p>
-                        </div>
-                    ) : (
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] text-zinc-500 uppercase tracking-widest block">
-                                    Input_Frequency (XXX-XXX)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={code}
-                                    onChange={handleInput}
-                                    placeholder="___-___"
-                                    className="w-full bg-black border border-emerald-900 text-emerald-500 text-center text-3xl font-bold py-4 tracking-widest focus:outline-none focus:border-emerald-500 transition-colors uppercase placeholder:text-emerald-900/30"
-                                    autoFocus
-                                />
+                    <div className="relative shrink-0 flex items-start justify-between gap-4 border-b border-[#f2ead0]/20 bg-black/20 px-5 py-4">
+                        <div className="min-w-0">
+                            <div className="mb-1 text-[10px] uppercase tracking-[0.22em] text-emerald-100/70">
+                                Security Box
                             </div>
-
-                            {error && (
-                                <div className="flex items-center gap-2 text-red-500 text-xs border border-red-900/30 bg-red-900/10 p-3">
-                                    <AlertTriangle size={12} />
-                                    {error}
-                                </div>
-                            )}
-
+                            <Dialog.Title className="flex items-center gap-3 text-base font-semibold uppercase tracking-[0.14em] text-[#fff7df]">
+                                <Radio size={18} className={isAuthorizing ? "animate-pulse text-emerald-100" : "text-emerald-100/80"} />
+                                Signal Tuning
+                            </Dialog.Title>
+                        </div>
+                        <Dialog.Close asChild>
                             <button
-                                type="submit"
-                                disabled={code.length < 7 || isAuthorizing}
-                                className="w-full py-4 bg-emerald-900/20 border border-emerald-900/50 hover:bg-emerald-500/20 hover:border-emerald-500 text-emerald-500 uppercase tracking-widest text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed group relative overflow-hidden"
+                                className="shrink-0 border border-[#f2ead0]/20 bg-black/30 p-2 text-[#f7f1dc]/75 transition-colors hover:border-emerald-100/40 hover:text-[#fff7df]"
+                                aria-label="Close tuning panel"
                             >
-                                {isAuthorizing ? (
-                                    <span className="flex items-center justify-center gap-2">
-                                        <Loader size={12} className="animate-spin" /> Tuning...
-                                    </span>
-                                ) : (
-                                    <span className="group-hover:tracking-[0.3em] transition-all duration-300"> establish_uplink </span>
-                                )}
+                                <X size={15} />
                             </button>
-                        </form>
-                    )}
+                        </Dialog.Close>
+                    </div>
 
-                    <Dialog.Close asChild>
-                        <button className="absolute top-4 right-4 text-emerald-900 hover:text-emerald-500 transition-colors">
-                            <X size={20} />
-                        </button>
-                    </Dialog.Close>
+                    <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 custom-scrollbar">
+                        <Dialog.Description className="mb-6 text-[13px] leading-relaxed tracking-wide text-[#f7f1dc]">
+                            Your frequency code is an anonymous recovery key. Use it on another browser or device to restore the same observation record.
+                        </Dialog.Description>
+
+                        {success ? (
+                            <div className="space-y-4 py-8 text-center">
+                                <RefreshCw size={44} className="mx-auto animate-spin text-emerald-100" />
+                                <p className="text-sm uppercase tracking-[0.2em] text-[#fff7df]">Signal locked. Realigning...</p>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] uppercase tracking-[0.22em] text-emerald-100/70">
+                                        Recovery Frequency (XXX-XXX)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={code}
+                                        onChange={handleInput}
+                                        placeholder="___-___"
+                                        className="w-full border border-[#f2ead0]/20 bg-black/40 py-4 text-center text-3xl font-bold uppercase tracking-widest text-[#fff7df] placeholder:text-[#f7f1dc]/25 transition-colors focus:border-emerald-100/60 focus:bg-black/50 focus:outline-none"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                {error && (
+                                    <div className="flex items-center gap-2 border border-red-300/30 bg-red-950/30 p-3 text-xs leading-relaxed text-red-100">
+                                        <AlertTriangle size={13} className="shrink-0 text-red-200" />
+                                        {error}
+                                    </div>
+                                )}
+
+                                <p className="text-[10px] leading-relaxed tracking-wide text-[#f7f1dc]/70">
+                                    Same device recovery happens automatically. This tuner is only needed when the room no longer recognizes your local record.
+                                </p>
+
+                                <button
+                                    type="submit"
+                                    disabled={code.length < 7 || isAuthorizing}
+                                    className="group relative w-full overflow-hidden border border-emerald-100/40 bg-emerald-100/10 py-4 text-xs uppercase tracking-[0.2em] text-[#fff7df] transition-all hover:border-emerald-50/70 hover:bg-emerald-100/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {isAuthorizing ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <Loader size={12} className="animate-spin" /> Tuning...
+                                        </span>
+                                    ) : (
+                                        <span className="transition-all duration-300 group-hover:tracking-[0.28em]">Restore Record</span>
+                                    )}
+                                </button>
+                            </form>
+                        )}
+                    </div>
                 </Dialog.Content>
             </Dialog.Portal>
         </Dialog.Root>

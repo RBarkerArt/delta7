@@ -22,6 +22,12 @@ service firebase.storage {
       allow write: if isAdmin();
     }
 
+    // Rooms imagery: Public read, Admin write
+    match /rooms/{allPaths=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // All other paths: Admin-only read, no write
     match /{allPaths=**} {
       allow read: if isAdmin();

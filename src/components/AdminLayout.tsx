@@ -18,7 +18,10 @@ import {
     X,
     Users,
     BookOpen,
+    Coffee,
     Zap,
+    Compass,
+    DoorOpen,
     type LucideIcon
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
@@ -173,6 +176,9 @@ export const AdminLayout: React.FC = () => {
         { icon: Users, label: 'Users', path: '/admin/observers' },
         { icon: Database, label: 'Days', path: '/admin/logs' },
         { icon: BookOpen, label: 'Story Bible', path: '/admin/story-bible' },
+        { icon: Coffee, label: 'Break Room', path: '/admin/break-room' },
+        { icon: Compass, label: 'Cartography', path: '/admin/cartography' },
+        { icon: DoorOpen, label: 'Rooms', path: '/admin/rooms' },
         { icon: Activity, label: 'Stats', path: '/admin/stats' },
         { icon: Zap, label: 'Director', path: '/admin/director' }, // Atmosphere Control
         { icon: Settings, label: 'Settings', path: '/admin/settings' },

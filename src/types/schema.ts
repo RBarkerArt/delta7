@@ -2,6 +2,17 @@ import { Timestamp } from 'firebase/firestore';
 
 export type CoherenceState = 'FEED_STABLE' | 'SYNC_RECOVERING' | 'COHERENCE_FRAYING' | 'SIGNAL_FRAGMENTED' | 'CRITICAL_INTERFERENCE';
 
+export type ReturnSignalReason = 'same_day_return' | 'daily_signal_opened' | 'catchup_return';
+
+export interface ReturnSignalReport {
+    absenceMs: number;
+    dayDelta: number;
+    previousDay: number;
+    currentDay: number;
+    coherenceDelta: number;
+    reason: ReturnSignalReason;
+}
+
 // Note: ObserverSession is defined in lib/visitor.ts - do not duplicate here
 
 export interface UserProgress {
@@ -11,6 +22,7 @@ export interface UserProgress {
     coherenceScore: number; // 0-100
     coherenceState: CoherenceState;
     seenFragments: string[];
+    recoveredItems?: string[];
     dayProgress: number;
     isManualDayProgress?: boolean;
     isAnchored: boolean;
@@ -19,6 +31,21 @@ export interface UserProgress {
     anchoredFirebaseUid?: string | null;
     accessCode?: string; // Tuning Code for manual matching
     createdAt?: Timestamp; // Legacy support
+    milligrams?: number;
+    lastCoffeeSignalDay?: number;
+    lastCoffeeClaimedAt?: Timestamp;
+    lastFridgeSignalDay?: number;
+    lastFridgeClaimedAt?: Timestamp;
+    lastFridgeOutcome?: {
+        signalDay: number;
+        selectedSlot: number;
+        selectedItemName: string;
+        winningSlot: number;
+        winningItemName: string;
+        success: boolean;
+        milligramsAwarded: number;
+        message: string;
+    };
 }
 
 export interface DayLog {

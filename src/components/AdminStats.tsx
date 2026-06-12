@@ -9,7 +9,15 @@ import {
     getCountFromServer
 } from 'firebase/firestore';
 import { Activity, Users, Calendar, Image, FileText, AlertTriangle, Sparkles } from 'lucide-react';
-import type { DayLog } from '../types/schema';
+import type { CoherenceState, DayLog } from '../types/schema';
+
+const REQUIRED_LOG_STATES: CoherenceState[] = [
+    'FEED_STABLE',
+    'SYNC_RECOVERING',
+    'COHERENCE_FRAYING',
+    'SIGNAL_FRAGMENTED',
+    'CRITICAL_INTERFERENCE'
+];
 
 interface ObserverStats {
     total: number;
@@ -26,8 +34,17 @@ interface DayStats {
     missingLogs: number;
     missingFragments: number;
     missingImages: number;
+    missingReturnPacket: number;
+    incompleteLogSet: number;
+    missingEvidence: number;
+    completeRitualDays: number;
     avgLogs: number;
     avgFragments: number;
+}
+
+interface RitualIssue {
+    day: number;
+    missing: string[];
 }
 
 export const AdminStats: React.FC = () => {
@@ -45,9 +62,14 @@ export const AdminStats: React.FC = () => {
         missingLogs: 0,
         missingFragments: 0,
         missingImages: 0,
+        missingReturnPacket: 0,
+        incompleteLogSet: 0,
+        missingEvidence: 0,
+        completeRitualDays: 0,
         avgLogs: 0,
         avgFragments: 0
     });
+    const [ritualIssues, setRitualIssues] = useState<RitualIssue[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -89,14 +111,41 @@ export const AdminStats: React.FC = () => {
                 let missingLogs = 0;
                 let missingFragments = 0;
                 let missingImages = 0;
+                let missingReturnPacket = 0;
+                let incompleteLogSet = 0;
+                let missingEvidence = 0;
+                let completeRitualDays = 0;
                 let totalLogs = 0;
                 let totalFragments = 0;
+                const nextRitualIssues: RitualIssue[] = [];
 
                 days.forEach((day) => {
+                    const missing: string[] = [];
+                    const hasEntryPrologue = !!day.prologueSentences?.[0]?.trim();
+                    const hasReturnPacket = !!day.prologueSentences?.[1]?.trim();
+                    const hasAllLogs = REQUIRED_LOG_STATES.every(logState => !!day.vm_logs?.[logState]?.body?.trim());
+                    const hasFragments = !!day.fragments?.length;
+                    const hasEvidence = !!day.images?.some(image => !!image.url && !image.placeholder);
+
                     if (!day.prologueSentences || day.prologueSentences.length === 0) missingPrologue++;
                     if (!day.vm_logs || Object.keys(day.vm_logs).length === 0) missingLogs++;
                     if (!day.fragments || day.fragments.length === 0) missingFragments++;
                     if (!day.images || day.images.length === 0) missingImages++;
+                    if (!hasReturnPacket) missingReturnPacket++;
+                    if (!hasAllLogs) incompleteLogSet++;
+                    if (!hasEvidence) missingEvidence++;
+
+                    if (!hasEntryPrologue) missing.push('entry prologue');
+                    if (!hasReturnPacket) missing.push('return packet');
+                    if (!hasAllLogs) missing.push('five-state logs');
+                    if (!hasFragments) missing.push('fragments');
+                    if (!hasEvidence) missing.push('evidence');
+
+                    if (missing.length === 0) {
+                        completeRitualDays++;
+                    } else {
+                        nextRitualIssues.push({ day: day.day, missing });
+                    }
 
                     totalLogs += Object.keys(day.vm_logs || {}).length;
                     totalFragments += day.fragments?.length || 0;
@@ -110,9 +159,14 @@ export const AdminStats: React.FC = () => {
                     missingLogs,
                     missingFragments,
                     missingImages,
+                    missingReturnPacket,
+                    incompleteLogSet,
+                    missingEvidence,
+                    completeRitualDays,
                     avgLogs: totalDays > 0 ? Math.round(totalLogs / totalDays) : 0,
                     avgFragments: totalDays > 0 ? Math.round(totalFragments / totalDays) : 0
                 });
+                setRitualIssues(nextRitualIssues.sort((a, b) => a.day - b.day));
             } catch (error) {
                 console.error('Error fetching admin stats:', error);
             } finally {
@@ -204,6 +258,55 @@ export const AdminStats: React.FC = () => {
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm space-y-5">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 text-gray-900 font-semibold">
+                        <Sparkles size={18} className="text-gray-400" /> Ritual Coverage
+                    </div>
+                    <div className="text-xs font-medium text-gray-500">
+                        {loading ? '-' : `${dayStats.completeRitualDays}/${dayStats.totalDays}`} complete
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
+                    {[
+                        { label: 'Entry gaps', value: dayStats.missingPrologue },
+                        { label: 'Return gaps', value: dayStats.missingReturnPacket },
+                        { label: 'Log gaps', value: dayStats.incompleteLogSet },
+                        { label: 'Fragment gaps', value: dayStats.missingFragments },
+                        { label: 'Evidence gaps', value: dayStats.missingEvidence }
+                    ].map(item => (
+                        <div key={item.label} className="bg-gray-50 rounded-lg p-3">
+                            <div className="text-xs text-gray-500">{item.label}</div>
+                            <div className="text-lg font-bold text-gray-900">{loading ? '-' : item.value}</div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="border-t border-gray-100 pt-4">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Open Ritual Issues</div>
+                    {loading ? (
+                        <p className="text-sm text-gray-400">Checking coverage...</p>
+                    ) : ritualIssues.length === 0 ? (
+                        <p className="text-sm text-gray-500">All visible days have entry, return, log, fragment, and evidence coverage.</p>
+                    ) : (
+                        <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-100 divide-y divide-gray-100">
+                            {ritualIssues.slice(0, 16).map(issue => (
+                                <div key={issue.day} className="flex items-start justify-between gap-4 px-3 py-2 text-sm">
+                                    <span className="font-mono text-gray-700">Day {String(issue.day).padStart(3, '0')}</span>
+                                    <span className="text-right text-gray-500">{issue.missing.join(', ')}</span>
+                                </div>
+                            ))}
+                            {ritualIssues.length > 16 && (
+                                <div className="px-3 py-2 text-xs text-gray-400">
+                                    {ritualIssues.length - 16} additional days omitted from this view.
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 

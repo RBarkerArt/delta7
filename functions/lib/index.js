@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.pruneStaleUsers = exports.migrateProloguesToDays = exports.generateNarrativeContent = exports.recoverSignal = exports.assignFrequency = exports.deleteUserData = exports.generateResizedImage = exports.sendAnchorWelcome = exports.onNewVisitor = void 0;
+exports.discoverRoom = exports.claimDailyPresence = exports.tuneRelay = exports.pruneStaleUsers = exports.migrateProloguesToDays = exports.generateNarrativeContent = exports.claimBreakRoomFridge = exports.claimBreakRoomCoffee = exports.recoverSignal = exports.assignFrequency = exports.deleteUserData = exports.generateResizedImage = exports.sendAnchorWelcome = exports.onNewVisitor = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 const path = __importStar(require("path"));
@@ -216,10 +216,13 @@ exports.sendAnchorWelcome = (0, https_1.onCall)({
     </head>
     <body>
         <div class="container">
-            <div class="header">TRANS_STATUS: ENCRYPTED // OBS_LOG_000</div>
+            <div class="header">TRANS_STATUS: ANCHORED // OBS_LOG_000</div>
             <div class="body">
-                ObsLog: 
-                Observer recorded. The coherence began to stabilize. Your presence makes an impact. Purpose is the variable i cannot track. It can only be measured from the presence of you.
+                Observer record anchored.
+
+                The same signal can now be recovered from another surface. No additional access has opened. The archive remains unchanged.
+
+                The room will remember this identifier. That is the only adjustment.
             </div>
             <div class="signature">
                 Dr. Kael
@@ -234,7 +237,7 @@ exports.sendAnchorWelcome = (0, https_1.onCall)({
         from: '"Delta-7 System" <purpose@delta7project.com>',
         to: email,
         subject: "TRANS_SIGNAL: Identity Anchored",
-        text: `ObsLog: Observer recorded. The coherence began to stabilize. Your presence makes an impact. Purpose is the variable i cannot track. It can only be measured from the presence of you.\n\nDr. Kael\nEnd Transmission`,
+        text: `Observer record anchored.\n\nThe same signal can now be recovered from another surface. No additional access has opened. The archive remains unchanged.\n\nThe room will remember this identifier. That is the only adjustment.\n\nDr. Kael\nEnd Transmission`,
         html: htmlContent
     };
     try {
@@ -445,6 +448,217 @@ exports.recoverSignal = (0, https_1.onCall)({
         console.error('Signal Recovery Failed:', err);
         throw new https_1.HttpsError('internal', 'Signal recovery failed');
     }
+});
+const round2 = (num) => parseFloat(Math.max(0, num).toFixed(2));
+const DEFAULT_FRIDGE_ITEMS = [
+    { slot: 1, name: "Soda", milligramValue: 1.42, snarkyMessage: "The soda is mostly static and regret.", correctMessage: "A cold soda rolls forward like it was waiting for you." },
+    { slot: 2, name: "Sandwich", milligramValue: 2.84, snarkyMessage: "The sandwich has filed a formal complaint.", correctMessage: "Somehow, this sandwich still looks structurally sound." },
+    { slot: 3, name: "Milk", milligramValue: 1.42, snarkyMessage: "The milk declines to participate.", correctMessage: "The milk carton hums at a reassuring frequency." },
+    { slot: 4, name: "Deli Meat", milligramValue: 2.84, snarkyMessage: "A brave choice. Not a wise one.", correctMessage: "The deli meat packet is sealed, labeled, and only mildly suspicious." },
+    { slot: 5, name: "Sliced Cheese", milligramValue: 1.42, snarkyMessage: "The cheese square bends away from your expectations.", correctMessage: "A perfect square of cheese. Geometry has smiled on you." },
+    { slot: 6, name: "Apple", milligramValue: 1.42, snarkyMessage: "The apple is decorative. Emotionally, if not legally.", correctMessage: "The apple is crisp enough to feel like a small victory." },
+    { slot: 7, name: "Orange", milligramValue: 1.42, snarkyMessage: "The orange refuses to explain itself.", correctMessage: "The orange smells like daylight found a loophole." },
+    { slot: 8, name: "Ketchup", milligramValue: 1.42, snarkyMessage: "Ketchup alone is not lunch. The room is concerned.", correctMessage: "The ketchup packet lands with impossible confidence." },
+    { slot: 9, name: "Mayonnaise", milligramValue: 1.42, snarkyMessage: "The mayonnaise makes eye contact first. This is not ideal.", correctMessage: "The mayonnaise is cold, sealed, and quietly triumphant." },
+    { slot: 10, name: "Broccoli", milligramValue: 2.84, snarkyMessage: "The broccoli knows what you did and remains unimpressed.", correctMessage: "The broccoli is shockingly fresh. Suspicious, but fresh." },
+];
+const DEFAULT_BREAK_ROOM_CONFIG = {
+    unitLabel: "mg",
+    coffeeValue: 1.42,
+    fridgeOutOfOrderMessage: "Refrigerator is out of order. Maintenance will have it working tomorrow.",
+    fridgeCorrectMessage: "Correct shelf. Correct signal.",
+    fridgeWrongMessage: "That was a choice. The refrigerator has logged it.",
+    fridgeItems: DEFAULT_FRIDGE_ITEMS,
+};
+const getStringValue = (value, fallback) => {
+    if (typeof value !== "string")
+        return fallback;
+    const trimmed = value.trim();
+    return trimmed || fallback;
+};
+const getNumberValue = (value, fallback) => (typeof value === "number" && Number.isFinite(value) ? value : fallback);
+const normalizeBreakRoomFunctionConfig = (data) => {
+    const rawItems = Array.isArray(data === null || data === void 0 ? void 0 : data.fridgeItems) ? data.fridgeItems : [];
+    const fridgeItems = DEFAULT_FRIDGE_ITEMS.map((fallback, index) => {
+        const rawItem = rawItems.find((entry) => (typeof entry === "object" &&
+            entry !== null &&
+            getNumberValue(entry.slot, 0) === fallback.slot)) || rawItems[index];
+        const item = typeof rawItem === "object" && rawItem !== null ? rawItem : {};
+        return {
+            slot: fallback.slot,
+            name: getStringValue(item.name, fallback.name),
+            milligramValue: round2(getNumberValue(item.milligramValue, fallback.milligramValue)),
+            snarkyMessage: getStringValue(item.snarkyMessage, fallback.snarkyMessage),
+            correctMessage: getStringValue(item.correctMessage, fallback.correctMessage),
+        };
+    });
+    return {
+        unitLabel: getStringValue(data === null || data === void 0 ? void 0 : data.unitLabel, DEFAULT_BREAK_ROOM_CONFIG.unitLabel),
+        coffeeValue: round2(getNumberValue(data === null || data === void 0 ? void 0 : data.coffeeValue, DEFAULT_BREAK_ROOM_CONFIG.coffeeValue)),
+        fridgeOutOfOrderMessage: getStringValue(data === null || data === void 0 ? void 0 : data.fridgeOutOfOrderMessage, DEFAULT_BREAK_ROOM_CONFIG.fridgeOutOfOrderMessage),
+        fridgeCorrectMessage: getStringValue(data === null || data === void 0 ? void 0 : data.fridgeCorrectMessage, DEFAULT_BREAK_ROOM_CONFIG.fridgeCorrectMessage),
+        fridgeWrongMessage: getStringValue(data === null || data === void 0 ? void 0 : data.fridgeWrongMessage, DEFAULT_BREAK_ROOM_CONFIG.fridgeWrongMessage),
+        fridgeItems,
+    };
+};
+const getValidatedVisitorId = (value) => {
+    if (typeof value !== "string" || value.trim().length < 8 || value.trim().length > 128) {
+        throw new https_1.HttpsError("invalid-argument", "Valid visitorId required.");
+    }
+    return value.trim();
+};
+const assertObserverAccess = async (uid, visitorId) => {
+    var _a, _b;
+    const db = admin.firestore();
+    const observerRef = db.collection("observers").doc(visitorId);
+    const mappingSnap = await db.collection("firebase_uid_mapping").doc(uid).get();
+    if (mappingSnap.exists && ((_a = mappingSnap.data()) === null || _a === void 0 ? void 0 : _a.visitorId) === visitorId) {
+        return observerRef;
+    }
+    const observerSnap = await observerRef.get();
+    if (observerSnap.exists && ((_b = observerSnap.data()) === null || _b === void 0 ? void 0 : _b.anchoredFirebaseUid) === uid) {
+        return observerRef;
+    }
+    throw new https_1.HttpsError("permission-denied", "Observer record mismatch.");
+};
+const getSignalDay = (observer) => {
+    const day = getNumberValue(observer.dayProgress, 1);
+    return Math.max(1, Math.round(day));
+};
+const hashString = (value) => {
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i += 1) {
+        hash ^= value.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+};
+const getWinningFridgeSlot = (visitorId, signalDay) => (hashString(`${visitorId}:${signalDay}:break-room-fridge`) % 10 + 1);
+exports.claimBreakRoomCoffee = (0, https_1.onCall)({}, async (request) => {
+    var _a;
+    if (!request.auth)
+        throw new https_1.HttpsError("unauthenticated", "Auth required");
+    await enforceRateLimit(`breakRoomCoffee:${request.auth.uid}`, 30, 60 * 60 * 1000);
+    const visitorId = getValidatedVisitorId((_a = request.data) === null || _a === void 0 ? void 0 : _a.visitorId);
+    const db = admin.firestore();
+    const observerRef = await assertObserverAccess(request.auth.uid, visitorId);
+    const configSnap = await db.collection("break_room_config").doc("main").get();
+    const config = normalizeBreakRoomFunctionConfig(configSnap.exists ? configSnap.data() : undefined);
+    let response = null;
+    await db.runTransaction(async (tx) => {
+        const observerSnap = await tx.get(observerRef);
+        if (!observerSnap.exists) {
+            throw new https_1.HttpsError("not-found", "Observer record unavailable.");
+        }
+        const observer = observerSnap.data() || {};
+        const signalDay = getSignalDay(observer);
+        const currentTotal = round2(getNumberValue(observer.milligrams, 0));
+        const lastCoffeeSignalDay = Math.round(getNumberValue(observer.lastCoffeeSignalDay, 0));
+        if (lastCoffeeSignalDay === signalDay) {
+            response = {
+                success: false,
+                alreadyClaimed: true,
+                message: "The pot is warm, empty, and pretending not to notice you.",
+                milligrams: currentTotal,
+                awarded: 0,
+                unitLabel: config.unitLabel,
+            };
+            return;
+        }
+        const nextTotal = round2(currentTotal + config.coffeeValue);
+        tx.update(observerRef, {
+            milligrams: nextTotal,
+            lastCoffeeSignalDay: signalDay,
+            lastCoffeeClaimedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        response = {
+            success: true,
+            alreadyClaimed: false,
+            message: `Coffee poured. ${config.coffeeValue} ${config.unitLabel} recorded.`,
+            milligrams: nextTotal,
+            awarded: config.coffeeValue,
+            unitLabel: config.unitLabel,
+        };
+    });
+    if (!response)
+        throw new https_1.HttpsError("internal", "Coffee claim did not resolve.");
+    return response;
+});
+exports.claimBreakRoomFridge = (0, https_1.onCall)({}, async (request) => {
+    var _a, _b;
+    if (!request.auth)
+        throw new https_1.HttpsError("unauthenticated", "Auth required");
+    await enforceRateLimit(`breakRoomFridge:${request.auth.uid}`, 30, 60 * 60 * 1000);
+    const visitorId = getValidatedVisitorId((_a = request.data) === null || _a === void 0 ? void 0 : _a.visitorId);
+    const selectedSlot = getNumberValue((_b = request.data) === null || _b === void 0 ? void 0 : _b.selectedSlot, 0);
+    if (!Number.isInteger(selectedSlot) || selectedSlot < 1 || selectedSlot > 10) {
+        throw new https_1.HttpsError("invalid-argument", "selectedSlot must be 1-10.");
+    }
+    const db = admin.firestore();
+    const observerRef = await assertObserverAccess(request.auth.uid, visitorId);
+    const configSnap = await db.collection("break_room_config").doc("main").get();
+    const config = normalizeBreakRoomFunctionConfig(configSnap.exists ? configSnap.data() : undefined);
+    let response = null;
+    await db.runTransaction(async (tx) => {
+        const observerSnap = await tx.get(observerRef);
+        if (!observerSnap.exists) {
+            throw new https_1.HttpsError("not-found", "Observer record unavailable.");
+        }
+        const observer = observerSnap.data() || {};
+        const signalDay = getSignalDay(observer);
+        const currentTotal = round2(getNumberValue(observer.milligrams, 0));
+        const lastFridgeSignalDay = Math.round(getNumberValue(observer.lastFridgeSignalDay, 0));
+        if (lastFridgeSignalDay === signalDay) {
+            response = {
+                success: false,
+                alreadyClaimed: true,
+                message: config.fridgeOutOfOrderMessage,
+                milligrams: currentTotal,
+                awarded: 0,
+                unitLabel: config.unitLabel,
+            };
+            return;
+        }
+        const winningSlot = getWinningFridgeSlot(visitorId, signalDay);
+        const selectedItem = config.fridgeItems[selectedSlot - 1];
+        const winningItem = config.fridgeItems[winningSlot - 1];
+        const success = selectedSlot === winningSlot;
+        const awarded = success ? selectedItem.milligramValue : 0;
+        const nextTotal = round2(currentTotal + awarded);
+        const message = success
+            ? selectedItem.correctMessage || config.fridgeCorrectMessage
+            : selectedItem.snarkyMessage || config.fridgeWrongMessage;
+        tx.update(observerRef, {
+            milligrams: nextTotal,
+            lastFridgeSignalDay: signalDay,
+            lastFridgeClaimedAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastFridgeOutcome: {
+                signalDay,
+                selectedSlot,
+                selectedItemName: selectedItem.name,
+                winningSlot,
+                winningItemName: winningItem.name,
+                success,
+                milligramsAwarded: awarded,
+                message,
+            },
+        });
+        response = {
+            success,
+            alreadyClaimed: false,
+            message,
+            milligrams: nextTotal,
+            awarded,
+            unitLabel: config.unitLabel,
+            selectedSlot,
+            winningSlot,
+            selectedItemName: selectedItem.name,
+            winningItemName: winningItem.name,
+        };
+    });
+    if (!response)
+        throw new https_1.HttpsError("internal", "Refrigerator claim did not resolve.");
+    return response;
 });
 // Interface for the expected AI response structure
 exports.generateNarrativeContent = (0, https_1.onCall)({
@@ -714,5 +928,339 @@ exports.pruneStaleUsers = (0, https_1.onCall)({
         console.error("Prune failed:", err);
         throw new https_1.HttpsError("internal", "Prune process failed.");
     }
+});
+exports.tuneRelay = (0, https_1.onCall)({}, async (request) => {
+    var _a, _b;
+    if (!request.auth)
+        throw new https_1.HttpsError("unauthenticated", "Auth required");
+    await enforceRateLimit(`tuneRelay:${request.auth.uid}`, 60, 60 * 1000);
+    const visitorId = getValidatedVisitorId((_a = request.data) === null || _a === void 0 ? void 0 : _a.visitorId);
+    const tuningType = (_b = request.data) === null || _b === void 0 ? void 0 : _b.tuningType; // 'inspect' | 'tune' | 'overtune'
+    if (tuningType !== 'inspect' && tuningType !== 'tune' && tuningType !== 'overtune') {
+        throw new https_1.HttpsError("invalid-argument", "tuningType must be inspect, tune, or overtune.");
+    }
+    const db = admin.firestore();
+    const observerRef = await assertObserverAccess(request.auth.uid, visitorId);
+    const signalsCol = db.collection("system").doc("cartography").collection("tuning_signals");
+    // Self-healing check: Seed default signals if collection is empty
+    const checkEmpty = await signalsCol.limit(1).get();
+    if (checkEmpty.empty) {
+        const defaultSignals = [
+            {
+                id: "sig_001",
+                type: "verified",
+                category: "label",
+                title: "Archive Wing",
+                text: "Status: detected. Door count inconsistent. Paper movement recorded behind sealed wall."
+            },
+            {
+                id: "sig_002",
+                type: "verified",
+                category: "object",
+                title: "Wall Map",
+                text: "The map does not update when watched. It waits until the room is empty."
+            },
+            {
+                id: "sig_003",
+                type: "verified",
+                category: "marginalia",
+                title: "Drawing Hallways",
+                text: "I keep drawing the same hallway wrong. Not incorrectly. Wrong in the same way every time."
+            },
+            {
+                id: "sig_004",
+                type: "verified",
+                category: "label",
+                title: "Hydroponic Corridor",
+                text: "Status: humidity detected behind sealed concrete."
+            },
+            {
+                id: "sig_005",
+                type: "verified",
+                category: "marginalia",
+                title: "Observer Weight",
+                text: "The observer does not repair the room. That was my first mistake. The observer gives the room a reason to hold its shape."
+            },
+            {
+                id: "sig_006",
+                type: "verified",
+                category: "object",
+                title: "Coffee Mug",
+                text: "Ceramic mass unchanged. Contents refreshed without visible source. Taste profile: regret, burnt sugar, old wiring."
+            },
+            {
+                id: "sig_007",
+                type: "verified",
+                category: "label",
+                title: "Sleep Quarters",
+                text: "Status: one cot registered as occupied."
+            },
+            {
+                id: "unv_001",
+                type: "unverified",
+                category: "route",
+                title: "Denied Route",
+                text: "There is a route between the Break Room and the Observation Cell that neither room admits exists."
+            },
+            {
+                id: "unv_002",
+                type: "unverified",
+                category: "marginalia",
+                title: "Temporal Marginalia",
+                text: "Kael wrote this note tomorrow. He was sorry before he knew why."
+            },
+            {
+                id: "unv_003",
+                type: "unverified",
+                category: "deadzone",
+                title: "Name Request",
+                text: "The empty channel asked for your name. The system did not answer."
+            },
+            {
+                id: "unv_004",
+                type: "unverified",
+                category: "deadzone",
+                title: "Breathing Echo",
+                text: "DEAD ZONE RETURN 03. No image recovered. Audio suggests breathing or ventilation. System cannot distinguish."
+            },
+            {
+                id: "unv_005",
+                type: "unverified",
+                category: "route",
+                title: "Unexpected Steps",
+                text: "ROUTE TRACE RECOVERED. Observation Cell → Break Room → Signal Cartography. Additional step detected: Corridor 7-B. Observer denies movement. System believes observer."
+            },
+            {
+                id: "unv_006",
+                type: "unverified",
+                category: "deadzone",
+                title: "Empty Places",
+                text: "Dead Zone is not empty. Empty places do not wait."
+            },
+            {
+                id: "unv_007",
+                type: "unverified",
+                category: "object",
+                title: "Facility Map Object",
+                text: "Board predates the room. Ink is newer than the board."
+            }
+        ];
+        const batch = db.batch();
+        for (const sig of defaultSignals) {
+            batch.set(signalsCol.doc(sig.id), Object.assign(Object.assign({}, sig), { createdAt: admin.firestore.FieldValue.serverTimestamp() }));
+        }
+        await batch.commit();
+    }
+    const inspectOutcomes = [
+        "The relay coil is cold. It hums at 1.42Hz, vibrating the casing slightly.",
+        "A faint carrier wave is active. No coherent data is modulating the signal.",
+        "Tuning dial is locked to the local cartography frequency. Sector is quiet.",
+        "Relay temp is nominal. Power grid load is 12%."
+    ];
+    let response = null;
+    await db.runTransaction(async (tx) => {
+        const observerSnap = await tx.get(observerRef);
+        if (!observerSnap.exists) {
+            throw new https_1.HttpsError("not-found", "Observer record unavailable.");
+        }
+        const observer = observerSnap.data() || {};
+        const signalDay = getSignalDay(observer);
+        const currentTotal = round2(getNumberValue(observer.milligrams, 0));
+        const cost = tuningType === 'tune' ? 4.26 : tuningType === 'overtune' ? 9.94 : 0;
+        if (cost > 0 && currentTotal < cost) {
+            throw new https_1.HttpsError("failed-precondition", "Insufficient residue mass balance.");
+        }
+        const lastTuningSignalDay = Math.round(getNumberValue(observer.lastTuningSignalDay, 0));
+        if (cost > 0 && lastTuningSignalDay === signalDay) {
+            throw new https_1.HttpsError("failed-precondition", "Daily tuning capacity reached for this signal day.");
+        }
+        let selectedMessage = "";
+        let chosenSignal = null;
+        let elapsed = "";
+        if (tuningType === 'inspect') {
+            const outcomesList = inspectOutcomes;
+            const seedStr = `${visitorId}:${signalDay}:inspect`;
+            let hash = 0;
+            for (let i = 0; i < seedStr.length; i++) {
+                hash = (hash << 5) - hash + seedStr.charCodeAt(i);
+                hash |= 0;
+            }
+            const index = Math.abs(hash) % outcomesList.length;
+            selectedMessage = outcomesList[index];
+        }
+        else {
+            // Retrieve signals from DB
+            const typeQuery = tuningType === 'tune' ? 'verified' : 'unverified';
+            const allMatchingSnap = await tx.get(signalsCol.where('type', '==', typeQuery));
+            const allMatching = allMatchingSnap.docs.map(d => (Object.assign({ id: d.id }, d.data())));
+            if (allMatching.length === 0) {
+                throw new https_1.HttpsError("internal", "No signals available in the database.");
+            }
+            const recoveredIds = observer.recoveredItems || [];
+            const available = allMatching.filter(sig => {
+                const itemKey = tuningType === 'tune' ? `signal:${sig.id}` : `unverified:${sig.id}`;
+                return !recoveredIds.includes(itemKey);
+            });
+            if (available.length > 0) {
+                const seedStr = `${visitorId}:${signalDay}:${tuningType}:${recoveredIds.length}`;
+                let hash = 0;
+                for (let i = 0; i < seedStr.length; i++) {
+                    hash = (hash << 5) - hash + seedStr.charCodeAt(i);
+                    hash |= 0;
+                }
+                const index = Math.abs(hash) % available.length;
+                chosenSignal = available[index];
+            }
+            else {
+                // All signals recovered, fallback to random repeat
+                const index = Math.floor(Math.random() * allMatching.length);
+                chosenSignal = allMatching[index];
+            }
+            selectedMessage = chosenSignal.text;
+            elapsed = (0.5 + Math.random() * 1.5).toFixed(1) + "s";
+        }
+        const nextTotal = round2(currentTotal - cost);
+        const updates = {
+            milligrams: nextTotal
+        };
+        if (cost > 0 && chosenSignal) {
+            updates.lastTuningSignalDay = signalDay;
+            updates.lastTuningClaimedAt = admin.firestore.FieldValue.serverTimestamp();
+            updates.lastTuningOutcome = {
+                tuningType,
+                cost,
+                message: selectedMessage,
+                signalId: chosenSignal.id,
+                signalTitle: chosenSignal.title,
+                signalCategory: chosenSignal.category,
+                elapsed,
+                timestamp: new Date()
+            };
+            // Add chosen signal to user's recoveredItems
+            const recoveryId = tuningType === 'tune' ? `signal:${chosenSignal.id}` : `unverified:${chosenSignal.id}`;
+            const recoveredIds = observer.recoveredItems || [];
+            if (!recoveredIds.includes(recoveryId)) {
+                updates.recoveredItems = [...recoveredIds, recoveryId];
+            }
+            // Write atomics into observer_tuning_logs
+            const logRef = db.collection("observer_tuning_logs").doc();
+            tx.set(logRef, {
+                observerId: visitorId,
+                tuningType,
+                cost,
+                signalId: chosenSignal.id,
+                title: chosenSignal.title,
+                text: chosenSignal.text,
+                elapsed,
+                dayProgress: signalDay,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        tx.update(observerRef, updates);
+        response = Object.assign({ success: true, message: selectedMessage, milligrams: nextTotal, tuningType }, (chosenSignal ? {
+            signalId: chosenSignal.id,
+            signalTitle: chosenSignal.title,
+            signalCategory: chosenSignal.category,
+            elapsed
+        } : {}));
+    });
+    if (!response)
+        throw new https_1.HttpsError("internal", "Relay tuning did not resolve.");
+    return response;
+});
+exports.claimDailyPresence = (0, https_1.onCall)({}, async (request) => {
+    var _a;
+    if (!request.auth)
+        throw new https_1.HttpsError("unauthenticated", "Auth required");
+    await enforceRateLimit(`claimDailyPresence:${request.auth.uid}`, 60, 60 * 1000);
+    const visitorId = getValidatedVisitorId((_a = request.data) === null || _a === void 0 ? void 0 : _a.visitorId);
+    const db = admin.firestore();
+    const observerRef = await assertObserverAccess(request.auth.uid, visitorId);
+    let response = null;
+    await db.runTransaction(async (tx) => {
+        const observerSnap = await tx.get(observerRef);
+        if (!observerSnap.exists) {
+            throw new https_1.HttpsError("not-found", "Observer record unavailable.");
+        }
+        const observer = observerSnap.data() || {};
+        const signalDay = getSignalDay(observer);
+        const lastDailyReturnDay = Math.round(getNumberValue(observer.lastDailyReturnDay, 0));
+        const currentTotal = round2(getNumberValue(observer.milligrams, 0));
+        if (signalDay <= lastDailyReturnDay) {
+            response = {
+                success: false,
+                message: "Daily presence already processed for today.",
+                milligrams: currentTotal,
+                awarded: 0
+            };
+            return;
+        }
+        const dayDelta = signalDay - lastDailyReturnDay;
+        const awarded = round2(2.84 * dayDelta);
+        const nextTotal = round2(currentTotal + awarded);
+        tx.update(observerRef, {
+            milligrams: nextTotal,
+            lastDailyReturnDay: signalDay,
+            lastDailyReturnClaimedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        response = {
+            success: true,
+            message: `Daily return processed. +${awarded} mg Residue Mass recorded.`,
+            milligrams: nextTotal,
+            awarded
+        };
+    });
+    if (!response)
+        throw new https_1.HttpsError("internal", "Daily return did not resolve.");
+    return response;
+});
+exports.discoverRoom = (0, https_1.onCall)({}, async (request) => {
+    var _a, _b;
+    if (!request.auth)
+        throw new https_1.HttpsError("unauthenticated", "Auth required");
+    await enforceRateLimit(`discoverRoom:${request.auth.uid}`, 60, 60 * 1000);
+    const visitorId = getValidatedVisitorId((_a = request.data) === null || _a === void 0 ? void 0 : _a.visitorId);
+    const room = (_b = request.data) === null || _b === void 0 ? void 0 : _b.room;
+    if (room !== 'lab' && room !== 'break-room' && room !== 'signal-cartography') {
+        throw new https_1.HttpsError("invalid-argument", "Invalid room identifier.");
+    }
+    const db = admin.firestore();
+    const observerRef = await assertObserverAccess(request.auth.uid, visitorId);
+    let response = null;
+    await db.runTransaction(async (tx) => {
+        const observerSnap = await tx.get(observerRef);
+        if (!observerSnap.exists) {
+            throw new https_1.HttpsError("not-found", "Observer record unavailable.");
+        }
+        const observer = observerSnap.data() || {};
+        const recoveredIds = observer.recoveredItems || [];
+        const currentTotal = round2(getNumberValue(observer.milligrams, 0));
+        const discoveryId = `room:discovered:${room}`;
+        if (recoveredIds.includes(discoveryId)) {
+            response = {
+                success: false,
+                message: "Room already discovered.",
+                milligrams: currentTotal,
+                awarded: 0
+            };
+            return;
+        }
+        const awarded = 4.26;
+        const nextTotal = round2(currentTotal + awarded);
+        const nextRecoveredItems = [...recoveredIds, discoveryId];
+        tx.update(observerRef, {
+            milligrams: nextTotal,
+            recoveredItems: nextRecoveredItems
+        });
+        response = {
+            success: true,
+            message: `New sector entry confirmed. +${awarded} mg Residue Mass surge.`,
+            milligrams: nextTotal,
+            awarded
+        };
+    });
+    if (!response)
+        throw new https_1.HttpsError("internal", "Room discovery did not resolve.");
+    return response;
 });
 //# sourceMappingURL=index.js.map

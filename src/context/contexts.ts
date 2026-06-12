@@ -1,7 +1,7 @@
 import { createContext } from 'react';
 import type { User } from 'firebase/auth';
 import type { AuthUser } from '../context/AuthContext';
-import type { CoherenceState } from '../types/schema';
+import type { CoherenceState, ReturnSignalReport } from '../types/schema';
 
 export interface AuthContextType {
     user: AuthUser | null;
@@ -16,7 +16,7 @@ export interface AuthContextType {
     clearMigration: () => void;
     isAuthorizing: boolean;
     visitorId: string | null;
-    anchorIdentity: (method: 'google' | 'email', payload?: any) => Promise<void>;
+    anchorIdentity: (method: 'google' | 'email', payload?: { email: string; password: string }) => Promise<void>;
     recoverSession: (code: string) => Promise<void>;
 }
 
@@ -28,13 +28,17 @@ export interface CoherenceContextType {
     loading: boolean;
     user: User | null;
     currentDay: number;
+    nextDayAt: number | null;
+    arrivalDayDelta: number;
+    returnSignal: ReturnSignalReport | null;
     isAnchored: boolean;
-    isAdmin: boolean;
     isGlitching: boolean; // True during day transition animation
-    setScore: (score: number) => void;
-    setCurrentDay: (day: number) => void;
+    recoveredItems: string[];
+    markRecovered: (id: string) => Promise<void>;
+    markRecoveredMany: (ids: string[]) => Promise<void>;
     ensureUser: () => Promise<AuthUser>;
     accessCode: string | null;
+    discoverRoom: (roomName: string) => Promise<{ success: boolean; message: string; milligrams: number; awarded: number } | null>;
 }
 
 export const CoherenceContext = createContext<CoherenceContextType | undefined>(undefined);
