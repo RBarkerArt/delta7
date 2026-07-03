@@ -1,6 +1,7 @@
 import React from 'react';
 import { Archive, KeyRound, Radio, ShieldAlert, ShieldCheck } from 'lucide-react';
 import type { CoherenceState } from '../types/schema';
+import { DecodeText } from './ui/DecodeText';
 
 interface SecurityGatewayPanelProps {
     accessCode: string | null;
@@ -30,7 +31,11 @@ export const SecurityGatewayPanel: React.FC<SecurityGatewayPanelProps> = ({
                     <KeyRound size={18} className="mb-3 text-emerald-100/75" />
                     <div className="text-[10px] uppercase tracking-[0.2em] text-[#f7f1dc]/62">Recovery Frequency</div>
                     <div className="mt-2 text-lg font-semibold tracking-[0.16em] text-[#fff7df]">
-                        {accessCode || 'ASSIGNING'}
+                        {accessCode ? (
+                            <DecodeText text={accessCode} speed={55} startDelay={350} />
+                        ) : (
+                            <span className="animate-pulse">ASSIGNING</span>
+                        )}
                     </div>
                 </div>
 

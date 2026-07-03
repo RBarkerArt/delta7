@@ -7,6 +7,58 @@
     <title>Delta 7 Project</title>
   </head>
   <body>
+    <script>
+      // Mobile room navigation reload: raise a black telemetry veil before
+      // first paint so the reload reads as a feed relink, not a page load.
+      // The React entry overlay removes it by id once it has mounted.
+      (function () {
+        try {
+          var raw = sessionStorage.getItem('delta7_mobile_room_navigation');
+          if (!raw) return;
+
+          var from = '';
+          var to = '';
+          if (raw !== '1') {
+            var data = JSON.parse(raw);
+            if (!data || data.v !== 1) return;
+            from = typeof data.from === 'string' ? data.from : '';
+            to = typeof data.to === 'string' ? data.to : '';
+          }
+
+          var veil = document.createElement('div');
+          veil.id = 'd7-relink-veil';
+          veil.setAttribute('aria-hidden', 'true');
+          veil.style.cssText =
+            'position:fixed;inset:0;z-index:2147483647;background:#050505;' +
+            'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;' +
+            'font-family:"Courier New",Courier,monospace;pointer-events:none;';
+
+          var line = document.createElement('div');
+          line.style.cssText =
+            'color:rgba(110,231,183,0.62);font-size:10px;letter-spacing:0.28em;text-transform:uppercase;';
+          line.textContent = from && to ? 'LEAVING ' + from + ' // SECTOR: ' + to : 'RELINKING FEED…';
+          veil.appendChild(line);
+
+          if (from && to) {
+            var sub = document.createElement('div');
+            sub.style.cssText =
+              'color:rgba(110,231,183,0.35);font-size:9px;letter-spacing:0.3em;text-transform:uppercase;';
+            sub.textContent = 'RELINKING FEED…';
+            veil.appendChild(sub);
+          }
+
+          document.body.appendChild(veil);
+
+          // Never strand a black screen if the app fails to consume the flag.
+          setTimeout(function () {
+            var el = document.getElementById('d7-relink-veil');
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+          }, 10000);
+        } catch (e) {
+          /* sessionStorage unavailable or malformed payload: skip the veil */
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

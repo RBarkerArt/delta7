@@ -1,5 +1,19 @@
 import React, { useMemo } from 'react';
 import { SignalIcon, type SignalIconName } from './SignalIcon';
+import { soundEngine } from '../lib/SoundEngine';
+
+// Module-level throttle so rapid hovers across many hotspots stay sparse.
+let lastHoverPlay = 0;
+const HOVER_THROTTLE_MS = 150;
+
+const playHoverTick = () => {
+  if (typeof window === 'undefined') return;
+  if (!window.matchMedia('(pointer: fine)').matches) return;
+  const now = performance.now();
+  if (now - lastHoverPlay < HOVER_THROTTLE_MS) return;
+  lastHoverPlay = now;
+  soundEngine.playHotspotHover();
+};
 
 export type HotspotState = 'available' | 'used' | 'locked' | 'new' | 'corrupted';
 
@@ -108,6 +122,7 @@ export const HotspotButton: React.FC<HotspotButtonProps> = ({
     <button
       type="button"
       onClick={handleButtonClick}
+      onPointerEnter={playHoverTick}
       onPointerDown={onPointerDown}
       onPointerCancel={onPointerCancel}
       style={{

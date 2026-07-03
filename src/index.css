@@ -8,6 +8,10 @@
   :root {
     /* Default Green (Signal) - RGB components for opacity support */
     --signal-color: 51 255 0;
+    /* Motion policy: keyframes multiply by these so reduced-motion collapses
+       movement/fx to calm opacity fades instead of 1ms snaps. */
+    --motion-scale: 1;
+    --fx-scale: 1;
   }
 
   body.theme-amber {
@@ -32,6 +36,27 @@ body {
   min-height: 100%;
   background-color: #050505;
   cursor: crosshair;
+}
+
+html {
+  overscroll-behavior: none;
+  /* body height can collapse while the room is loading (its content is
+     absolutely positioned) — paint the root dark so no load gap ever
+     flashes white. */
+  background-color: #050505;
+}
+
+/* Progressive enhancement: cross-fade full-page navigations (mobile room
+   reloads) in browsers that support view transitions. */
+@view-transition {
+  navigation: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-scale: 0;
+    --fx-scale: 0;
+  }
 }
 
 body {
@@ -875,12 +900,17 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Calm tier: transform/glitch animations off, but the flash eases out as a
+     plain opacity fade instead of snapping. */
   .room-transition-source-shifting,
   .room-transition-glitch,
   .room-transition-glitch::after,
-  .room-transition-scan,
-  .room-transition-flash {
+  .room-transition-scan {
     animation: none;
+  }
+
+  .room-transition-flash {
+    animation: calm-fade-out 320ms ease-out both;
   }
 }
 
@@ -1019,6 +1049,236 @@ body {
 @keyframes radar-sweep {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ========== ROOM MODAL CHOREOGRAPHY ========== */
+@keyframes room-modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes room-modal-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes room-modal-panel-in {
+  from {
+    opacity: 0;
+    transform: perspective(1100px) rotateX(5deg) scale(0.955) translateY(14px);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: perspective(1100px) rotateX(0deg) scale(1) translateY(0);
+  }
+}
+
+@keyframes room-modal-panel-out {
+  from {
+    opacity: 1;
+    transform: perspective(1100px) rotateX(0deg) scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: perspective(1100px) rotateX(3deg) scale(0.965) translateY(8px);
+  }
+}
+
+@keyframes room-modal-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes room-modal-boot-line {
+  0% { top: 0; opacity: 0; }
+  8% { opacity: 0.9; }
+  85% { opacity: 0.7; }
+  100% { top: 100%; opacity: 0; }
+}
+
+.room-modal-backdrop-enter {
+  animation: room-modal-backdrop-in 260ms ease-out both;
+}
+
+.room-modal-backdrop-exit {
+  animation: room-modal-backdrop-out 170ms ease-in both;
+}
+
+.room-modal-panel-enter {
+  animation: room-modal-panel-in 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ---- Per-variant modal materiality (C4) ---- */
+/* Paper panels settle in gentler: pure scale, no rotateX snap. */
+@keyframes room-modal-panel-in-paper {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(10px);
+  }
+  60% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.room-modal-panel-enter:has([data-material='paper']) {
+  animation: room-modal-panel-in-paper 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Instrument panels: brief emerald CRT bloom on open that settles. */
+@keyframes room-modal-instrument-bloom {
+  0% {
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.72), 0 0 8px rgba(16, 185, 129, 0);
+  }
+  35% {
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.72), 0 0 46px rgba(16, 185, 129, 0.55);
+  }
+  100% {
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.72), 0 0 42px rgba(242, 234, 208, 0.06);
+  }
+}
+
+[data-material='instrument'].room-modal-material {
+  animation: room-modal-instrument-bloom 180ms ease-out 1 both;
+}
+
+/* Paper-grain overlay: inline feTurbulence noise, sits above the panel content. */
+[data-material='paper'].room-modal-material::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  z-index: 20;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.room-modal-panel-exit {
+  animation: room-modal-panel-out 160ms ease-in both;
+}
+
+/* ---- World recedes while a modal is open (C1) ---- */
+/* Transform-only so the WebGL room keeps compositing cheaply (no blur/filter). */
+.room-stage {
+  transition: transform 400ms ease-out;
+}
+
+.room-recede {
+  transform: scale(0.988);
+}
+
+.room-modal-stagger {
+  animation: room-modal-stagger-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.room-modal-boot-line {
+  animation: room-modal-boot-line 520ms ease-in 120ms both;
+}
+
+/* Kael's marginalia settles in after the panel, once the eye has landed. */
+.room-modal-marginalia {
+  animation: calm-fade-in 700ms ease-out 520ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Calm tier: opacity-only fades — no transform, no blur, no snaps. */
+  .room-modal-backdrop-enter {
+    animation: calm-fade-in 280ms ease-out both;
+  }
+
+  .room-modal-backdrop-exit {
+    animation: calm-fade-out 200ms ease-out both;
+  }
+
+  .room-modal-panel-enter {
+    animation: calm-fade-in 320ms ease-out both;
+  }
+
+  .room-modal-panel-exit {
+    animation: calm-fade-out 200ms ease-out both;
+  }
+
+  .room-modal-stagger {
+    animation: calm-fade-in 280ms ease-out both;
+    animation-delay: 0ms;
+  }
+
+  .room-modal-boot-line {
+    animation: none;
+    opacity: 0;
+  }
+
+  /* C1: no scale recede under calm tier. */
+  .room-recede {
+    transform: none;
+  }
+
+  /* C4: paper settles as a plain fade; instrument bloom is dropped. */
+  .room-modal-panel-enter:has([data-material='paper']) {
+    animation: calm-fade-in 320ms ease-out both;
+  }
+
+  [data-material='instrument'].room-modal-material {
+    animation: none;
+  }
+}
+
+/* ========== CALM TIER SHARED FADES ========== */
+@keyframes calm-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes calm-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* ========== MODAL SCROLL CUE (diegetic read-progress telemetry) ========== */
+.room-scroll-cue {
+  --scroll-progress: 0;
+}
+
+.room-scroll-cue-fade {
+  background: linear-gradient(
+    to top,
+    var(--scroll-cue-base, rgba(27, 26, 21, 0.92)),
+    rgba(16, 185, 129, 0.02) 60%,
+    transparent
+  );
+  opacity: calc(1 - var(--scroll-progress));
+}
+
+.room-scroll-cue-tick {
+  background: linear-gradient(to bottom, rgba(16, 185, 129, 0.6), rgba(16, 185, 129, 0.14));
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.22);
+  transform-origin: top;
+  transform: scaleY(calc(1 - var(--scroll-progress)));
+  opacity: 0.75;
+  transition: opacity 240ms ease-out;
+}
+
+.room-scroll-cue-label {
+  opacity: 1;
+  transition: opacity 240ms ease-out;
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.25);
+}
+
+.room-scroll-cue[data-at-end='true'] .room-scroll-cue-tick,
+.room-scroll-cue[data-at-end='true'] .room-scroll-cue-label {
+  opacity: 0;
 }
 
 

@@ -1,9 +1,12 @@
 import React from 'react';
 import { Clock, Radio, X } from 'lucide-react';
 import type { ReturnSignalReport } from '../types/schema';
+import { DecodeText } from './ui/DecodeText';
 
 interface ReturnSignalPanelProps {
   report: ReturnSignalReport;
+  /** How many interval records are buffered for the terminal confirm. */
+  packetCount?: number;
   onClose: () => void;
 }
 
@@ -24,17 +27,19 @@ const getReportLabel = (report: ReturnSignalReport): string => {
   return 'Absence registered';
 };
 
-const getRedirectionText = (report: ReturnSignalReport): string => {
+const getNarrativeText = (report: ReturnSignalReport, packetCount: number): string => {
   if (report.reason === 'catchup_return') {
-    return `Temporal drift of +${report.dayDelta} days detected. A series of unfiled interval packets have been buffered in local memory. Access terminal node D7 to execute recovery.`;
+    return packetCount > 0
+      ? `You were away for ${report.dayDelta} day${report.dayDelta === 1 ? '' : 's'}. The record kept itself: ${packetCount} interval record${packetCount === 1 ? ' was' : 's were'} written in your absence and buffered for you.`
+      : `You were away for ${report.dayDelta} day${report.dayDelta === 1 ? '' : 's'}. The system held your place and buffered the missing interval.`;
   }
   if (report.reason === 'daily_signal_opened') {
-    return 'New daily interval return signal detected. An unfiled interval packet is buffered in local memory. Access terminal node D7 to execute recovery.';
+    return 'A new signal day has opened since your last visit. Its interval record was written and buffered while the room was empty.';
   }
-  return 'A return signal packet has been buffered in local memory. Access terminal node D7 to execute recovery.';
+  return 'The system registered your absence and wrote an interval record while the room was empty.';
 };
 
-export const ReturnSignalPanel: React.FC<ReturnSignalPanelProps> = ({ report, onClose }) => {
+export const ReturnSignalPanel: React.FC<ReturnSignalPanelProps> = ({ report, packetCount = 0, onClose }) => {
   const driftLabel = report.dayDelta > 0
     ? `+${report.dayDelta} day${report.dayDelta === 1 ? '' : 's'}`
     : 'none';
@@ -43,15 +48,45 @@ export const ReturnSignalPanel: React.FC<ReturnSignalPanelProps> = ({ report, on
     : `${report.coherenceDelta > 0 ? '+' : ''}${report.coherenceDelta.toFixed(1)}`;
 
   return (
-    <div className="fixed bottom-3 left-3 right-3 z-[12000] mx-auto max-h-[calc(100dvh-1.5rem)] max-w-md overflow-y-auto overscroll-contain border border-[#f2ead0]/18 bg-[#11100d]/92 font-mono text-[#f7f1dc] shadow-[0_24px_80px_rgba(0,0,0,0.68)] backdrop-blur-sm custom-scrollbar sm:bottom-5 sm:left-auto sm:right-5">
+    <div className="return-signal-panel fixed bottom-3 left-3 right-3 z-[12000] mx-auto max-h-[calc(100dvh-1.5rem)] max-w-md overflow-y-auto overscroll-contain border border-[#f2ead0]/18 bg-[#11100d]/92 font-mono text-[#f7f1dc] shadow-[0_24px_80px_rgba(0,0,0,0.68)] backdrop-blur-sm custom-scrollbar sm:bottom-5 sm:left-auto sm:right-5">
+      <style>{`
+        @keyframes return-signal-in {
+          from { opacity: 0; transform: translateY(18px) scale(0.985); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .return-signal-panel {
+          animation: return-signal-in 600ms 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        @keyframes return-signal-ping {
+          0% { transform: scale(1); opacity: 0.6; }
+          70%, 100% { transform: scale(2.4); opacity: 0; }
+        }
+        .return-signal-ping::after {
+          content: '';
+          position: absolute;
+          inset: -3px;
+          border-radius: 9999px;
+          border: 1px solid rgba(167, 243, 208, 0.55);
+          animation: return-signal-ping 2.2s infinite ease-out;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .return-signal-panel { animation-duration: 1ms; animation-delay: 0ms; }
+          .return-signal-ping::after { animation: none; opacity: 0; }
+        }
+      `}</style>
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-200/60 to-transparent" />
+
       <div className="flex items-start justify-between gap-4 border-b border-[#f2ead0]/12 bg-black/18 px-4 py-3">
         <div className="min-w-0">
           <div className="mb-1 text-[10px] uppercase tracking-[0.22em] text-emerald-100/62">
             Return Signal
           </div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#fff7df]">
-            <Radio size={14} className="text-emerald-100/76" />
-            {getReportLabel(report)}
+          <div className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-[#fff7df]">
+            <span className="return-signal-ping relative inline-flex">
+              <Radio size={14} className="text-emerald-100/76" />
+            </span>
+            <DecodeText text={getReportLabel(report)} speed={26} startDelay={650} />
           </div>
         </div>
         <button
@@ -75,22 +110,35 @@ export const ReturnSignalPanel: React.FC<ReturnSignalPanelProps> = ({ report, on
             <div>Drift</div>
             <div className="mt-1 text-[#fff7df]/86">{driftLabel}</div>
           </div>
-          <div className="border border-white/10 bg-black/24 p-3">
-            <div className="mb-2 text-emerald-100/65">COH</div>
-            <div>Delta</div>
-            <div className="mt-1 text-[#fff7df]/86">{coherenceLabel}</div>
-          </div>
+          {packetCount > 0 ? (
+            <div className="border border-emerald-100/22 bg-emerald-100/6 p-3">
+              <div className="mb-2 text-emerald-100/65">PKT</div>
+              <div>Buffered</div>
+              <div className="mt-1 text-[#fff7df]/86">{packetCount}</div>
+            </div>
+          ) : (
+            <div className="border border-white/10 bg-black/24 p-3">
+              <div className="mb-2 text-emerald-100/65">COH</div>
+              <div>Delta</div>
+              <div className="mt-1 text-[#fff7df]/86">{coherenceLabel}</div>
+            </div>
+          )}
         </div>
 
         <div className="border-l border-emerald-100/28 pl-4 text-xs leading-relaxed text-[#f7f1dc]/74">
-          <p>{getRedirectionText(report)}</p>
+          <p>{getNarrativeText(report, packetCount)}</p>
+          <p className="mt-2 text-[#f7f1dc]/50">
+            Interval records are the lab's log of the days you missed. File them at the terminal to fold them into your record.
+          </p>
         </div>
 
         <button
           onClick={onClose}
           className="w-full border border-emerald-100/28 bg-emerald-100/10 py-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-50/86 transition-colors hover:bg-emerald-100/16"
         >
-          Open Terminal Node
+          {packetCount > 0
+            ? `Open Terminal — File ${packetCount} Record${packetCount === 1 ? '' : 's'}`
+            : 'Open Terminal Node'}
         </button>
       </div>
     </div>

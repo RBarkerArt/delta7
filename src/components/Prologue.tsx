@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ThreePrologueAtmosphere } from './ThreePrologueAtmosphere';
+import { openAudioChannel } from '../lib/audioUnlock';
 
 // The WebGL atmosphere costs a ~730KB three.js download plus a GL context on
 // the very first screen. Phones and tablets get a cheap CSS glow instead so
@@ -29,6 +30,10 @@ export const Prologue: React.FC<PrologueProps> = ({ sentence, onComplete, eyebro
 
     const enterRoom = () => {
         if (phase === 'fade-out') return;
+        // Prologue-path users skip RoomEntryTransition, so the advance click is
+        // their audio-unlock gesture. openAudioChannel no-ops if the user
+        // previously muted (opt-in '0'), so a mute choice stays sticky.
+        void openAudioChannel();
         setPhase('fade-out');
     };
 

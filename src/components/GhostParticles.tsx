@@ -8,7 +8,12 @@ interface GhostParticlesProps {
     density?: number;
     speed?: number;
     opacity?: number;
+    /** Mobile/coarse-pointer tier: caps count, forces dpr 1, halves frame rate. */
+    lite?: boolean;
 }
+
+// Lite-mode caps: mobile atmosphere renders a thinner, cheaper particle field.
+const LITE_MAX_PARTICLES = 24;
 
 interface Particle {
     x: number;
@@ -31,7 +36,8 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
     sizeScale = 0.85,
     density = 1,
     speed = 1,
-    opacity = 1
+    opacity = 1,
+    lite = false
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const particlesRef = useRef<Particle[]>([]);
@@ -99,7 +105,10 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
         const width = window.innerWidth;
         const height = window.innerHeight;
         const { count, sizeRange } = config;
-        const scaledCount = Math.max(10, Math.round(count * density));
+        // Density multiplier applies on top of the base count; in lite mode the
+        // result is still hard-capped so the cap remains the maximum.
+        let scaledCount = Math.max(10, Math.round(count * density));
+        if (lite) scaledCount = Math.min(scaledCount, LITE_MAX_PARTICLES);
 
         for (let i = 0; i < scaledCount; i++) {
             const depth = Math.random();
@@ -125,7 +134,7 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
         window.addEventListener('mousemove', handleMouseMove);
 
         return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, [config, density, isDisabled, sizeScale]);
+    }, [config, density, isDisabled, sizeScale, lite]);
 
     // Animation Loop
     useEffect(() => {
@@ -136,7 +145,17 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
+        // Lite mode: step the sim at ~30fps by skipping every other rAF frame.
+        // The backing store already matches CSS pixels (dpr forced to 1), which
+        // keeps particle coordinates — seeded in CSS-pixel space — consistent.
+        let frameParity = 0;
+
         const animate = (time: number) => {
+            if (lite && (frameParity ^= 1)) {
+                requestRef.current = requestAnimationFrame(animate);
+                return;
+            }
+
             if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
@@ -223,7 +242,7 @@ export const GhostParticles: React.FC<GhostParticlesProps> = ({
         return () => {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
-    }, [config, isDisabled, speed, opacity]);
+    }, [config, isDisabled, speed, opacity, lite]);
 
     if (isDisabled) return null;
 

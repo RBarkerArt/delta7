@@ -114,6 +114,10 @@ export interface SystemSettings {
     particleEffect?: 'dust' | 'ash' | 'digital-rain' | 'none';
     cursorStyle?: 'crosshair' | 'default' | 'none';
     isBlackout?: boolean;
+    // Rooms — when true, mobile/memory-safe runtime does a true SPA room swap
+    // (react-router navigate) instead of the sessionStorage + location.replace
+    // reload. Default falsey = keep the reload behavior.
+    mobileSpaRooms?: boolean;
     particleSize?: number; // 0.4 to 1.6 (scale)
     particleDensity?: number; // 0.5 to 2.0 (multiplier)
     particleSpeed?: number; // 0.4 to 1.6 (multiplier)

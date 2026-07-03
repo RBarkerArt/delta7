@@ -3,6 +3,8 @@ import { db } from '../lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { GhostParticles } from './GhostParticles';
 import { useSound } from '../hooks/useSound';
+import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock';
+import { setSystemFlag } from '../lib/systemFlags';
 import { BlackoutMessage } from './BlackoutMessage';
 import type { SystemSettings } from '../types/schema';
 
@@ -23,24 +25,29 @@ const isMobileOrTabletDevice = () => {
     return isMobileUserAgent || isIPadDesktopMode || isCoarse || shortestSide <= 820;
 };
 
+const prefersReducedMotion = () => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+};
+
 const shouldUseReducedAtmosphere = () => {
     if (typeof window === 'undefined') return false;
 
-    return (
-        isMobileOrTabletDevice() ||
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    );
+    return isMobileOrTabletDevice() || prefersReducedMotion();
 };
 
 export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence, roomRestoration = 1, suspendParticles = false }) => {
     const [settings, setSettings] = useState<SystemSettings | null>(null);
     const [reducedAtmosphere, setReducedAtmosphere] = useState(() => shouldUseReducedAtmosphere());
+    const [reducedMotion, setReducedMotion] = useState(() => prefersReducedMotion());
 
     // Sync with Global Settings
     useEffect(() => {
         const unsub = onSnapshot(doc(db, 'system', 'settings'), (doc) => {
             if (doc.exists()) {
-                setSettings(doc.data() as SystemSettings);
+                const data = doc.data() as SystemSettings;
+                setSystemFlag('mobileSpaRooms', data.mobileSpaRooms === true);
+                setSettings(data);
             }
         });
         return () => unsub();
@@ -49,7 +56,10 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence,
     useEffect(() => {
         const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
         const pointerQuery = window.matchMedia('(pointer: coarse)');
-        const updatePreference = () => setReducedAtmosphere(shouldUseReducedAtmosphere());
+        const updatePreference = () => {
+            setReducedAtmosphere(shouldUseReducedAtmosphere());
+            setReducedMotion(prefersReducedMotion());
+        };
 
         motionQuery.addEventListener('change', updatePreference);
         pointerQuery.addEventListener('change', updatePreference);
@@ -73,6 +83,12 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence,
     const particleOpacity = settings?.particleOpacity ?? 1.0;
     const particleTint = settings?.particleTint;
     const runtimeParticleScale = reducedAtmosphere ? 0.28 : 1;
+
+    // prefers-reduced-motion disables particles outright; mobile/coarse-pointer
+    // WITHOUT reduced-motion instead renders GhostParticles in a cheaper "lite"
+    // tier (capped count, ~30fps) rather than dropping them entirely.
+    const liteAtmosphere = reducedAtmosphere && !reducedMotion;
+    const particlesEnabled = !reducedMotion;
 
     const THEME_COLORS: Record<string, string> = {
         green: '51, 255, 0',
@@ -128,21 +144,24 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence,
         else if (cursor === 'default') body.style.cursor = 'default';
         else body.style.cursor = 'crosshair';
 
-        // 3. Blackout (Handled by Overlay below, but maybe disable scrolling?)
-        if (isBlackout) {
-            body.style.overflow = 'hidden';
-        } else {
-            body.style.overflowY = 'auto';
-            body.style.overflowX = 'hidden';
-        }
+        // 3. Page-level reset; blackout scroll locking lives in its own effect.
+        body.style.overflowX = 'hidden';
 
-    }, [theme, cursor, isBlackout]);
+    }, [theme, cursor]);
+
+    // Blackout pins the page via the shared re-entrant scroll lock so it can
+    // overlap with modal/terminal locks without stomping their state.
+    useEffect(() => {
+        if (!isBlackout) return undefined;
+        lockBodyScroll();
+        return () => unlockBodyScroll();
+    }, [isBlackout]);
 
     // Force re-render particles when theme changes to pick up new color
     return (
         <>
             {/* Particle System */}
-            {!isBlackout && !suspendParticles && !reducedAtmosphere && (
+            {!isBlackout && !suspendParticles && particlesEnabled && (
                 <GhostParticles
                     key={theme} // Force remount on theme change to read new CSS var
                     coherence={coherence}
@@ -152,6 +171,7 @@ export const AtmosphereManager: React.FC<AtmosphereManagerProps> = ({ coherence,
                     density={particleDensity * (1.15 - roomRestoration * 0.35) * runtimeParticleScale}
                     speed={particleSpeed * (1.1 - roomRestoration * 0.25) * (reducedAtmosphere ? 0.75 : 1)}
                     opacity={particleOpacity * (0.45 + (1 - roomRestoration) * 0.45) * (reducedAtmosphere ? 0.55 : 1)}
+                    lite={liteAtmosphere}
                 />
             )}
 

@@ -18,7 +18,7 @@ export const GlitchOverlay: React.FC<GlitchOverlayProps> = ({ coherence, isGlitc
     const [scanlineTop, setScanlineTop] = useState(50);
     const [invertFlash, setInvertFlash] = useState(false);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const { playSignalNoise, playTemporalShift } = useSound();
+    const { playSignalNoise } = useSound();
 
     useEffect(() => {
         if (!ambientDisabled) return;
@@ -140,8 +140,8 @@ export const GlitchOverlay: React.FC<GlitchOverlayProps> = ({ coherence, isGlitc
             setRgbShift(true);
             setScanlineTop(20 + Math.random() * 60);
             setScanlineGlitch(true);
-            // Play the day transition sound
-            playTemporalShift();
+            // Day-transition audio now routes through App's playDayArrival beat
+            // (soundEngine.playDayStinger); this overlay stays purely visual.
             window.setTimeout(() => {
                 setActiveGlitch('none');
                 setRgbShift(false);
@@ -151,7 +151,7 @@ export const GlitchOverlay: React.FC<GlitchOverlayProps> = ({ coherence, isGlitc
         }, 0);
 
         return () => window.clearTimeout(timer);
-    }, [isGlitching, playTemporalShift]);
+    }, [isGlitching]);
 
     // No visual if stable
     if (activeGlitch === 'none' && !isGlitching) return null;

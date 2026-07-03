@@ -21,6 +21,11 @@ import { ReturnSignalPanel } from './components/ReturnSignalPanel';
 import { InlineAutoplayVideo } from './components/InlineAutoplayVideo';
 import { RoomIndexPanel } from './components/RoomIndexPanel';
 import { BreakRoomBulletinPanel, BreakRoomClockPanel, BreakRoomCoffeePanel, BreakRoomRefrigeratorPanel, useObserverBreakRoomState } from './components/BreakRoomPanels';
+import { CartographyCompassPanel } from './components/CartographyCompassPanel';
+import { AnimatedCounter } from './components/ui/AnimatedCounter';
+import { TypeOn } from './components/ui/TypeOn';
+import { DecodeText } from './components/ui/DecodeText';
+import { RoomEntryTransition } from './components/RoomEntryTransition';
 
 import { ScreenEffects } from './components/ScreenEffects';
 import { BackgroundAtmosphere } from './components/BackgroundAtmosphere';
@@ -28,8 +33,15 @@ import { Prologue } from './components/Prologue';
 import { AuthModal } from './components/AuthModal';
 import { GlitchOverlay } from './components/GlitchOverlay';
 import { AtmosphereManager } from './components/AtmosphereManager';
+import { getSystemFlag } from './lib/systemFlags';
 import { TuningInterface } from './components/TuningInterface'; // Project Signal
 import { useSound } from './hooks/useSound';
+import { getAudioOptIn, setAudioOptIn, openAudioChannel } from './lib/audioUnlock';
+import { startStormDirector, stopStormDirector } from './lib/stormDirector';
+import { startAbsenceWatcher, stopAbsenceWatcher } from './lib/absenceWatcher';
+import { setRoomFxTarget } from './lib/roomFx';
+import { soundEngine } from './lib/SoundEngine';
+import { onRecoverySurge } from './lib/recoverySurge';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { getWillowRestorationState, isVideoSource, selectAvailableWillowState, toStoragePath, WILLOW_VIDEO_VARIANTS, type WillowEvidenceState } from './lib/roomMedia';
 import { buildPrologueThresholdsFromDays, buildPrologueThresholdsFromLocalData, getPrologueThresholdId, type PrologueThreshold } from './lib/prologueThresholds';
@@ -106,6 +118,12 @@ const getRoomPath = (room: ActiveRoom): string => {
   return `/rooms/${room}`;
 };
 
+const getRoomDisplayName = (room: ActiveRoom): string => {
+  if (room === 'lab') return 'OBSERVATION';
+  if (room === 'break-room') return 'BREAK ROOM';
+  return 'SIGNAL CARTOGRAPHY';
+};
+
 const getRoomFromRoute = (roomSlug?: string): ActiveRoom => {
   if (roomSlug === 'break-room') return 'break-room';
   if (roomSlug === 'signal-cartography') return 'signal-cartography';
@@ -141,125 +159,6 @@ const RoomSignalTransitionOverlay: React.FC = () => {
 };
 
 
-
-const CartographyCompassPanel: React.FC<{
-  visitorId: string | null;
-  currentDay: number;
-  readout: string;
-}> = ({ visitorId, currentDay, readout }) => {
-  const [isCalibrating, setIsCalibrating] = useState(true);
-
-  useEffect(() => {
-    setIsCalibrating(true);
-    const timer = setTimeout(() => {
-      setIsCalibrating(false);
-    }, 1800);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const getDailyCompassAngle = () => {
-    let hash = 0;
-    const str = `${visitorId || 'anon'}-${currentDay}`;
-    for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash |= 0;
-    }
-    return 30 + (Math.abs(hash) % 300);
-  };
-
-  const dailyAngle = getDailyCompassAngle();
-
-  return (
-    <div className="flex flex-col items-center justify-center p-4 space-y-6">
-      <style>{`
-        @keyframes compass-wild-spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes compass-settle-jitter {
-          0%, 100% { transform: rotate(var(--target-angle)); }
-          20% { transform: rotate(calc(var(--target-angle) - 3deg)); }
-          40% { transform: rotate(calc(var(--target-angle) + 4deg)); }
-          60% { transform: rotate(calc(var(--target-angle) - 1.5deg)); }
-          80% { transform: rotate(calc(var(--target-angle) + 2deg)); }
-        }
-        .animate-compass-wild {
-          animation: compass-wild-spin 0.25s infinite linear;
-        }
-        .animate-compass-settled {
-          animation: compass-settle-jitter 3s infinite ease-in-out;
-        }
-      `}</style>
-
-      <div className="relative w-52 h-52 flex items-center justify-center border border-emerald-500/25 rounded-full bg-black/50 p-2 shadow-[0_0_20px_rgba(16,185,129,0.05)]">
-        <svg viewBox="0 0 200 200" className="w-full h-full text-emerald-500 select-none">
-          <circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" strokeWidth="0.5" strokeDasharray="2 4" className="opacity-30" />
-          <circle cx="100" cy="100" r="86" fill="none" stroke="currentColor" strokeWidth="1" className="opacity-60" />
-          <circle cx="100" cy="100" r="82" fill="none" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1 8" className="opacity-80" />
-          <circle cx="100" cy="100" r="70" fill="none" stroke="currentColor" strokeWidth="0.5" className="opacity-20" />
-          
-          {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => (
-            <line
-              key={deg}
-              x1="100"
-              y1="14"
-              x2="100"
-              y2="20"
-              stroke="currentColor"
-              strokeWidth={deg % 90 === 0 ? "1.5" : "0.5"}
-              className="opacity-70"
-              transform={`rotate(${deg} 100 100)`}
-            />
-          ))}
-
-          <text x="100" y="32" textAnchor="middle" className="font-mono text-xs font-bold fill-current">N</text>
-          <text x="168" y="104" textAnchor="middle" className="font-mono text-xs font-bold fill-current">E</text>
-          <text x="100" y="176" textAnchor="middle" className="font-mono text-xs font-bold fill-current">S</text>
-          <text x="32" y="104" textAnchor="middle" className="font-mono text-xs font-bold fill-red-500/50 animate-pulse">Ø</text>
-
-          <line x1="100" y1="20" x2="100" y2="180" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1 8" className="opacity-30" />
-          <line x1="20" y1="100" x2="180" y2="100" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1 8" className="opacity-30" />
-
-          <g 
-            transform="translate(100, 100)" 
-            className={isCalibrating ? "animate-compass-wild" : "animate-compass-settled"}
-            style={{
-              '--target-angle': `${dailyAngle}deg`,
-              transformOrigin: '50% 50%'
-            } as React.CSSProperties}
-          >
-            <path d="M 0 0 L -8 -20 L 0 -72 L 8 -20 Z" fill="currentColor" className="opacity-90" stroke="currentColor" strokeWidth="1" />
-            <path d="M 0 0 L -8 20 L 0 72 L 8 20 Z" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-50" />
-            
-            <circle cx="0" cy="0" r="7" fill="#0c0a09" stroke="currentColor" strokeWidth="1.5" />
-            <circle cx="0" cy="0" r="2" fill="currentColor" />
-          </g>
-        </svg>
-
-        {isCalibrating && (
-          <div className="absolute top-[48%] left-4 right-4 h-[1px] bg-emerald-400/80 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" />
-        )}
-        <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none bg-scanlines opacity-[0.08]" />
-      </div>
-
-      <div className="w-full border border-emerald-500/25 bg-black/50 p-4 rounded font-mono text-xs space-y-3">
-        <div className="flex justify-between items-center text-[9px] text-emerald-100/50 uppercase tracking-widest border-b border-emerald-500/10 pb-1.5">
-          <span>TELESCOPIC AZIMUTH DEVIATION</span>
-          <span className={isCalibrating ? "text-amber-400 animate-pulse" : "text-emerald-400"}>
-            {isCalibrating ? "CALIBRATING..." : "LOCK ACTIVE"}
-          </span>
-        </div>
-        <p className="text-emerald-100/80 leading-relaxed select-text min-h-[40px]">
-          {isCalibrating ? (
-            <span className="opacity-60 italic">Reading magnetospheric telemetry vectors...</span>
-          ) : (
-            readout
-          )}
-        </p>
-      </div>
-    </div>
-  );
-};
 
 const formatSignalCountdown = (target: number | null, now: number): string => {
   if (!target) return 'CALIBRATING';
@@ -328,6 +227,38 @@ const compressCatchupQueue = (
   return { visibleQueue, autoRecoveryIds: [] };
 };
 
+/**
+ * Fixed bottom-left telemetry line. Fades in while a message is present, then
+ * fades out when it clears (the message drives visibility). Reduced motion gets
+ * a plain opacity fade — transform/opacity only. A single generalized line
+ * serves recovery surges, absence returns, and day arrivals; only one shows at
+ * a time (last event wins).
+ */
+const TelemetryLine: React.FC<{ message: string | null }> = ({ message }) => {
+  const reducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const visible = message !== null;
+  // Keep the last non-null message mounted so it can fade out gracefully.
+  const [held, setHeld] = React.useState<string | null>(message);
+  React.useEffect(() => {
+    if (message !== null) setHeld(message);
+  }, [message]);
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none fixed bottom-4 left-4 z-[13000] text-[10px] uppercase tracking-[0.28em] text-emerald-100/80"
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: reducedMotion ? undefined : visible ? 'translateY(0)' : 'translateY(4px)',
+        transition: reducedMotion ? 'opacity 500ms ease-out' : 'opacity 700ms ease-out, transform 700ms ease-out',
+        textShadow: '0 0 12px rgba(16,185,129,0.35)',
+      }}
+    >
+      {held}
+    </div>
+  );
+};
+
 
 
 const LabInterface: React.FC = () => {
@@ -340,6 +271,11 @@ const LabInterface: React.FC = () => {
   const [dayData, setDayData] = useState<DayLog | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [isPrologueActive, setIsPrologueActive] = useState(true);
+  const [showEntryTransition, setShowEntryTransition] = useState(false);
+  // The active room's scene has signaled ready this mount — gates the entry
+  // overlay fade so slow asset loads never reveal a half-composed room.
+  const [isRoomSceneLive, setIsRoomSceneLive] = useState(false);
+  const [entryTransitionMode, setEntryTransitionMode] = useState<'reentry' | 'relink'>('reentry');
   const [prologueQueue, setPrologueQueue] = useState<PrologueThreshold[]>([]);
   const [prologueQueueTotal, setPrologueQueueTotal] = useState(0);
   const [prologueGateDay, setPrologueGateDay] = useState<number | null>(null);
@@ -356,6 +292,89 @@ const LabInterface: React.FC = () => {
   const [observationVideoSrc, setObservationVideoSrc] = useState<Partial<Record<WillowEvidenceState, string>>>({});
   const [cartMapUrl, setCartMapUrl] = useState<string>('');
   const [dbDays, setDbDays] = useState<DayLog[]>([]);
+  // One generalized bottom-left telemetry line, shared by recovery surges,
+  // absence returns, and day arrivals. Last event wins; auto-clears after a
+  // hold. showTelemetry() re-arms the hold timer.
+  const [telemetryMessage, setTelemetryMessage] = useState<string | null>(null);
+  const telemetryHideTimerRef = useRef(0);
+  const showTelemetry = useCallback((message: string, holdMs = 4000) => {
+    setTelemetryMessage(message);
+    window.clearTimeout(telemetryHideTimerRef.current);
+    telemetryHideTimerRef.current = window.setTimeout(() => setTelemetryMessage(null), holdMs);
+  }, []);
+  useEffect(() => () => window.clearTimeout(telemetryHideTimerRef.current), []);
+
+  // A recovery surge (day-log recovered) flashes: the room remembers.
+  useEffect(() => {
+    const unsubscribe = onRecoverySurge(() => {
+      showTelemetry('LOG RECOVERED — THE ROOM REMEMBERS');
+    });
+    return unsubscribe;
+  }, [showTelemetry]);
+
+  // A room swap starts a fresh scene: not live until it signals ready again.
+  useEffect(() => {
+    setIsRoomSceneLive(false);
+  }, [activeRoom]);
+
+  // Returning opted-in sessions have no entry overlay, so nothing gesture-bound
+  // initializes the audio engine — the first interaction anywhere quietly
+  // re-opens the channel (no swell). New/muted visitors are untouched.
+  useEffect(() => {
+    if (getAudioOptIn() !== '1') return undefined;
+    const resume = () => {
+      void openAudioChannel({ silent: true });
+    };
+    window.addEventListener('pointerdown', resume, { once: true });
+    return () => window.removeEventListener('pointerdown', resume);
+  }, []);
+
+  // D2 — Absence made visible. While in a room, drift the room when the
+  // observer looks away or stops interacting; arrest it on return. Only
+  // surface the return line if the drift actually lasted long enough to notice.
+  useEffect(() => {
+    startAbsenceWatcher({
+      onDrift: () => {},
+      onReturn: (driftMs) => {
+        if (driftMs > 30_000) showTelemetry('OBSERVER RETURNED — DRIFT ARRESTED');
+      },
+    });
+    return () => stopAbsenceWatcher();
+  }, [showTelemetry]);
+
+  // D4 — Day-transition stinger. A single unified beat for a day arrival,
+  // called from the one place the day boundary is observed (the isGlitching
+  // rising edge below). All day-advance paths in CoherenceContext funnel
+  // through isGlitching, so this covers normal boundaries and catch-up returns.
+  const playDayArrival = useCallback((dayDelta: number, dayNumber?: number) => {
+    const reducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // 1. Brief veil-dip (transform/opacity-only fx bus), skipped for reduced
+    //    motion — the sound still plays.
+    if (!reducedMotion) {
+      setRoomFxTarget({ dim: 0.5 });
+      window.setTimeout(() => setRoomFxTarget({ dim: 0 }), 1200);
+    }
+
+    // 2. Day stinger, scaled by how many days arrived (min 1).
+    soundEngine.playDayStinger(Math.max(1, Math.abs(dayDelta || 1)));
+
+    // 3. Telemetry line if we know the day number.
+    if (typeof dayNumber === 'number') {
+      showTelemetry(`DAY ${dayNumber} — SIGNAL REACQUIRED`);
+    }
+  }, [showTelemetry]);
+
+  // Fire the day-arrival beat on the isGlitching rising edge (day boundary).
+  const prevGlitchingRef = useRef(isGlitching);
+  useEffect(() => {
+    if (isGlitching && !prevGlitchingRef.current) {
+      playDayArrival(arrivalDayDelta, currentDay);
+    }
+    prevGlitchingRef.current = isGlitching;
+  }, [isGlitching, arrivalDayDelta, currentDay, playDayArrival]);
 
   const handleConfirmReturnSignal = useCallback(async () => {
     if (!returnSignal) return;
@@ -532,8 +551,11 @@ const LabInterface: React.FC = () => {
   const [isHudOpen, setIsHudOpen] = useState(false);
   const [isMemorySafeRoomRuntime, setIsMemorySafeRoomRuntime] = useState(() => shouldUseMemorySafeRoomRuntime());
 
-  const [isAudioEnabled, setIsAudioEnabled] = useState(false);
-  const { setMuted } = useSound();
+  // Default the audio-enabled flag from the persisted opt-in so a prior mute/
+  // un-mute choice sticks across reloads. Until the entry gesture unlocks the
+  // channel, audio stays off (browser autoplay policy blocks it anyway).
+  const [isAudioEnabled, setIsAudioEnabled] = useState(() => getAudioOptIn() === '1');
+  const { setMuted, setRoomProfile } = useSound();
   const desiredWillowViewportState = getWillowRestorationState(roomRestoration);
   const activeWillowEvidenceState = selectAvailableWillowState(desiredWillowViewportState, observationVideoSrc);
   const activeObservationVideoSrc = observationVideoSrc[activeWillowEvidenceState] || '';
@@ -637,14 +659,27 @@ const LabInterface: React.FC = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-    if (window.sessionStorage.getItem(MOBILE_ROOM_NAVIGATION_KEY) !== '1') return undefined;
+    // Legacy value is '1'; current value is a small JSON payload the
+    // index.html boot veil also reads. Either way the flag means a mobile
+    // room-navigation reload just landed.
+    if (window.sessionStorage.getItem(MOBILE_ROOM_NAVIGATION_KEY) === null) return undefined;
 
     window.sessionStorage.removeItem(MOBILE_ROOM_NAVIGATION_KEY);
     setIsRoomTransitioning(true);
+    setEntryTransitionMode('relink');
+    setShowEntryTransition(true);
 
     const timer = window.setTimeout(() => setIsRoomTransitioning(false), ROOM_TRANSITION_MIN_MS);
     return () => window.clearTimeout(timer);
   }, []);
+
+  // If the relink reload lands on a prologue day, the prologue surface
+  // replaces the entry overlay — clear the boot veil once it has painted.
+  useEffect(() => {
+    if (isPrologueActive && isPrologueGateReady) {
+      document.getElementById('d7-relink-veil')?.remove();
+    }
+  }, [isPrologueActive, isPrologueGateReady]);
 
   useEffect(() => {
     let nextRoom = routeRoom;
@@ -661,6 +696,24 @@ const LabInterface: React.FC = () => {
 
     setActiveRoom(nextRoom);
   }, [hasNextRoomAccess, hasSignalRoomAccess, navigate, routeRoom]);
+
+  // Layer the room ambience profile over the breath drone as the active room
+  // changes ('lab' scene id is the observation cell). Teardown on unmount.
+  useEffect(() => {
+    const profile = activeRoom === 'lab' ? 'observation' : activeRoom;
+    setRoomProfile(profile);
+    return () => setRoomProfile(null);
+  }, [activeRoom, setRoomProfile]);
+
+  // Storm director: ambient lightning + thunder while coherence is degraded.
+  // The director reads coherence through a ref-backed getter so it isn't
+  // restarted on every state change (only mounts/unmounts with the room).
+  const coherenceStateRef = useRef(state);
+  coherenceStateRef.current = state;
+  useEffect(() => {
+    startStormDirector(() => coherenceStateRef.current);
+    return () => stopStormDirector();
+  }, []);
 
   useEffect(() => {
     if (isMemorySafeRoomRuntime) return;
@@ -851,7 +904,10 @@ const LabInterface: React.FC = () => {
         if (visibleQueue.length > 0) {
           setIsPrologueActive(true);
         } else {
+          // No prologue this session: play the lighter re-entry beat instead
+          // of hard-cutting from black to the room.
           setIsPrologueActive(false);
+          setShowEntryTransition(true);
         }
         setPrologueGateDay(currentDay);
       } catch (error) {
@@ -878,7 +934,10 @@ const LabInterface: React.FC = () => {
         if (visibleQueue.length > 0) {
           setIsPrologueActive(true);
         } else {
+          // No prologue this session: play the lighter re-entry beat instead
+          // of hard-cutting from black to the room.
           setIsPrologueActive(false);
+          setShowEntryTransition(true);
         }
         setPrologueGateDay(currentDay);
       }
@@ -939,6 +998,8 @@ const LabInterface: React.FC = () => {
   }, [state, resolvedDay, isPrologueActive]);
 
   const handlePrologueComplete = useCallback(async () => {
+    // The prologue advance click may have opened the audio channel — sync the HUD.
+    setIsAudioEnabled(getAudioOptIn() === '1');
     if (!activePrologue) {
       setIsPrologueActive(false);
       return;
@@ -1031,8 +1092,16 @@ const LabInterface: React.FC = () => {
 
       if (transitionId !== roomTransitionIdRef.current) return;
 
-      if (isMemorySafeRoomRuntime) {
-        window.sessionStorage.setItem(MOBILE_ROOM_NAVIGATION_KEY, '1');
+      // Memory-safe runtime (mobile) normally reloads the page to force the OS
+      // to release accumulated WebGL/video decoder memory. When the remote
+      // `mobileSpaRooms` kill-switch is enabled, DepthRoomCanvas now disposes GL
+      // + video resources on unmount, so we can do a true SPA swap instead.
+      if (isMemorySafeRoomRuntime && !getSystemFlag('mobileSpaRooms')) {
+        window.sessionStorage.setItem(MOBILE_ROOM_NAVIGATION_KEY, JSON.stringify({
+          v: 1,
+          from: getRoomDisplayName(activeRoom),
+          to: getRoomDisplayName(nextRoom),
+        }));
         window.location.replace(getRoomPath(nextRoom));
         return;
       }
@@ -1099,6 +1168,7 @@ const LabInterface: React.FC = () => {
 
   return (
     <>
+      <TelemetryLine message={telemetryMessage} />
       {/* Atmosphere Control System (Theme, Particles, Blackout) */}
       <AtmosphereManager
         coherence={score}
@@ -1153,21 +1223,44 @@ const LabInterface: React.FC = () => {
         {dataLoading ? (
           <div className="h-screen w-screen bg-black" aria-hidden="true" />
         ) : (
-          <LabObserverRoom
-            key={activeRoom}
-            roomId={getRoomSceneId(activeRoom)}
-            onHotspotAction={handleHotspotAction}
-            isZoomed={isZoomed}
-            roomRestoration={roomRestoration}
-            willowVideoSources={observationVideoSrc}
-            hotspotStates={hotspotStates}
-            onSceneReady={() => handleRoomSceneReady(activeRoom)}
+          <div className={`room-stage ${activePopup !== null ? 'room-recede' : ''}`}>
+            <LabObserverRoom
+              key={activeRoom}
+              roomId={getRoomSceneId(activeRoom)}
+              onHotspotAction={handleHotspotAction}
+              isZoomed={isZoomed}
+              roomRestoration={roomRestoration}
+              willowVideoSources={observationVideoSrc}
+              hotspotStates={hotspotStates}
+              onSceneReady={() => {
+                setIsRoomSceneLive(true);
+                handleRoomSceneReady(activeRoom);
+              }}
+            />
+          </div>
+        )}
+
+        {showEntryTransition && (
+          <RoomEntryTransition
+            currentDay={currentDay}
+            state={state}
+            score={score}
+            absenceMs={returnSignal?.absenceMs}
+            dayDelta={returnSignal?.dayDelta}
+            mode={entryTransitionMode}
+            sceneReady={isRoomSceneLive}
+            onComplete={() => {
+              setShowEntryTransition(false);
+              // The entry click may have opened the audio channel — sync the HUD.
+              setIsAudioEnabled(getAudioOptIn() === '1');
+            }}
           />
         )}
 
-        {isReturnSignalOpen && returnSignal && !isPrologueActive && !dataLoading && !activePopup && !isTerminalOpen && (
+        {isReturnSignalOpen && returnSignal && !isPrologueActive && !showEntryTransition && !dataLoading && !activePopup && !isTerminalOpen && (
           <ReturnSignalPanel
             report={returnSignal}
+            packetCount={missedDaysPackets.length}
             onClose={() => {
               setIsReturnSignalOpen(false);
               setIsTerminalOpen(true);
@@ -1203,6 +1296,7 @@ const LabInterface: React.FC = () => {
             eyebrow={activeRoom === 'break-room' ? 'Break Room' : activeRoom === 'signal-cartography' ? 'Signal Cartography' : 'Observation Cell'}
             maxWidth={activePopup === 'archive' || activePopup === 'prologue' || activePopup === 'break-bulletin' || activePopup === 'break-fridge' || activePopup === 'cart-map' ? 'max-w-4xl' : activePopup === 'security' || activePopup === 'cart-notes' ? 'max-w-3xl' : activePopup === 'break-clock' || activePopup === 'break-coffee' || activePopup === 'cart-compass' || activePopup === 'cart-dead-zones' || activePopup === 'cart-relay-tuning' || activePopup === 'cart-route-trace' || activePopup === 'cart-unmarked-door' || activePopup === 'cart-sector-scan' ? 'max-w-xl' : 'max-w-2xl'}
             variant={activePopup === 'return-door' || activePopup === 'next-room-door' || activePopup === 'room-signal' ? 'cart-room-index' : activePopup}
+            marginaliaDay={currentDay}
             onClose={() => setActivePopup(null)}
           >
             <>
@@ -1212,19 +1306,68 @@ const LabInterface: React.FC = () => {
                 </div>
               )}
               {activePopup === 'blackboard' && (
-                <div className="space-y-4 text-sm text-[#d8d2bd]/74">
-                  <div className="space-y-2">
-                    <div>Coherence: <span className="text-[#f2ead0]">{score.toFixed(2)}%</span></div>
-                    <div>Signal state: <span className="text-[#f2ead0]">{state}</span></div>
-                    <div>Room restoration: <span className="text-[#f2ead0]">{Math.round(roomRestoration * 100)}%</span></div>
-                    <div>Next signal: <span className="text-[#f2ead0]">{formatSignalCountdown(nextDayAt, signalNow)}</span></div>
+                <div className="space-y-5 text-sm text-[#d8d2bd]/74">
+                  <style>{`
+                    @keyframes blackboard-gauge-in {
+                      from { transform: scaleX(0); }
+                      to { transform: scaleX(1); }
+                    }
+                    .blackboard-gauge {
+                      transform-origin: left center;
+                      animation: blackboard-gauge-in 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+                    }
+                    @media (prefers-reduced-motion: reduce) {
+                      .blackboard-gauge { animation-duration: 1ms; }
+                    }
+                  `}</style>
+
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-emerald-100/55">Coherence</span>
+                        <span className="text-xl font-semibold text-[#fff7df]">
+                          <AnimatedCounter value={score} duration={1200} suffix="%" />
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full bg-white/8">
+                        <div
+                          className="blackboard-gauge h-full bg-gradient-to-r from-emerald-300/70 to-emerald-100/80"
+                          style={{ width: `${Math.max(0, Math.min(100, score))}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-emerald-100/55">Room restoration</span>
+                        <span className="text-xl font-semibold text-[#fff7df]">
+                          <AnimatedCounter value={roomRestoration * 100} decimals={0} duration={1200} suffix="%" />
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full bg-white/8">
+                        <div
+                          className="blackboard-gauge h-full bg-gradient-to-r from-cyan-300/55 to-emerald-100/70"
+                          style={{ width: `${Math.max(0, Math.min(100, roomRestoration * 100))}%`, animationDelay: '140ms' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border border-[#f2ead0]/12 bg-black/24 px-3 py-2">
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-emerald-100/55">Signal state</span>
+                      <span className="text-sm font-semibold uppercase tracking-[0.12em] text-[#f2ead0]">{state}</span>
+                    </div>
+                    <div className="flex items-center justify-between border border-[#f2ead0]/12 bg-black/24 px-3 py-2">
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-emerald-100/55">Next signal</span>
+                      <span className="text-sm font-semibold tracking-[0.12em] text-[#f2ead0]">{formatSignalCountdown(nextDayAt, signalNow)}</span>
+                    </div>
                   </div>
+
                   <div className="border-t border-white/10 pt-4 space-y-2 text-xs text-[#d8d2bd]/58">
                     <div className="uppercase tracking-[0.2em] text-emerald-100/55">Telemetry Variables</div>
-                    <div>FLICKER RATING: {((dayData?.variables?.flicker ?? 1) * (100 - score) / 100).toFixed(1)} ms</div>
+                    <div className="animate-flicker-subtle">FLICKER RATING: {((dayData?.variables?.flicker ?? 1) * (100 - score) / 100).toFixed(1)} ms</div>
                     <div>DRIFT MULTIPLIER: {(dayData?.variables?.drift ?? 1).toFixed(1)}x</div>
                     <div>COGNITIVE COHERENCE: {dayData?.variables?.kaelCoherence ?? 'UNKNOWN'}%</div>
-                    {dayData?.variables?.kaelMood && <div>KAEL MOOD SIGNAL: <span className="italic">"{dayData.variables.kaelMood}"</span></div>}
+                    {dayData?.variables?.kaelMood && <div>KAEL MOOD SIGNAL: <span className="italic text-[#f2ead0]/75">"{dayData.variables.kaelMood}"</span></div>}
                   </div>
                 </div>
               )}
@@ -1236,9 +1379,13 @@ const LabInterface: React.FC = () => {
                   </div>
                   <div className="italic text-sm border-l border-emerald-200/25 pl-4 py-1 space-y-2 leading-relaxed max-h-[40vh] overflow-y-auto">
                     {dayData?.narrativeSummary ? (
-                      <p className="select-text text-[#f2ead0]">"{dayData.narrativeSummary}"</p>
+                      <p className="select-text text-[#f2ead0]">
+                        <TypeOn text={`"${dayData.narrativeSummary}"`} speed={14} startDelay={300} />
+                      </p>
                     ) : (
-                      <p className="text-[#d8d2bd]/60">Scattered papers show fragment records and mathematical drafts referencing the 1.42Hz frequency, but the pages are too degraded to resolve completely.</p>
+                      <p className="text-[#d8d2bd]/60">
+                        <TypeOn text="Scattered papers show fragment records and mathematical drafts referencing the 1.42Hz frequency, but the pages are too degraded to resolve completely." speed={8} startDelay={300} showCursor={false} />
+                      </p>
                     )}
                   </div>
                 </div>
@@ -1290,6 +1437,16 @@ const LabInterface: React.FC = () => {
                     )}
 
                     <div className="pointer-events-none absolute inset-0 bg-scanlines opacity-[0.12]" />
+
+                    {isObservationVideoReady && (
+                      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-3 py-2 text-[9px] uppercase tracking-[0.22em] text-emerald-100/75">
+                        <span className="flex items-center gap-1.5">
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                          REC
+                        </span>
+                        <span className="text-emerald-100/55">EXT_FEED_01 // DAY {String(currentDay).padStart(3, '0')}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1357,11 +1514,35 @@ const LabInterface: React.FC = () => {
 
               {activePopup === 'cart-map' && (
                 <div className="relative flex flex-col items-center justify-center p-4">
-                  <div className="relative border border-emerald-500/30 bg-black/45 p-2">
+                  <style>{`
+                    @keyframes map-blueprint-in {
+                      0% { opacity: 0; filter: brightness(2.2) contrast(0.4) blur(5px); }
+                      45% { opacity: 1; filter: brightness(1.5) contrast(0.7) blur(2px); }
+                      100% { opacity: 1; filter: brightness(1) contrast(1) blur(0); }
+                    }
+                    .map-blueprint-in {
+                      animation: map-blueprint-in 1400ms ease-out both;
+                    }
+                    @keyframes map-survey-line {
+                      0% { top: 0; opacity: 0.8; }
+                      100% { top: 100%; opacity: 0; }
+                    }
+                    .map-survey-line {
+                      animation: map-survey-line 1400ms ease-in both;
+                    }
+                    @media (prefers-reduced-motion: reduce) {
+                      .map-blueprint-in { animation-duration: 1ms; }
+                      .map-survey-line { animation: none; opacity: 0; }
+                    }
+                  `}</style>
+                  <div className="relative overflow-hidden border border-emerald-500/30 bg-black/45 p-2">
                     {cartMapUrl ? (
-                      <img src={cartMapUrl} alt="Facility Map" className="w-full max-h-[60vh] object-contain select-none" />
+                      <>
+                        <img src={cartMapUrl} alt="Facility Map" className="map-blueprint-in w-full max-h-[60vh] object-contain select-none" />
+                        <div className="map-survey-line pointer-events-none absolute inset-x-0 h-px bg-emerald-300/70 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                      </>
                     ) : (
-                      <div className="flex aspect-[1.6] w-full items-center justify-center text-xs uppercase tracking-widest text-emerald-500/50">
+                      <div className="flex aspect-[1.6] w-full items-center justify-center text-xs uppercase tracking-widest text-emerald-500/50 animate-pulse">
                         LOADING MAP BLUEPRINT...
                       </div>
                     )}
@@ -1387,7 +1568,27 @@ const LabInterface: React.FC = () => {
                       }}
                     />
                     
+                    <style>{`
+                      @keyframes dead-zone-render-attempt {
+                        0% { stroke-dashoffset: 290; opacity: 0.85; }
+                        55% { stroke-dashoffset: 60; opacity: 0.85; }
+                        62% { stroke-dashoffset: 60; opacity: 0.15; }
+                        66% { stroke-dashoffset: 60; opacity: 0.7; }
+                        70% { stroke-dashoffset: 60; opacity: 0.1; }
+                        78% { stroke-dashoffset: 60; opacity: 0.5; }
+                        100% { stroke-dashoffset: 290; opacity: 0; }
+                      }
+                      .dead-zone-outline {
+                        stroke-dasharray: 290;
+                        animation: dead-zone-render-attempt 4.5s infinite linear;
+                      }
+                      @media (prefers-reduced-motion: reduce) {
+                        .dead-zone-outline { animation: none; stroke-dashoffset: 60; opacity: 0.4; }
+                      }
+                    `}</style>
                     <svg viewBox="0 0 100 100" className="w-20 h-20 text-red-500 my-4 animate-pulse">
+                      {/* Sector 03 trying — and failing — to draw itself */}
+                      <polygon points="50,8 92,88 8,88" fill="none" stroke="currentColor" strokeWidth="0.6" className="dead-zone-outline opacity-40" />
                       <polygon points="50,15 90,85 10,85" fill="none" stroke="currentColor" strokeWidth="2" />
                       <line x1="50" y1="40" x2="50" y2="65" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                       <circle cx="50" cy="76" r="3" fill="currentColor" />
@@ -1411,8 +1612,10 @@ const LabInterface: React.FC = () => {
                     <div className="text-emerald-100/80 leading-relaxed font-mono">
                       <div>[TIME] {new Date().toISOString().split('T')[0]} 14:03:00</div>
                       <div>[CODE] D-7-ERR-CART-DZ-03</div>
-                      <div className="text-red-400 mt-2">[MESSAGE] DEAD ZONE 03: Rendering failed. The space is unresolvable. Coherence too low or attention absent.</div>
-                      <div className="text-[#d8d2bd]/50 mt-1">"The cartographer notes that Sector 03 refuses to draw itself. When we look away, it expands. When we look back, it is just static."</div>
+                      <div className="text-red-400 mt-2">[MESSAGE] <DecodeText text="DEAD ZONE 03: Rendering failed. The space is unresolvable. Coherence too low or attention absent." speed={14} startDelay={400} /></div>
+                      <div className="text-[#d8d2bd]/50 mt-1 italic">
+                        <TypeOn text='"The cartographer notes that Sector 03 refuses to draw itself. When we look away, it expands. When we look back, it is just static."' speed={10} startDelay={2200} showCursor={false} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1422,8 +1625,20 @@ const LabInterface: React.FC = () => {
 
               {activePopup === 'cart-route-trace' && (
                 <div className="flex flex-col p-4 space-y-6">
+                  <style>{`
+                    @keyframes route-trace-reveal {
+                      from { clip-path: inset(0 100% 0 0); }
+                      to { clip-path: inset(0 0% 0 0); }
+                    }
+                    .route-trace-reveal {
+                      animation: route-trace-reveal 2200ms cubic-bezier(0.4, 0, 0.4, 1) both;
+                    }
+                    @media (prefers-reduced-motion: reduce) {
+                      .route-trace-reveal { animation-duration: 1ms; }
+                    }
+                  `}</style>
                   <div className="relative w-full h-40 bg-black/40 border border-emerald-500/25 rounded overflow-hidden flex items-center justify-center">
-                    <svg viewBox="0 0 400 150" className="w-full h-full text-emerald-500">
+                    <svg viewBox="0 0 400 150" className="w-full h-full text-emerald-500 route-trace-reveal">
                       <path 
                         d="M 20 120 Q 100 20, 200 80 T 380 40" 
                         fill="none" 
@@ -1464,10 +1679,10 @@ const LabInterface: React.FC = () => {
                   <div className="border border-emerald-500/25 bg-black/60 p-3 rounded font-mono text-xs space-y-2">
                     <div className="text-[10px] text-emerald-100/50 uppercase tracking-widest">ROUTE TRACE LOG</div>
                     <div className="space-y-1 text-emerald-100/80 leading-relaxed">
-                      <div>[00:12:08] Route trace initiated. Origin: Observation Cell.</div>
-                      <div>[00:12:15] Signal path split detected. Path divergence: 14.2%.</div>
-                      <div className="text-red-400">[00:12:22] Warning: Observer position reported in two spatial coords simultaneously.</div>
-                      <div>[00:12:35] Re-stabilizing route. Attention required.</div>
+                      <div className="room-modal-stagger" style={{ animationDelay: '200ms' }}>[00:12:08] Route trace initiated. Origin: Observation Cell.</div>
+                      <div className="room-modal-stagger" style={{ animationDelay: '900ms' }}>[00:12:15] Signal path split detected. Path divergence: 14.2%.</div>
+                      <div className="room-modal-stagger text-red-400" style={{ animationDelay: '1600ms' }}>[00:12:22] Warning: Observer position reported in two spatial coords simultaneously.</div>
+                      <div className="room-modal-stagger" style={{ animationDelay: '2300ms' }}>[00:12:35] Re-stabilizing route. Attention required.</div>
                     </div>
                   </div>
                 </div>
@@ -1475,10 +1690,10 @@ const LabInterface: React.FC = () => {
 
               {activePopup === 'cart-relay-tuning' && (
                 <div className="flex flex-col p-4 space-y-6">
-                  <div className="flex justify-between items-center border border-emerald-500/25 bg-black/40 p-3 rounded">
+                  <div className={`flex justify-between items-center border bg-black/40 p-3 rounded transition-colors duration-500 ${isTuningRelay ? 'border-cyan-300/45' : 'border-emerald-500/25'}`}>
                     <span className="font-mono text-xs text-emerald-100/60 uppercase">RESIDUE MASS</span>
                     <span className="font-mono text-sm font-bold text-emerald-400">
-                      {Math.max(0, observerState?.milligrams || 0).toFixed(2)} mg
+                      <AnimatedCounter value={Math.max(0, observerState?.milligrams || 0)} duration={1000} suffix=" mg" />
                     </span>
                   </div>
 
@@ -1512,18 +1727,24 @@ const LabInterface: React.FC = () => {
                   </div>
 
                   <div className="relative border border-emerald-500/20 bg-black/70 p-4 rounded min-h-[120px] flex flex-col justify-between overflow-hidden">
-                    <div className="font-mono text-xs space-y-2">
+                    {isTuningRelay && (
+                      <svg viewBox="0 0 200 30" className="absolute inset-x-0 top-0 h-6 w-full text-cyan-300/60" aria-hidden="true">
+                        <path d="M 0 15 Q 12 2, 25 15 T 50 15 T 75 15 T 100 15 T 125 15 T 150 15 T 175 15 T 200 15" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="4 3" style={{ animation: 'route-flow 0.5s infinite linear' }} />
+                      </svg>
+                    )}
+                    <div className="font-mono text-xs space-y-2 pt-3">
                       <div className="text-[10px] text-emerald-100/40 uppercase tracking-widest">RELAY FEEDBACK</div>
                       {isTuningRelay ? (
-                        <div className="text-emerald-500/80 animate-pulse uppercase tracking-wider text-[10px]">
-                          Calibrating relay coil... Please maintain attention.
+                        <div className="text-cyan-300/80 animate-pulse uppercase tracking-wider text-[10px]">
+                          Coil charging — calibrating relay... maintain attention.
                         </div>
                       ) : tuningError ? (
-                        <p className="text-red-400 leading-relaxed font-mono">{tuningError}</p>
+                        <p className="text-red-400 leading-relaxed font-mono">
+                          <TypeOn key={tuningError} text={tuningError} speed={10} showCursor={false} />
+                        </p>
                       ) : tuningResponse ? (
                         <p className="text-emerald-100/90 leading-relaxed font-mono select-text">
-                          {tuningResponse}
-                          <span className="inline-block w-1.5 h-3 bg-emerald-400 ml-1 animate-pulse" />
+                          <TypeOn key={tuningResponse} text={tuningResponse} speed={14} />
                         </p>
                       ) : (
                         <p className="text-emerald-100/50 font-mono italic">
@@ -1548,8 +1769,8 @@ const LabInterface: React.FC = () => {
                     </div>
                   ) : (
                     <div className="space-y-6 max-h-[55vh] overflow-y-auto pr-2 custom-scrollbar">
-                      {dbCartographerNotes.map((note) => (
-                        <div key={note.id} className="border border-emerald-500/20 bg-black/45 p-4 rounded space-y-4">
+                      {dbCartographerNotes.map((note, noteIndex) => (
+                        <div key={note.id} className="room-modal-stagger border border-emerald-500/20 bg-black/45 p-4 rounded space-y-4" style={{ animationDelay: `${Math.min(noteIndex, 6) * 110}ms` }}>
                           <p className="font-mono text-xs text-emerald-100/90 leading-relaxed whitespace-pre-wrap select-text">
                             "{note.text}"
                           </p>
@@ -1577,13 +1798,33 @@ const LabInterface: React.FC = () => {
 
               {activePopup === 'cart-unmarked-door' && (
                 <div className="flex flex-col p-4 space-y-6">
+                  <style>{`
+                    @keyframes door-scan-beam {
+                      0% { transform: translateY(-10%); opacity: 0; }
+                      8% { opacity: 0.9; }
+                      92% { opacity: 0.9; }
+                      100% { transform: translateY(820%); opacity: 0; }
+                    }
+                    .door-scan-beam {
+                      animation: door-scan-beam 2.8s infinite cubic-bezier(0.4, 0, 0.6, 1);
+                    }
+                    @media (prefers-reduced-motion: reduce) {
+                      .door-scan-beam { animation: none; opacity: 0; }
+                    }
+                  `}</style>
                   <div className="relative w-full h-32 border border-emerald-500/25 bg-black/40 rounded flex items-center justify-center overflow-hidden">
                     <div className={`w-16 h-24 border-2 transition-all duration-1000 ${
                       score < 35 ? 'border-red-500/20 border-dashed animate-pulse' :
                       score < 70 ? 'border-emerald-500/40 border-dotted' :
                       'border-emerald-500/80 shadow-[0_0_15px_rgba(16,185,129,0.3)]'
-                    }`} />
-                    
+                    }`}>
+                      {score >= 70 && (
+                        <div className="relative left-2 top-10 h-2.5 w-1 bg-emerald-400/70 shadow-[0_0_6px_rgba(16,185,129,0.6)] room-modal-stagger" style={{ animationDelay: '900ms' }} />
+                      )}
+                    </div>
+
+                    <div className="door-scan-beam pointer-events-none absolute inset-x-6 top-2 h-3.5 bg-gradient-to-b from-transparent via-emerald-300/22 to-transparent" />
+
                     <div className="absolute top-2 left-2 text-[8px] font-mono text-emerald-100/50 uppercase tracking-widest">DOORWAY METRIC SCAN</div>
                     <div className="absolute bottom-2 right-2 text-[8px] font-mono text-emerald-100/40 uppercase tracking-widest">
                       RESOLUTION: {score >= 70 ? 'STABLE' : score >= 35 ? 'DEGRADED' : 'UNRESOLVED'}
@@ -1593,13 +1834,16 @@ const LabInterface: React.FC = () => {
                   <div className="border border-emerald-500/20 bg-black/60 p-4 rounded font-mono text-xs space-y-3">
                     <div className="text-[10px] text-emerald-100/40 uppercase tracking-widest">SCAN DETAILS</div>
                     <p className="text-emerald-100/80 leading-relaxed select-text">
-                      {score < 35 ? (
-                        "No door resolved. The scanner reports only flat brickwork and unstable carrier waves. You are looking at a space that has already faded."
-                      ) : score < 70 ? (
-                        "The silhouette of an unnumbered frame is present in the scan, but the door handle remains out of coherence. A faint hum originates from behind it."
-                      ) : (
-                        "The door is resolved and locked. Diagnostics report: SECTOR 05 CONNECTION ACTIVE. No physical access is permitted under current laboratory directives."
-                      )}
+                      <TypeOn
+                        speed={10}
+                        startDelay={500}
+                        showCursor={false}
+                        text={score < 35
+                          ? 'No door resolved. The scanner reports only flat brickwork and unstable carrier waves. You are looking at a space that has already faded.'
+                          : score < 70
+                            ? 'The silhouette of an unnumbered frame is present in the scan, but the door handle remains out of coherence. A faint hum originates from behind it.'
+                            : 'The door is resolved and locked. Diagnostics report: SECTOR 05 CONNECTION ACTIVE. No physical access is permitted under current laboratory directives.'}
+                      />
                     </p>
                   </div>
                 </div>
@@ -1638,12 +1882,26 @@ const LabInterface: React.FC = () => {
                         />
                       )}
 
-                      {cartScanComplete && (
-                        <g className="animate-pulse">
-                          <circle cx="140" cy="70" r="4" fill="#ef4444" />
-                          <circle cx="140" cy="70" r="8" fill="none" stroke="#ef4444" strokeWidth="1" />
-                        </g>
-                      )}
+                      {cartScanComplete && (() => {
+                        // Daily-seeded anomaly position so the blip moves between days/observers.
+                        let blipHash = 0;
+                        const blipSeed = `${visitorId || 'anon'}-${currentDay}-blip`;
+                        for (let i = 0; i < blipSeed.length; i++) {
+                          blipHash = (blipHash << 5) - blipHash + blipSeed.charCodeAt(i);
+                          blipHash |= 0;
+                        }
+                        const blipAngle = (Math.abs(blipHash) % 360) * (Math.PI / 180);
+                        const blipRadius = 32 + (Math.abs(blipHash >> 3) % 50);
+                        const bx = 100 + Math.cos(blipAngle) * blipRadius;
+                        const by = 100 + Math.sin(blipAngle) * blipRadius;
+                        return (
+                          <g className="animate-pulse">
+                            <circle cx={bx} cy={by} r="4" fill="#ef4444" />
+                            <circle cx={bx} cy={by} r="8" fill="none" stroke="#ef4444" strokeWidth="1" />
+                            <line x1="100" y1="100" x2={bx} y2={by} stroke="#ef4444" strokeWidth="0.5" strokeDasharray="2 3" opacity="0.4" />
+                          </g>
+                        );
+                      })()}
                     </svg>
                     <div className="absolute inset-0 rounded-full overflow-hidden pointer-events-none bg-scanlines opacity-[0.08]" />
                   </div>
@@ -1669,7 +1927,7 @@ const LabInterface: React.FC = () => {
                         <div className="space-y-1">
                           <div className="text-red-400 font-bold animate-pulse text-[10px]">[WARNING: DEVIANT RESPONSE]</div>
                           <p className="text-emerald-100/80 leading-relaxed select-text">
-                            {DAILY_ANOMALIES[currentDay % DAILY_ANOMALIES.length]}
+                            <DecodeText text={DAILY_ANOMALIES[currentDay % DAILY_ANOMALIES.length]} speed={18} />
                           </p>
                         </div>
                       ) : (
@@ -1695,7 +1953,16 @@ const LabInterface: React.FC = () => {
           toggleAudio={() => {
             const newState = !isAudioEnabled;
             setIsAudioEnabled(newState);
-            setMuted(!newState);
+            if (newState) {
+              // Full unlock path: initializes the engine if the user never
+              // clicked through the entry overlay, un-mutes, persists opt-in,
+              // and plays the channel-open swell as feedback.
+              void openAudioChannel({ force: true });
+            } else {
+              setMuted(true);
+              // Persist the mute choice so it survives reloads.
+              setAudioOptIn(false);
+            }
           }}
           observerState={observerState}
           returnSignal={returnSignal}

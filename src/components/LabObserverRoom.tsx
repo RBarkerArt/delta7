@@ -446,6 +446,8 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
   });
   const [useLightweightRoom, setUseLightweightRoom] = useState(() => shouldUseLightweightRoom());
   const [roomAssetProfile, setRoomAssetProfile] = useState<RoomAssetProfile>(() => getPreferredRoomAssetProfile());
+  // Depth renderer has drawn its first textured frame for this room mount.
+  const [depthFirstFrameDrawn, setDepthFirstFrameDrawn] = useState(false);
   const [threeStartKey, setThreeStartKey] = useState('');
 
   const signaledReadyKeyRef = useRef<string | null>(null);
@@ -482,6 +484,7 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
     schedulePlaneTransforms();
     previousBackgroundState.current = null;
     signaledReadyKeyRef.current = null;
+    setDepthFirstFrameDrawn(false);
     setResolvedImages(lastResolvedRoomImages.get(roomCacheKey) || {});
     setThreeStartKey('');
     setThreeRoomState({ key: '', status: 'loading' });
@@ -521,7 +524,12 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
     };
   }, [layout.maxX, layout.maxY, layout.minX, layout.minY]);
 
-  // Keep pan bounds and layout correct on window resize
+  // Keep pan bounds and layout correct on window resize. iOS Safari doesn't
+  // reliably fire window `resize` when the viewport settles after a
+  // location.replace room reload (URL bar collapse, transient dimensions), so
+  // also listen to visualViewport and re-measure once shortly after mount —
+  // otherwise a layout computed from a transient viewport sticks until the
+  // user manually refreshes.
   useEffect(() => {
     const handleResize = () => {
       const config = getLayoutConfig();
@@ -533,7 +541,15 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
       schedulePlaneTransforms();
     };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    window.visualViewport?.addEventListener('resize', handleResize);
+    const settleTimer = window.setTimeout(handleResize, 1200);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+      window.visualViewport?.removeEventListener('resize', handleResize);
+      window.clearTimeout(settleTimer);
+    };
   }, [schedulePlaneTransforms]);
 
   // Desktop Mouse Scroll / Wheel Panning
@@ -858,7 +874,12 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
   const shouldStartThreeRoom = threeStartKey === threeRoomKey;
   const canStartThreeRoom = roomSupportsThreeVisuals && isLoaded && shouldStartThreeRoom && !useLightweightRoom && !useDepthRenderer;
   const showThreeVisuals = canStartThreeRoom && threeRoomStatus === 'ready';
-  const isSceneReady = isLoaded && (!roomSupportsThreeVisuals || useLightweightRoom || threeRoomStatus === 'ready' || threeRoomStatus === 'unavailable');
+  // Depth-renderer rooms are "ready" when the canvas has actually drawn its
+  // first textured frame — URL resolution alone can beat the pixels by
+  // seconds on a phone over the network.
+  const isSceneReady = isLoaded && (useDepthRenderer
+    ? depthFirstFrameDrawn
+    : (!roomSupportsThreeVisuals || useLightweightRoom || threeRoomStatus === 'ready' || threeRoomStatus === 'unavailable'));
 
   useEffect(() => {
     if (!isSceneReady || signaledReadyKeyRef.current === threeRoomKey) return;
@@ -1227,6 +1248,7 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
               coherence={score}
               parallaxSource={pointerTiltRef}
               windowVideoUrl={isVideoSource(activeBackgroundSource) ? activeBackgroundSource : null}
+              onFirstFrame={() => setDepthFirstFrameDrawn(true)}
             />
           </div>
         )}
