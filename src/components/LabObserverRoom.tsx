@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { useCoherence } from '../hooks/useCoherence';
 import { useSound } from '../hooks/useSound';
+import { isGyroAvailable, getGyroOptIn, requestGyro, stopGyro } from '../hooks/useGyroParallax';
 import { db, storage } from '../lib/firebase';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { ref, getDownloadURL } from 'firebase/storage';
@@ -333,6 +334,7 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
   // requestAnimationFrame, so dragging never re-renders this component tree.
   const panRef = useRef({ x: 0, y: 0 });
   const pointerTiltRef = useRef({ x: 0, y: 0 });
+  const gyroTiltRef = useRef({ x: 0, y: 0 });
   const isTouchDraggingRef = useRef(false);
   const [isMouseDragging, setIsMouseDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
@@ -435,6 +437,68 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
     return () => {
       reducedMotion.removeEventListener('change', syncTiltPreference);
       el.removeEventListener('pointermove', handlePointerMove);
+    };
+  }, [schedulePlaneTransforms]);
+
+  // Gyro parallax opt-in (D1). On touch devices that granted motion, feed
+  // device tilt into the SAME pointerTiltRef the mouse uses. Mouse writes only
+  // fire for fine pointers, so there's no conflict on phones. The gyro writes a
+  // separate ref; a light rAF copies it in slightly gentler than the mouse.
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    if (!isGyroAvailable()) return undefined;
+
+    // Gentler than the mouse: gyro clamps to +/-0.6, this trims it a touch more.
+    const GYRO_GAIN = 0.8;
+    let rafId = 0;
+    let running = false;
+
+    const pump = () => {
+      // Copy the smoothed gyro reading in, scaled down for a gentler feel.
+      pointerTiltRef.current = {
+        x: gyroTiltRef.current.x * GYRO_GAIN,
+        y: gyroTiltRef.current.y * GYRO_GAIN,
+      };
+      schedulePlaneTransforms();
+      rafId = window.requestAnimationFrame(pump);
+    };
+
+    const begin = () => {
+      if (running) return;
+      // requestGyro handles the (already-granted) platform case; on iOS the
+      // grant happened during the entry tap, so this just (re)attaches.
+      void requestGyro(gyroTiltRef.current).then((ok) => {
+        if (!ok || running) return;
+        running = true;
+        rafId = window.requestAnimationFrame(pump);
+      });
+    };
+
+    const end = () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      rafId = 0;
+      stopGyro();
+      running = false;
+      // Release the tilt back to neutral so a mid-motion stop settles.
+      pointerTiltRef.current = { x: 0, y: 0 };
+      gyroTiltRef.current = { x: 0, y: 0 };
+      schedulePlaneTransforms();
+    };
+
+    if (getGyroOptIn() === '1') begin();
+
+    // The entry overlay grants motion during its tap and fires this event so a
+    // mounted room starts immediately without waiting for a remount. The
+    // terminal's `motion` command fires optin/optout to toggle live.
+    const onOptIn = () => begin();
+    const onOptOut = () => end();
+    window.addEventListener('delta7:gyro-optin', onOptIn);
+    window.addEventListener('delta7:gyro-optout', onOptOut);
+
+    return () => {
+      window.removeEventListener('delta7:gyro-optin', onOptIn);
+      window.removeEventListener('delta7:gyro-optout', onOptOut);
+      end();
     };
   }, [schedulePlaneTransforms]);
 

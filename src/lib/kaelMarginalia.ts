@@ -84,6 +84,13 @@ const groupForVariant = (variant: string): MarginaliaGroup => {
     return 'instrument';
 };
 
+// Curated variant-specific overrides: a fixed line that always wins over the
+// seeded group pool for panels with their own singular note. The dead-zones
+// panel earns one after the void refuses to be drawn (see deadZoneSwallow).
+const VARIANT_OVERRIDES: Record<string, string> = {
+    'cart-dead-zones': 'Sector 03 declined to be drawn. I have stopped asking why.',
+};
+
 // Same seeded-hash idiom as RoomEntryTransition's ambient-line picker.
 const seededHash = (seed: string): number => {
     let hash = 0;
@@ -99,6 +106,8 @@ const seededHash = (seed: string): number => {
  * Graceful with day 0 and an empty seed.
  */
 export function getMarginaliaLine(variant: string, day: number, seed: string): string {
+    const override = VARIANT_OVERRIDES[variant];
+    if (override) return override;
     const group = groupForVariant(variant);
     const pool = GROUP_LINES[group];
     const hash = seededHash(`${group}:${day}:${seed}`);

@@ -42,6 +42,7 @@ import { startAbsenceWatcher, stopAbsenceWatcher } from './lib/absenceWatcher';
 import { setRoomFxTarget } from './lib/roomFx';
 import { soundEngine } from './lib/SoundEngine';
 import { onRecoverySurge } from './lib/recoverySurge';
+import { runDeadZoneSwallow } from './lib/deadZoneSwallow';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { getWillowRestorationState, isVideoSource, selectAvailableWillowState, toStoragePath, WILLOW_VIDEO_VARIANTS, type WillowEvidenceState } from './lib/roomMedia';
 import { buildPrologueThresholdsFromDays, buildPrologueThresholdsFromLocalData, getPrologueThresholdId, type PrologueThreshold } from './lib/prologueThresholds';
@@ -106,6 +107,10 @@ const VALID_POPUP_IDS = new Set<ActivePopup>([
   'cart-room-index', 'cart-route-trace', 'cart-relay-tuning', 'cart-notes',
   'cart-unmarked-door', 'cart-sector-scan',
 ]);
+
+// One-shot recovery id for the dead-zone swallow (D3). Recorded via
+// markRecovered on first open; presence in recoveredItems disables the takeover.
+const DEAD_ZONE_SWALLOW_ID = 'event_dead_zone_swallow';
 
 const getRoomSceneId = (room: ActiveRoom): RoomSceneId => {
   if (room === 'lab') return 'lab';
@@ -626,6 +631,27 @@ const LabInterface: React.FC = () => {
         setLoreContent(hotspot.lore ?? { title: hotspot.label.replace(/_/g, ' '), body: 'Signal recovered. No transcript attached.' });
         setActivePopup('lore');
         return;
+      case 'cart-dead-zones': {
+        // The dead-zone swallow (D3): first-ever open triggers a ~2s scripted
+        // void takeover, THEN opens the panel. One-shot per observer forever.
+        // Any later open (already recovered) is an unchanged immediate open.
+        if (recoveredItems.includes(DEAD_ZONE_SWALLOW_ID)) {
+          setActivePopup('cart-dead-zones');
+          return;
+        }
+        const openDeadZones = () => {
+          setActivePopup('cart-dead-zones');
+          showTelemetry('SECTOR 03 DECLINED TO BE DRAWN');
+        };
+        void markRecovered(DEAD_ZONE_SWALLOW_ID);
+        try {
+          runDeadZoneSwallow(openDeadZones);
+        } catch {
+          // Never block the panel: if the swallow throws, open directly.
+          openDeadZones();
+        }
+        return;
+      }
       default:
         if (VALID_POPUP_IDS.has(hotspot.actionId as ActivePopup)) {
           setActivePopup(hotspot.actionId as ActivePopup);
@@ -633,7 +659,7 @@ const LabInterface: React.FC = () => {
           console.warn('[Delta-7] Unknown hotspot action:', hotspot.actionId);
         }
     }
-  }, [markRecovered, resolvedDay]);
+  }, [markRecovered, resolvedDay, recoveredItems, showTelemetry]);
 
   const returnSignalKey = returnSignal
     ? `${returnSignal.reason}:${returnSignal.previousDay}:${returnSignal.currentDay}:${returnSignal.dayDelta}:${Math.round(returnSignal.absenceMs / 60000)}:${returnSignal.coherenceDelta.toFixed(1)}`

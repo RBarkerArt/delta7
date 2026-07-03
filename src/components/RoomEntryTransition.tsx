@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { TypeOn } from './ui/TypeOn';
 import { openAudioChannel, resumeAudioChannel } from '../lib/audioUnlock';
+import { isGyroAvailable, getGyroOptIn, requestGyro } from '../hooks/useGyroParallax';
 import type { CoherenceState } from '../types/schema';
 
 interface RoomEntryTransitionProps {
@@ -83,6 +84,14 @@ export const RoomEntryTransition: React.FC<RoomEntryTransitionProps> = ({
     const [reducedMotion] = useState(
         () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
     );
+    // Show the motion-link calibration line only on touch devices that expose
+    // the gyro and haven't explicitly opted out. Never nag when reduced-motion
+    // is requested — we won't start the gyro in that case anyway.
+    const [motionOffered] = useState(
+        () => !reducedMotion && isGyroAvailable() && getGyroOptIn() !== '0'
+    );
+    // 'idle' -> the calibrate cue; 'linked' -> the brief post-grant confirmation.
+    const [motionStatus, setMotionStatus] = useState<'idle' | 'linked'>('idle');
     const onCompleteRef = useRef(onComplete);
     const isRelink = mode === 'relink';
     const isLongAbsence = (dayDelta ?? 0) > 0 || (absenceMs ?? 0) > 12 * 60 * 60 * 1000;
@@ -138,17 +147,37 @@ export const RoomEntryTransition: React.FC<RoomEntryTransitionProps> = ({
 
     const skip = () => {
         if (isFading) return;
-        // The entry click is the diegetic audio-unlock gesture. In relink mode
-        // the channel is already open, so just resume the (possibly suspended)
-        // context; in full re-entry, open the channel.
+
+        // The single entry tap grants BOTH audio and motion. iOS allows several
+        // permission flows from one gesture, but requestPermission() must sit on
+        // the synchronous call path — so fire the gyro request BEFORE any await.
+        if (motionOffered) {
+            const scratch = { x: 0, y: 0 };
+            void requestGyro(scratch).then((granted) => {
+                if (granted) {
+                    setMotionStatus('linked');
+                    // Let a mounted room start its own gyro immediately.
+                    window.dispatchEvent(new CustomEvent('delta7:gyro-optin'));
+                }
+                // On denial requestGyro() already persisted '0', so we won't nag.
+            });
+        }
+
+        // The entry click is also the diegetic audio-unlock gesture. In relink
+        // mode the channel is already open, so just resume the (possibly
+        // suspended) context; in full re-entry, open the channel.
         if (isRelink) {
             void resumeAudioChannel();
         } else {
             void openAudioChannel();
         }
         setIsFading(true);
-        window.setTimeout(() => onCompleteRef.current(), 450);
+        // Hold slightly longer when we granted motion so CALIBRATED can flash.
+        window.setTimeout(() => onCompleteRef.current(), motionOffered ? 650 : 450);
     };
+
+    const motionLine =
+        motionStatus === 'linked' ? 'MOTION LINK: CALIBRATED' : 'MOTION LINK: TAP TO CALIBRATE';
 
     return (
         <div
@@ -169,6 +198,11 @@ export const RoomEntryTransition: React.FC<RoomEntryTransitionProps> = ({
                         startDelay={120}
                         showCursor={false}
                     />
+                    {motionOffered && (
+                        <div className="mt-2 text-[10px] uppercase tracking-[0.26em] text-cyan-300/60">
+                            {motionLine}
+                        </div>
+                    )}
                 </div>
             ) : (
                 <>
@@ -204,6 +238,10 @@ export const RoomEntryTransition: React.FC<RoomEntryTransitionProps> = ({
                                 showCursor={false}
                             />
                         </div>
+                        {/* Motion-link calibration cue — cyan, distinct from the amber audio line. */}
+                        {motionOffered && (
+                            <div className="text-cyan-300/60">{motionLine}</div>
+                        )}
                     </div>
 
                     {/* Ambient line — same voice as the prologue */}

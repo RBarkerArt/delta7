@@ -153,8 +153,21 @@ export const CartographyCompassPanel: React.FC<CartographyCompassPanelProps> = (
             frame = requestAnimationFrame(step);
         };
 
+        // External force: the dead-zone swallow dispatches `delta7:compass-sweep`
+        // to make the needle lose the signal and hunt a full revolution, using
+        // the same machinery as the scheduled random sweep above.
+        const forceSweep = () => {
+            if (reducedMotion || phaseRef.current === 'calibrating' || dragState.current) return;
+            target.current += 360 * (Math.random() >= 0.5 ? 1 : -1);
+            setPhaseBoth('sweeping');
+        };
+        window.addEventListener('delta7:compass-sweep', forceSweep);
+
         frame = requestAnimationFrame(step);
-        return () => cancelAnimationFrame(frame);
+        return () => {
+            cancelAnimationFrame(frame);
+            window.removeEventListener('delta7:compass-sweep', forceSweep);
+        };
     }, [dailyAngle, seed, reducedMotion]);
 
     const pointerAngleFrom = (event: React.PointerEvent<SVGSVGElement>): number => {

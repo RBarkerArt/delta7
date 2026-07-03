@@ -1288,6 +1288,50 @@ class SoundEngine {
         } catch { /* best effort */ }
     }
 
+    /**
+     * Void heartbeat: a bare ~40Hz sine at very low gain with a slow ~1.2Hz
+     * amplitude pulse, for the dead-zone swallow takeover. Routed via the sfx
+     * bus so it sounds even in 'track' mode (like playThunder/playStabilize).
+     * Self-contained and auto-cleaned after `seconds`.
+     */
+    public playVoidHeartbeat(seconds: number): void {
+        if (!this.isReady() || !this.ctx || !this.masterGain || this.muted) return;
+        try {
+            const now = this.ctx.currentTime;
+            const dur = Math.max(0.1, seconds);
+            const bus = this.sfxGain ?? this.masterGain;
+
+            // Sub-bass sine — the void's pulse.
+            const osc = this.ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(40, now);
+
+            // Base gain, gently faded in and out so there's no click.
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.05, now + 0.3);
+            gain.gain.setValueAtTime(0.05, now + dur - 0.4);
+            gain.gain.exponentialRampToValueAtTime(0.0008, now + dur);
+
+            // ~1.2Hz amplitude pulse: a slow heartbeat over the base level.
+            const pulseLfo = this.ctx.createOscillator();
+            pulseLfo.type = 'sine';
+            pulseLfo.frequency.setValueAtTime(1.2, now);
+            const pulseDepth = this.ctx.createGain();
+            pulseDepth.gain.setValueAtTime(0.03, now);
+            pulseLfo.connect(pulseDepth);
+            pulseDepth.connect(gain.gain);
+
+            osc.connect(gain);
+            gain.connect(bus);
+
+            osc.start(now);
+            pulseLfo.start(now);
+            osc.stop(now + dur + 0.05);
+            pulseLfo.stop(now + dur + 0.05);
+        } catch { /* best effort */ }
+    }
+
     public dispose() {
         try {
             if (this.currentProfile) {

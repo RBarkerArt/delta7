@@ -9,6 +9,7 @@ import { getReturnPacketRecoveryId, getDayNoteRecoveryId, countRecoveredVmLogs }
 import { lockBodyScroll, unlockBodyScroll } from '../lib/scrollLock';
 import { triggerRecoverySurge } from '../lib/recoverySurge';
 import { useAuth } from '../hooks/useAuth';
+import { isGyroAvailable, getGyroOptIn, setGyroOptIn } from '../hooks/useGyroParallax';
 import type { BreakRoomObserverState } from '../lib/breakRoom';
 import localDaysData from '../season1_days.json';
 import localProloguesData from '../season1_prologues.json';
@@ -54,7 +55,7 @@ const CARTOGRAPHY_LOGS_REQUIRED = 15;
 const COMMAND_NAMES = [
   'guide', 'help', 'status', 'story', 'recap', 'progress', 'next', 'logs',
   'read', 'fragment', 'fragments', 'decrypt', 'recall', 'confirm',
-  'signals', 'tuning', 'mg', 'tune', 'audio', 'clear', 'exit',
+  'signals', 'tuning', 'mg', 'tune', 'audio', 'motion', 'clear', 'exit',
 ];
 
 const BOOT_LINES: Array<Partial<TermLine>> = [
@@ -318,6 +319,7 @@ export const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
       '  confirm          Execute and file pending return packets.',
       '  tune [code]      Restore an observation record by frequency.',
       '  audio [on/off]   Toggle audio signals.',
+      '  motion [on/off]  Toggle gyro parallax (touch devices).',
       '  clear            Flush terminal screen memory.',
       '  exit             Disconnect terminal link.',
       '',
@@ -966,6 +968,27 @@ export const TerminalOverlay: React.FC<TerminalOverlayProps> = ({
           appendToHistory('AUDIO_STREAM: MUTED');
         } else {
           appendToHistory(`Usage: audio [on/off]. Current state: ${isAudioEnabled ? 'ON' : 'OFF'}`);
+        }
+        break;
+      }
+
+      case 'motion': {
+        if (!isGyroAvailable()) {
+          appendToHistory('MOTION LINK: UNAVAILABLE — no motion sensor on this device.');
+          break;
+        }
+        const mode = args[0]?.toLowerCase();
+        const current = getGyroOptIn() === '1';
+        const next = mode === 'on' ? true : mode === 'off' ? false : !current;
+        if (next) {
+          setGyroOptIn('1');
+          // A mounted room will (re)attach the gyro on this signal.
+          window.dispatchEvent(new CustomEvent('delta7:gyro-optin'));
+          appendToHistory('MOTION LINK RESTORED');
+        } else {
+          setGyroOptIn('0');
+          window.dispatchEvent(new CustomEvent('delta7:gyro-optout'));
+          appendToHistory('MOTION LINK SEVERED');
         }
         break;
       }
