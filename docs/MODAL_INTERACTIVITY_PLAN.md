@@ -204,7 +204,15 @@ return-driver in the set; the pity timer and meaningful catch keep it honest.
   pair-witness-dream) + "The Coherence Thesis" set with endowed slot
   (`lore:set-endowed:coherence-thesis`), The Almost in the Observation Port
   (pity floor 4 misses, catch = `lore:the-almost`, dev hook `__almost`).
-- Wave 4 (community puzzles): not started.
+- **Wave 3.5 (runners-up) — SHIPPED 2026-07-03**: Hold the Feed presence
+  minigame (Continuity Relay, `held:day:*`), coherence-locked ghost text
+  (archive, 5s critical latch, `fragment:ghost:*`), Something Brewing deep
+  decode (Signal Lock locked state, `brew:started/done:*`, completes next
+  signal day), the Waking Panel night log (break clock 02:00–05:00,
+  `night:day:*`, dev hook `__night`), Behavioral Echo Observer Record
+  (Security Gateway, `lore:observer-record`, traits from existing ids only).
+- Wave 4 (community puzzles): not started — parked until the observer
+  community is large enough to compare notes.
 
 ## Suggested build order
 

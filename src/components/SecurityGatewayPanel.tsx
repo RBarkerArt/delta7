@@ -1,9 +1,16 @@
 import React from 'react';
-import { Archive, KeyRound, Radio, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Archive, Eye, KeyRound, Radio, ShieldAlert, ShieldCheck } from 'lucide-react';
 import type { CoherenceState } from '../types/schema';
 import { DecodeText } from './ui/DecodeText';
 import { TypeOn } from './ui/TypeOn';
-import { checkAcrostic, getAcrosticRejection, ACROSTIC_REVEAL } from '../lib/kaelMarginalia';
+import {
+    checkAcrostic,
+    getAcrosticRejection,
+    ACROSTIC_REVEAL,
+    buildObserverRecord,
+    deriveObserverTraits,
+    OBSERVER_RECORD_RECOVERY_ID,
+} from '../lib/kaelMarginalia';
 import { getObserverSession } from '../lib/visitor';
 
 interface SecurityGatewayPanelProps {
@@ -13,6 +20,11 @@ interface SecurityGatewayPanelProps {
     score: number;
     state: CoherenceState;
     recoveredCount: number;
+    /** Full recovery set + current day — for the Observer Record (Behavioral Echo). */
+    recoveredItems: string[];
+    currentDay: number;
+    /** Files lore:observer-record on first view of the Observer Record. */
+    markRecovered: (id: string) => void;
     /** True once `lore:acrostic` has been recovered — reveals the hidden log. */
     acrosticSolved: boolean;
     /** Called on a correct override phrase; recovers the acrostic lore. */
@@ -28,6 +40,9 @@ export const SecurityGatewayPanel: React.FC<SecurityGatewayPanelProps> = ({
     score,
     state,
     recoveredCount,
+    recoveredItems,
+    currentDay,
+    markRecovered,
     acrosticSolved,
     onAcrosticSolved,
     onAnchor,
@@ -39,6 +54,21 @@ export const SecurityGatewayPanel: React.FC<SecurityGatewayPanelProps> = ({
     const [phrase, setPhrase] = React.useState('');
     const [rejection, setRejection] = React.useState<string | null>(null);
     const seed = getObserverSession().visitorId;
+
+    // Behavioral Echo — Kael reads the observer's own pattern back to them, from
+    // traits derived entirely from existing persisted data. Files
+    // lore:observer-record once on first view (ref-guarded against StrictMode).
+    const observerRecord = React.useMemo(
+        () => buildObserverRecord(deriveObserverTraits(recoveredItems, currentDay)),
+        [recoveredItems, currentDay]
+    );
+    const observerRecordMarkedRef = React.useRef(false);
+    React.useEffect(() => {
+        if (observerRecordMarkedRef.current) return;
+        if (recoveredItems.includes(OBSERVER_RECORD_RECOVERY_ID)) { observerRecordMarkedRef.current = true; return; }
+        observerRecordMarkedRef.current = true;
+        markRecovered(OBSERVER_RECORD_RECOVERY_ID);
+    }, [recoveredItems, markRecovered]);
 
     const submitPhrase = (event: React.FormEvent) => {
         event.preventDefault();
@@ -159,6 +189,25 @@ export const SecurityGatewayPanel: React.FC<SecurityGatewayPanelProps> = ({
                     </form>
                 )}
             </div>
+
+            {/* Observer Record (Behavioral Echo) — Kael reads your pattern back
+                to you from what the record already knows. Curiosity, never a
+                task list. Pure bonus. */}
+            {observerRecord.length > 0 && (
+                <div className="border-t border-[#f2ead0]/14 pt-5">
+                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-emerald-100/58">
+                        <Eye size={13} />
+                        Observer Record
+                    </div>
+                    <div className="mt-3 space-y-3 border-l border-emerald-100/25 pl-4">
+                        {observerRecord.map((line, index) => (
+                            <p key={index} className="font-['EB_Garamond'] text-sm italic leading-relaxed text-[#f2ead0]/84">
+                                {line}
+                            </p>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <div className="grid gap-3 border-t border-[#f2ead0]/14 pt-5 text-xs text-[#f7f1dc]/72 sm:grid-cols-2">
                 <div>

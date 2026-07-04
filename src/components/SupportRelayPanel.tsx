@@ -1,5 +1,9 @@
 import React from 'react';
 import { HeartHandshake } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { useCoherence } from '../hooks/useCoherence';
+import { triggerRecoverySurge } from '../lib/recoverySurge';
+import { HoldTheFeedPanel } from './HoldTheFeedPanel';
 
 const SUPPORT_LINKS = [
     {
@@ -23,8 +27,26 @@ const SUPPORT_LINKS = [
 ];
 
 export const SupportRelayPanel: React.FC = () => {
+    const { visitorId } = useAuth();
+    const { currentDay, recoveredItems, markRecovered } = useCoherence();
+    const heldToday = recoveredItems.includes(`held:day:${currentDay}`);
+
     return (
         <div className="space-y-5 text-[#f7f1dc]">
+            {/* Hold the Feed — the continuity relay's diegetic act: keep Kael's
+                feed powered by staying present. Bonus only; nothing gates on it. */}
+            <div className="border border-[#f2ead0]/14 bg-black/24 p-4">
+                <HoldTheFeedPanel
+                    visitorId={visitorId}
+                    currentDay={currentDay}
+                    alreadyHeld={heldToday}
+                    onHeld={() => {
+                        void markRecovered(`held:day:${currentDay}`);
+                        triggerRecoverySurge();
+                    }}
+                />
+            </div>
+
             <div className="flex items-start gap-4 border-l border-emerald-200/25 pl-4">
                 <HeartHandshake size={20} className="mt-0.5 shrink-0 text-emerald-100/72" />
                 <div className="space-y-2 text-sm leading-relaxed text-[#f7f1dc]/84">

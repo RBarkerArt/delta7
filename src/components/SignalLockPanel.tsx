@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DecodeText } from './ui/DecodeText';
 import { useSound } from '../hooks/useSound';
 import { grantCoherenceBonus, pulseRoomFx } from '../lib/roomFx';
+import { getDeepDecodePassage } from '../lib/kaelMarginalia';
 
 interface SignalLockPanelProps {
     visitorId: string | null;
@@ -10,7 +11,25 @@ interface SignalLockPanelProps {
     alreadyLocked: boolean;
     /** Fired once, on the confirming hold completing. Persists the day's recovery. */
     onLock: () => void;
+    /** Recovery set, for the Deep Decode appointment (brew:started/done ids). */
+    recoveredItems: string[];
+    /** Files a recovery id (brew appointment start/completion). */
+    markRecovered: (id: string) => void;
 }
+
+const brewStartedId = (day: number): string => `brew:started:${day}`;
+const brewDoneId = (day: number): string => `brew:done:${day}`;
+
+// A deterministic drifting "progress" for an in-flight Deep Decode, derived
+// from time-of-day so it wanders without ever actually reaching 100 — the
+// decode only truly completes when the day ticks over. Capped at 94%.
+const inProgressPercent = (startedDay: number): number => {
+    const now = new Date();
+    const secondsIntoDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    const base = 0.62 + (secondsIntoDay / 86400) * 0.28;          // 0.62 → 0.90 across the day
+    const wobble = Math.sin((secondsIntoDay / 60 + startedDay) * 0.7) * 0.03;
+    return Math.min(0.94, Math.max(0.5, base + wobble)) * 100;
+};
 
 const hashSeed = (value: string): number => {
     let hash = 0;
@@ -70,6 +89,8 @@ export const SignalLockPanel: React.FC<SignalLockPanelProps> = ({
     currentDay,
     alreadyLocked,
     onLock,
+    recoveredItems,
+    markRecovered,
 }) => {
     const { playSignalNoise, playStabilize } = useSound();
 
@@ -116,7 +137,64 @@ export const SignalLockPanel: React.FC<SignalLockPanelProps> = ({
             pulseRoomFx(0.85);
         } catch { /* effects are never load-bearing */ }
         onLock();
-    }, [onLock, playStabilize]);
+        // Something Brewing: locking the carrier also starts a slower Deep
+        // Decode that completes at the next signal day. Filed once per day.
+        if (!recoveredItems.includes(brewStartedId(currentDay))) {
+            try { markRecovered(brewStartedId(currentDay)); } catch { /* never load-bearing */ }
+        }
+    }, [onLock, playStabilize, recoveredItems, currentDay, markRecovered]);
+
+    // --- Something Brewing (Deep Decode appointment) ------------------------
+    // The ready payload is snapshotted ONCE at mount (pure initializer, so
+    // StrictMode-safe): the done-marking effect below updates recoveredItems
+    // optimistically, and a live derivation would recompute to undefined and
+    // yank the passage mid-read. One panel open = one stable surfaced payload.
+    const [surfacedBrewDay] = useState<number | undefined>(() => {
+        const started: number[] = [];
+        const done = new Set<number>();
+        for (const id of recoveredItems) {
+            const s = /^brew:started:(\d+)$/.exec(id);
+            if (s) started.push(Number(s[1]));
+            const d = /^brew:done:(\d+)$/.exec(id);
+            if (d) done.add(Number(d[1]));
+        }
+        // Earliest started day that has since completed (currentDay > startedDay)
+        // and hasn't been read — that's the payload to surface this open.
+        return started
+            .filter(day => currentDay > day && !done.has(day))
+            .sort((a, b) => a - b)[0];
+    });
+
+    // A decode is still integrating if it was started today (it finishes when
+    // the day rolls over). Live, so the bar appears right after today's lock —
+    // unless a ready payload is being read, which takes the stage instead.
+    const brewingToday = useMemo(
+        () => recoveredItems.includes(brewStartedId(currentDay)) && surfacedBrewDay === undefined,
+        [recoveredItems, currentDay, surfacedBrewDay]
+    );
+
+    // Back-fill: if the day was locked before this feature existed (locked, no
+    // brew started), start the decode now so the appointment still happens.
+    const brewBackfillRef = useRef(false);
+    useEffect(() => {
+        if (brewBackfillRef.current) return;
+        if (alreadyLocked && !recoveredItems.includes(brewStartedId(currentDay))) {
+            brewBackfillRef.current = true;
+            try { markRecovered(brewStartedId(currentDay)); } catch { /* never load-bearing */ }
+        }
+    }, [alreadyLocked, recoveredItems, currentDay, markRecovered]);
+
+    // File the surfaced payload as read exactly once. Ref-guarded against
+    // StrictMode double-invoke. The room gave the deep layer up; it stays given.
+    const brewDoneRef = useRef(false);
+    useEffect(() => {
+        if (surfacedBrewDay === undefined || brewDoneRef.current) return;
+        brewDoneRef.current = true;
+        try { markRecovered(brewDoneId(surfacedBrewDay)); } catch { /* never load-bearing */ }
+    }, [surfacedBrewDay, markRecovered]);
+
+    const deepDecodePassage = surfacedBrewDay !== undefined ? getDeepDecodePassage(surfacedBrewDay) : null;
+    const brewPct = brewingToday ? inProgressPercent(currentDay) : 0;
 
     // Alignment error, 0 (perfect) .. 1 (worst). Both dials weighted evenly.
     const errorFrom = useCallback(
@@ -307,6 +385,36 @@ export const SignalLockPanel: React.FC<SignalLockPanelProps> = ({
                 )}
                 <div className="pointer-events-none absolute inset-0 bg-scanlines opacity-[0.05]" />
             </div>
+
+            {/* Something Brewing (Deep Decode): a second, slower process. Locking
+                the carrier starts it; it completes at the next signal day. In
+                progress it drifts a deterministic percentage (never reaching 100
+                until the day ticks); once complete, the "beneath the
+                transmission" payload decodes here. No pressure, no penalty — it
+                waits forever. */}
+            {(brewingToday || deepDecodePassage) && (
+                <div className="relative border border-cyan-500/20 bg-black/55 p-4 rounded overflow-hidden">
+                    <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-widest text-cyan-100/45 mb-2">
+                        <span>DEEP DECODE</span>
+                        <span>{deepDecodePassage ? 'RESOLVED' : `INTEGRATING… ${brewPct.toFixed(0)}%`}</span>
+                    </div>
+                    {deepDecodePassage ? (
+                        <p className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-cyan-50/85 select-text">
+                            <DecodeText text={deepDecodePassage} speed={14} startDelay={300} />
+                        </p>
+                    ) : (
+                        <>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full border border-cyan-500/15 bg-cyan-950/40">
+                                <div className="h-full rounded-full bg-cyan-400/50 transition-all duration-1000" style={{ width: `${brewPct.toFixed(1)}%` }} />
+                            </div>
+                            <p className="mt-2 font-mono text-[10px] italic leading-relaxed text-cyan-100/40">
+                                Integrating the layer beneath the transmission. It finishes when the next signal day arrives. There is no hurry — it waits.
+                            </p>
+                        </>
+                    )}
+                    <div className="pointer-events-none absolute inset-0 bg-scanlines opacity-[0.05]" />
+                </div>
+            )}
 
             <p className="text-[8px] font-mono uppercase tracking-[0.2em] text-emerald-100/30 text-center">
                 {locked

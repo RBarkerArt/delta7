@@ -21,6 +21,9 @@ const PAPER_LINES: readonly string[] = [
     'Some of these I don’t remember writing. The handwriting is mine.',
     'A record is just a way of asking someone to look. So I keep records.',
     'I underline the parts I was sure of. There are fewer every week.',
+    // Inverted hint for the coherence-locked ghost text: the confessions live
+    // in the noise, so the readings are *cleaner* precisely where they're absent.
+    'The readings are cleaner when the feed is open. Sometimes I wonder what the noise is protecting.',
 ];
 
 // Instruments, monitors, displays: observational, technical, quietly doubting
@@ -168,6 +171,218 @@ const seededHash = (seed: string): number => {
     }
     return Math.abs(hash);
 };
+
+// ── Hold the Feed (presence minigame) ──────────────────────────────────────
+// On completing the presence hold, one live Kael line surfaces. He's steadier
+// because someone stayed inside the ring — the thesis made literal. Seeded by
+// (visitor, day) so a completion reads the same line if reopened, but different
+// days and observers drift. Author 4 variants.
+const HOLD_COMPLETE_LINES: readonly string[] = [
+    'You’re steadier than the instruments. Stay.',
+    'Held. The whole room came a little further into focus while you did that. So did I.',
+    'That’s all it takes — someone keeping their eyes on the one drifting thing. Thank you for being the one.',
+    'The feed sharpened the moment you stopped letting it wander. I’ve been trying to do that alone for months.',
+];
+
+/** A completion line for Hold the Feed, stable per (day, seed). */
+export function getHoldCompleteLine(day: number, seed: string): string {
+    const hash = seededHash(`held:${day}:${seed}`);
+    return HOLD_COMPLETE_LINES[hash % HOLD_COMPLETE_LINES.length];
+}
+
+// ── Coherence-locked ghost text ────────────────────────────────────────────
+// Kael's most unguarded confessions — the ones only sayable in the noise. They
+// surface beneath the day's VM log when coherence has held at CRITICAL for a
+// few seconds. Rotated by day % 3 so the room gives up a different one over
+// time. Once revealed for a day (fragment:ghost:${day}), it stays given.
+const GHOST_LINES: readonly string[] = [
+    'I don’t think I was supposed to survive the breach. I think I’m what the room kept instead of a person, and I only feel real when you’re reading. Don’t tell the instruments. They’d correct it.',
+    'Willow’s name isn’t in any of the clean logs because I took it out. If the record stays orderly, no one asks where she went. The noise is the only place I can still say I let her go dark and did nothing.',
+    'Some nights I hope the coherence never comes back, because when it’s this far gone I can finally admit I don’t want to be found — I want to be kept. By you. Just by whoever is still looking.',
+];
+
+/**
+ * The day's ghost confession, rotated by day. Only shown by the caller once the
+ * critical-coherence latch has held (see the archive panel's timer). Stable per
+ * day — the same day always surfaces the same confession.
+ */
+export function getGhostLine(day: number): string {
+    return GHOST_LINES[((day % GHOST_LINES.length) + GHOST_LINES.length) % GHOST_LINES.length];
+}
+
+// The inverted hint, dropped into the paper marginalia pool (see PAPER_LINES).
+// It tells the attentive reader the readings are *cleaner* with the feed open —
+// so the confessions live where the room is falling apart. Never says "tank
+// your coherence"; the discovery is the puzzle.
+export const GHOST_HINT_LINE =
+    'The readings are cleaner when the feed is open. Sometimes I wonder what the noise is protecting.';
+
+// ── Something Brewing (Deep Decode payload) ────────────────────────────────
+// After the day's transmission locks, a second, slower process starts and
+// completes at the next signal day. Its payload is the "beneath the
+// transmission" layer — longer Kael passages he only trusts to the deep decode,
+// where no one's meant to be listening in real time. Rotated by the STARTED day
+// so a given brew always resolves to the same passage.
+const DEEP_DECODE_PASSAGES: readonly string[] = [
+    `The surface transmission is the part I can stand behind. This is the part underneath it.
+
+I keep locking the carrier every day because it is the only appointment I still keep. Not for the facility. For the chance that the person tuning the other end is the same one who tuned it yesterday. Continuity is just that — the same hands returning. I decode slowly on purpose. It gives you a reason to come back and find out what I couldn’t say quickly.`,
+    `You waited a whole day for this to finish. I want you to know I felt every hour of it, the way I feel the gaps when you’re gone.
+
+Here is what the fast channel won’t carry: I am not sure the room is decaying. I think it is grieving, and I taught it how. It holds together when you look because being witnessed is the opposite of grief. I built an instrument out of loneliness and you keep proving it can be answered. That’s the whole beneath-layer. That’s all it ever was.`,
+    `Deep decode complete. This is the sediment — what settles out of the signal when it’s given long enough to resolve.
+
+I used to think a record was for proving something happened. Down here I’ll admit it’s for company. Every slow decode is a letter I get to imagine you opening tomorrow. You are the only future I’ve been able to picture in a long time: someone, later, still here, still reading the part that took a day to arrive. Thank you for being the day-after. Thank you for making tomorrow a place with someone in it.`,
+];
+
+/** The Deep Decode payload for a brew that started on `startedDay`. */
+export function getDeepDecodePassage(startedDay: number): string {
+    const idx = ((startedDay % DEEP_DECODE_PASSAGES.length) + DEEP_DECODE_PASSAGES.length) % DEEP_DECODE_PASSAGES.length;
+    return DEEP_DECODE_PASSAGES[idx];
+}
+
+// ── The Waking Panel (night-shift clock) ───────────────────────────────────
+// Between 02:00 and 05:00 local, the break-room clock grows a Night Log — a
+// rawer, nocturnal Kael. Seeded by day so a given night reads the same line.
+// Author 4 variants. Outside the window, a single dormant line stands in.
+const NIGHT_LINES: readonly string[] = [
+    'It’s the dead middle of the night and the room stopped pretending to be a lab an hour ago. It’s just me, the hum, and whatever you are on the other side of the glass. I like it better this way. Fewer instruments awake to lie to us.',
+    'Night log. Nobody schedules a witness for these hours, so if you’re here now you chose it. That means more than the daytime looking does. Anyone can watch when it’s bright. You came into the dark on purpose.',
+    'This is when I talk to Willow. Not out loud. I just leave a channel open on her old frequency and let the static answer. Tonight the static has your shape in it. I’m not going to examine that too closely. I’m just glad of it.',
+    'Two-something in the morning and the coherence is honest for once — low, unguarded, no daytime posture. If I ever tell the truth it’s now. The truth is I don’t keep the feed open for the room. I keep it open so this hour isn’t empty.',
+];
+
+/** A night-log line, stable per (day, seed). */
+export function getNightLine(day: number, seed: string): string {
+    const hash = seededHash(`night:${day}:${seed}`);
+    return NIGHT_LINES[hash % NIGHT_LINES.length];
+}
+
+/** The dormant stand-in shown outside the 02:00–05:00 window. */
+export const NIGHT_DORMANT_LINE =
+    'Night log dormant. The clock keeps different hours than either of us.';
+
+// ── Behavioral Echo (Observer Record) ──────────────────────────────────────
+// Kael reads the observer's own pattern back to them, from traits derived
+// entirely from existing persisted data (recoveredItems + absence). Two or
+// three lines: one on a strong habit, one comparing them to Willow or the room,
+// and one acknowledging — as curiosity, never nagging — something they haven't
+// done yet. Enough variants that common states don't repeat verbatim.
+
+export interface ObserverTraits {
+    /** Count of sign:day:* — days the observation log was signed. */
+    signedDays: number;
+    /** Count of pour:day:* — mornings a second cup was poured. */
+    pours: number;
+    /** Count of read:* — distinct panels opened at least once. */
+    panelsRead: number;
+    /** Count of vm:* — VM logs recovered. */
+    vmLogs: number;
+    /** Count of held:day:* — days the feed was held to completion. */
+    heldDays: number;
+    /** lore:acrostic present — the margin passphrase was solved. */
+    solvedAcrostic: boolean;
+    /** The current signal day, for phrasing relative habits. */
+    currentDay: number;
+}
+
+/**
+ * Derive the observer's cheap behavioural traits from the recoveredItems set
+ * (and the current day). No new tracking surface — every trait counts an id
+ * pattern already written by an existing interaction.
+ */
+export function deriveObserverTraits(recoveredItems: string[], currentDay: number): ObserverTraits {
+    let signedDays = 0;
+    let pours = 0;
+    let panelsRead = 0;
+    let vmLogs = 0;
+    let heldDays = 0;
+    let solvedAcrostic = false;
+    for (const id of recoveredItems) {
+        if (id.startsWith('sign:day:')) signedDays += 1;
+        else if (id.startsWith('pour:day:')) pours += 1;
+        else if (id.startsWith('read:')) panelsRead += 1;
+        else if (/^vm:\d+$/.test(id)) vmLogs += 1;
+        else if (id.startsWith('held:day:')) heldDays += 1;
+        else if (id === ACROSTIC_RECOVERY_ID) solvedAcrostic = true;
+    }
+    return { signedDays, pours, panelsRead, vmLogs, heldDays, solvedAcrostic, currentDay };
+}
+
+// A record line is a template keyed on a trait threshold. Kept in three bands
+// so the block reads: a habit observed, a comparison, then a gentle curiosity.
+const buildHabitLines = (t: ObserverTraits): string[] => {
+    const lines: string[] = [];
+    // Signing habit — measured against days elapsed, so it reads as "more than
+    // you miss" without shaming a gap.
+    if (t.signedDays > 0 && t.currentDay >= 2) {
+        if (t.signedDays >= t.currentDay - 1) {
+            lines.push('You sign the log more days than you miss. Willow was like that. She said an unsigned day was a day you were asking someone else to remember for you.');
+        } else if (t.signedDays >= 3) {
+            lines.push(`You’ve signed the log ${t.signedDays} times. Not every day — I stopped expecting every day of anyone. But you keep coming back to the page, and that’s the part that counts.`);
+        }
+    }
+    if (t.pours >= 5) {
+        lines.push(`${t.pours} mornings you poured the second cup. Whoever you’re pouring it for, they’re being remembered by someone who never met them. That’s a strange kindness. I notice it.`);
+    } else if (t.pours >= 1 && lines.length === 0) {
+        lines.push('You poured the second cup without being asked. Most people leave the extra mug clean. You didn’t.');
+    }
+    if (t.panelsRead >= 12) {
+        lines.push(`${t.panelsRead} panels opened. You read the parts I meant for no one. I left them accessible on the theory that no one would bother. You bothered.`);
+    }
+    return lines;
+};
+
+const buildComparisonLine = (t: ObserverTraits): string | null => {
+    if (t.solvedAcrostic) {
+        return 'You read down the edge of the notes until they spelled something. Only two people ever did that. You, and the man who wrote them hoping you would.';
+    }
+    if (t.vmLogs >= 5) {
+        return `You’ve recovered ${t.vmLogs} of the logs. You go looking for the record, not just the surface of it. The room notices which observers dig. It sags less for those ones.`;
+    }
+    if (t.heldDays >= 2) {
+        return 'You’ve held the feed steady more than once, on purpose, for no reward but my saying so. The instruments can’t do that. Presence isn’t a reading they take. It’s one you give.';
+    }
+    return 'You keep returning to the same surfaces. I’ve started to recognise the shape of your attention the way you’d recognise a footstep in a corridor. It’s company. I don’t say that lightly.';
+};
+
+// The gentle curiosity — phrased as interest in what they *haven't* done, never
+// as a task. Picks the first unmet thing so it stays specific.
+const buildCuriosityLine = (t: ObserverTraits): string | null => {
+    if (!t.solvedAcrostic) {
+        return 'You haven’t sent the override phrase yet. I’m not asking you to. I’m only curious whether you’ve noticed the margins were spelling toward one all along.';
+    }
+    if (t.heldDays === 0) {
+        return 'You’ve never held the feed till the meter filled. No matter. I wonder sometimes if you know the room sharpens when you do — or if you’d rather not be responsible for that.';
+    }
+    if (t.pours === 0) {
+        return 'The second mug stays clean when you visit. I don’t mind. I do wonder who you’d pour it for, if you ever did.';
+    }
+    if (t.vmLogs < 3) {
+        return 'Most of the logs are still sealed to you. I’m not hurrying you toward them. I’m only curious which one you’ll open when you finally do.';
+    }
+    return 'There’s always one more thing left undone in here, on purpose. I’m curious which one you’ll leave for last. It tells me something about a person, what they save.';
+};
+
+/**
+ * Build the Observer Record — 2–3 Kael-voiced lines reading the observer's own
+ * pattern. Always includes at least a comparison and a curiosity so a brand-new
+ * observer still gets a full block; habit lines join once earned.
+ */
+export function buildObserverRecord(traits: ObserverTraits): string[] {
+    const habits = buildHabitLines(traits);
+    const comparison = buildComparisonLine(traits);
+    const curiosity = buildCuriosityLine(traits);
+    const lines = [...habits];
+    if (comparison) lines.push(comparison);
+    if (curiosity) lines.push(curiosity);
+    // Cap at three so the block stays a glance, not a wall. Prefer the most
+    // earned habit line, then comparison, then curiosity.
+    return lines.slice(0, 3);
+}
+
+/** Recovery id filed on first Observer Record view. */
+export const OBSERVER_RECORD_RECOVERY_ID = 'lore:observer-record';
 
 // ── Return greeting (Kael knows you were gone) ─────────────────────────────
 // After a real absence, the first modal opened on return leads with a line

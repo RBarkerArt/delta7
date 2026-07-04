@@ -1108,6 +1108,20 @@ body {
   .fragment-knit { animation: none; }
 }
 
+/* Coherence-locked ghost text: the confession surfaces out of the noise — a
+   slow blur-to-legible fade, as if it were always beneath the log and the
+   static finally thinned enough to read it. Reduced-motion shows it plainly. */
+@keyframes ghost-confession-surface {
+  0% { opacity: 0; filter: blur(3px); }
+  100% { opacity: 1; filter: blur(0); }
+}
+.ghost-confession {
+  animation: ghost-confession-surface 2.4s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ghost-confession { animation: none; }
+}
+
 /* Cartography Map & Compass animations */
 @keyframes compass-spin {
   from { transform: rotate(0deg); }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { collection, getDocs, orderBy, query } from 'firebase/firestore';
 import { Archive, FileText, Ghost, RefreshCw } from 'lucide-react';
 import { db } from '../lib/firebase';
@@ -6,6 +6,14 @@ import type { DayLog } from '../types/schema';
 import { getPrologueThresholdLabel } from '../lib/prologueThresholds';
 import { buildDailyRecoveryState } from '../lib/dailyRecovery';
 import { FRAGMENT_SETS, ENDOWED_SET_RECOVERY_ID } from '../lib/fragmentSets';
+import { getGhostLine } from '../lib/kaelMarginalia';
+import { useCoherence } from '../hooks/useCoherence';
+
+// How long CRITICAL_INTERFERENCE must hold, with the panel open, before a ghost
+// confession fades up. Latched so momentary flicker across the threshold can't
+// trigger it — the room has to genuinely be this far gone.
+const GHOST_LATCH_MS = 5000;
+const ghostRecoveryId = (day: number): string => `fragment:ghost:${day}`;
 
 interface ArchiveShelfPanelProps {
     currentDay: number;
@@ -27,6 +35,40 @@ const isFragmentHeld = (items: string[], fragmentId: string): boolean =>
 export const ArchiveShelfPanel: React.FC<ArchiveShelfPanelProps> = ({ currentDay, recoveredItems, markRecovered }) => {
     const [days, setDays] = useState<DayLog[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Coherence-locked ghost text: at CRITICAL_INTERFERENCE, held ≥5s with the
+    // panel open, a hidden confession fades up beneath the current day's log.
+    // The state comes straight from the coherence hook; the latch below turns
+    // the flickery "is critical right now" into a stable "has been critical".
+    const { state } = useCoherence();
+    const ghostAlreadyRevealed = recoveredItems.includes(ghostRecoveryId(currentDay));
+    const [ghostRevealed, setGhostRevealed] = useState(ghostAlreadyRevealed);
+    const ghostMarkedRef = useRef(false);
+
+    useEffect(() => {
+        // Once revealed (this session or a prior one) it stays given — no need
+        // to keep watching coherence.
+        if (ghostRevealed || ghostAlreadyRevealed) {
+            if (!ghostRevealed) setGhostRevealed(true);
+            return undefined;
+        }
+        if (state !== 'CRITICAL_INTERFERENCE') return undefined;
+        // Critical right now — start the latch. Leaving critical clears the
+        // timer (the effect re-runs on `state` change), so flicker can't win.
+        const timer = window.setTimeout(() => setGhostRevealed(true), GHOST_LATCH_MS);
+        return () => window.clearTimeout(timer);
+    }, [state, ghostRevealed, ghostAlreadyRevealed]);
+
+    // File the recovery once, the first time the line becomes visible. Ref-
+    // guarded so StrictMode's double-invoke can't double-mark; the day gives it
+    // up exactly once, then renders it at any coherence thereafter.
+    useEffect(() => {
+        if (!ghostRevealed || ghostAlreadyRevealed || ghostMarkedRef.current) return;
+        ghostMarkedRef.current = true;
+        void markRecovered(ghostRecoveryId(currentDay));
+    }, [ghostRevealed, ghostAlreadyRevealed, currentDay, markRecovered]);
+
+    const ghostLine = useMemo(() => getGhostLine(currentDay), [currentDay]);
 
     // Endowed progress (#7): on first archive view, hand over one set slot —
     // "recovered before you arrived" — so the collection never opens empty.
@@ -188,6 +230,16 @@ export const ArchiveShelfPanel: React.FC<ArchiveShelfPanelProps> = ({ currentDay
                                         </div>
                                     ) : (
                                         <p className="text-xs italic text-[#f7f1dc]/48">No stable log has been filed.</p>
+                                    )}
+
+                                    {/* Coherence-locked ghost text: a confession that only surfaces
+                                        beneath the *current* day's log once the room has held at
+                                        CRITICAL for ≥5s. Styled as under-noise text; once given for
+                                        a day it stays given, rendered at any coherence thereafter. */}
+                                    {day.day === currentDay && ghostRevealed && (
+                                        <p className="ghost-confession mt-3 whitespace-pre-wrap font-['EB_Garamond'] text-xs italic leading-relaxed text-[#d8cfc0]/55 [text-shadow:0_0_6px_rgba(120,110,100,0.35)]">
+                                            {ghostLine}
+                                        </p>
                                     )}
                                 </div>
 

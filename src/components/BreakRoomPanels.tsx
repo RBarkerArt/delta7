@@ -1,13 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { collection, doc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { CalendarClock, Hash, Loader2, StickyNote } from 'lucide-react';
+import { CalendarClock, Hash, Loader2, Moon, StickyNote } from 'lucide-react';
 import { SignalIcon } from './SignalIcon';
 import { AnimatedCounter } from './ui/AnimatedCounter';
 import { TypeOn } from './ui/TypeOn';
 import { db, functions } from '../lib/firebase';
 import { corruptClockString } from '../lib/textCorruption';
-import { getCoffeeForTwoLine } from '../lib/kaelMarginalia';
+import { getCoffeeForTwoLine, getNightLine, NIGHT_DORMANT_LINE } from '../lib/kaelMarginalia';
 import { triggerRecoverySurge } from '../lib/recoverySurge';
 import { useAuth } from '../hooks/useAuth';
 import { useCoherence } from '../hooks/useCoherence';
@@ -148,13 +148,71 @@ export const useObserverBreakRoomState = (visitorId: string | null) => {
   return state;
 };
 
+// The Waking Panel: the clock keeps a night shift. Between these local hours it
+// grows a Night Log with a rawer, nocturnal Kael. A dev hook can force the
+// window open for testing (see __night below).
+const NIGHT_START_HOUR = 2;   // 02:00 local, inclusive
+const NIGHT_END_HOUR = 5;     // 05:00 local, exclusive
+const NIGHT_FORCE_KEY = 'delta7:night:force';
+const nightRecoveryId = (day: number): string => `night:day:${day}`;
+
+const isNightWindow = (date: Date): boolean => {
+  const h = date.getHours();
+  return h >= NIGHT_START_HOUR && h < NIGHT_END_HOUR;
+};
+
 export const BreakRoomClockPanel: React.FC = () => {
   const { visitorId } = useAuth();
-  const { currentDay } = useCoherence();
+  const { currentDay, recoveredItems, markRecovered } = useCoherence();
   const [now, setNow] = useState(() => Date.now());
   const [isGlitching, setIsGlitching] = useState(false);
   const target = useMemo(() => buildClockTarget(visitorId, currentDay), [currentDay, visitorId]);
   const isFuture = target > now;
+
+  // Night-window state. The forced flag (dev hook) is read once at mount as a
+  // pure initializer — StrictMode-safe because it only READS; the ref-guarded
+  // effect below consumes it so one wake() covers one panel open rather than
+  // sticking all session. Real time is checked live so the window opens/closes
+  // on its own.
+  const [nightForced] = useState(() => {
+    try { return window.sessionStorage.getItem(NIGHT_FORCE_KEY) === '1'; } catch { return false; }
+  });
+  const nightForceConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!nightForced || nightForceConsumedRef.current) return;
+    nightForceConsumedRef.current = true;
+    try { window.sessionStorage.removeItem(NIGHT_FORCE_KEY); } catch { /* ignore */ }
+  }, [nightForced]);
+  const nightAwake = nightForced || isNightWindow(new Date(now));
+  const nightLine = useMemo(
+    () => getNightLine(currentDay, visitorId || 'anon'),
+    [currentDay, visitorId]
+  );
+
+  // File night:day:${day} once, the first time the log is awake and viewed.
+  const nightMarkedRef = useRef(false);
+  useEffect(() => {
+    if (!nightAwake || nightMarkedRef.current) return;
+    if (recoveredItems.includes(nightRecoveryId(currentDay))) { nightMarkedRef.current = true; return; }
+    nightMarkedRef.current = true;
+    void markRecovered(nightRecoveryId(currentDay));
+  }, [nightAwake, currentDay, recoveredItems, markRecovered]);
+
+  // Dev hook: force the night window open. Mirrors __storm / __almost. The flag
+  // is consumed (removed) by the same reload that reads it, so a single
+  // wake()+reopen shows the night log without sticking forever.
+  useEffect(() => {
+    if (!import.meta.env.DEV || typeof window === 'undefined') return;
+    (window as unknown as { __night: unknown }).__night = {
+      wake: () => {
+        try { window.sessionStorage.setItem(NIGHT_FORCE_KEY, '1'); } catch { /* ignore */ }
+        console.info('[Delta-7] __night: reopen the break-room clock to see the Night Log.');
+      },
+      sleep: () => {
+        try { window.sessionStorage.removeItem(NIGHT_FORCE_KEY); } catch { /* ignore */ }
+      },
+    };
+  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
@@ -209,6 +267,25 @@ export const BreakRoomClockPanel: React.FC = () => {
           <div className="mt-2 text-[9px] uppercase tracking-[0.2em] text-red-300/55">drift detected — resyncing</div>
         )}
       </div>
+
+      {/* The Waking Panel — the clock's night shift. Awake 02:00–05:00 local;
+          otherwise a single dormant line. Pure bonus; the day content above is
+          never reduced. */}
+      {nightAwake ? (
+        <div className="border border-indigo-300/18 bg-[#0b0b14]/80 p-4">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-indigo-200/60">
+            <Moon size={13} />
+            Night Log
+          </div>
+          <p className="mt-3 font-['EB_Garamond'] text-base italic leading-relaxed text-[#d7d3ea]/82">
+            <TypeOn key={`night-${currentDay}`} text={nightLine} speed={16} showCursor={false} />
+          </p>
+        </div>
+      ) : (
+        <p className="border-l border-[#f2ead0]/14 pl-3 font-['EB_Garamond'] text-[12px] italic leading-snug text-[#d1d1c7]/54">
+          {NIGHT_DORMANT_LINE}
+        </p>
+      )}
     </div>
   );
 };

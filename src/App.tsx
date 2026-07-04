@@ -1703,6 +1703,9 @@ const LabInterface: React.FC = () => {
                   score={score}
                   state={state}
                   recoveredCount={recoveredItems.length}
+                  recoveredItems={recoveredItems}
+                  currentDay={currentDay}
+                  markRecovered={(id) => { void markRecovered(id); }}
                   acrosticSolved={recoveredItems.includes(ACROSTIC_RECOVERY_ID)}
                   onAcrosticSolved={() => {
                     void markRecovered(ACROSTIC_RECOVERY_ID);
@@ -1953,6 +1956,8 @@ const LabInterface: React.FC = () => {
                       void markRecovered(`relay-frag-${currentDay}`);
                       showTelemetry('CARRIER LOCKED — TRANSMISSION RESOLVED');
                     }}
+                    recoveredItems={recoveredItems}
+                    markRecovered={(id) => { void markRecovered(id); }}
                   />
 
                   <div className="mx-4 my-2 border-t border-emerald-500/10" />

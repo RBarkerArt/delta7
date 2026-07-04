@@ -10,6 +10,13 @@
 //   pour:day:${day}   — the second cup poured that day
 //   read:${variant}   — a papery artifact opened at least once (dog-ear trace)
 //   lore:${slug}      — a hidden log unlocked by paying attention (e.g. acrostic)
+// Wave 3.5 additions (runner-up interactions), same recoveredItems set:
+//   held:day:${day}       — the day's presence meter filled in Hold the Feed
+//   fragment:ghost:${day} — the day's low-coherence ghost confession, once revealed
+//   brew:started:${day}   — a Deep Decode kicked off when that day's signal locked
+//   brew:done:${day}      — the Deep Decode payload for that started-day was read
+//   night:day:${day}      — the break-room clock's Night Log viewed that night
+//   lore:observer-record  — the Observer Record (Behavioral Echo) first viewed
 // Pre-existing ids (note:day, vm:, fragment:, return:day, evidence:, catchup:day)
 // live in dailyRecovery.ts and stay as they are.
 
