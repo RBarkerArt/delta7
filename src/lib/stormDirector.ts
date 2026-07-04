@@ -22,6 +22,24 @@ const THUNDER_MAX_MS = 2_000;
 // conditions: signal fragmented and critical interference.
 const STORM_STATES = new Set(['SIGNAL_FRAGMENTED', 'CRITICAL_INTERFERENCE']);
 
+// Open modals subscribe here to react to each strike (a shiver + flicker in
+// time with the room's lightning). Fired at strike time with the strike
+// intensity so listeners can scale their reaction; kept a plain Set so there's
+// no React coupling. prefers-reduced-motion gating is the listener's job.
+type StrikeListener = (intensity: number) => void;
+const strikeListeners = new Set<StrikeListener>();
+
+/**
+ * Subscribe to storm strikes. Returns an unsubscribe fn. A modal registers on
+ * open and drops on close, so the flicker only runs while something is up.
+ */
+export function onStormStrike(listener: StrikeListener): () => void {
+    strikeListeners.add(listener);
+    return () => {
+        strikeListeners.delete(listener);
+    };
+}
+
 let getState: (() => string) | null = null;
 let checkTimer: ReturnType<typeof setInterval> | null = null;
 let strikeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -44,6 +62,17 @@ const fireStrike = (): void => {
     if (!prefersReducedMotion()) {
         pulseRoomFx(intensity);
     }
+
+    // Let any open modal react in time with the strike. Listeners self-gate on
+    // reduced-motion; we notify regardless so a papery panel can still rustle
+    // quietly. Guarded so one throwing listener can't break the storm loop.
+    strikeListeners.forEach((listener) => {
+        try {
+            listener(intensity);
+        } catch {
+            /* a modal unmounting mid-strike — ignore */
+        }
+    });
 
     if (thunderTimer !== null) clearTimeout(thunderTimer);
     thunderTimer = setTimeout(() => {
@@ -84,6 +113,13 @@ export function startStormDirector(getCoherenceState: () => string): void {
     getState = getCoherenceState;
     tick();
     checkTimer = setInterval(tick, CHECK_INTERVAL_MS);
+}
+
+// Dev-only console hook (mirrors __roomFx): fire a strike on demand so the
+// modal storm-flicker can be exercised without degrading coherence and waiting
+// out the 20-60s storm timer. e.g. `__storm.strike()` with a modal open.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+    (window as unknown as { __storm: unknown }).__storm = { strike: fireStrike };
 }
 
 export function stopStormDirector(): void {

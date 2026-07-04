@@ -25,10 +25,21 @@ interface HotspotButtonProps {
   y: string;
   size?: number; // Visual inner circle size (defaults to 28)
   state?: HotspotState;
-  onClick?: () => void;
+  /**
+   * This hotspot's artifact has been opened before, so the room glows faintly
+   * here — a lasting "someone was here" trace (#2b). Decorative, aria-hidden.
+   */
+  opened?: boolean;
+  /**
+   * This hotspot carries the day's freshest signal (Variable Signal, #6). A
+   * cool emerald/cyan breathing glow reads as "live signal" — distinct from the
+   * warm `opened` lamp-trace. Diegetic tell only; never a badge. aria-hidden.
+   */
+  featured?: boolean;
+  onClick?: (originRect?: DOMRect) => void;
   onPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void;
   onPointerCancel?: () => void;
-  triggerHotspot: (callback?: () => void) => (event: React.MouseEvent<HTMLButtonElement>) => void;
+  triggerHotspot: (callback?: (originRect?: DOMRect) => void) => (event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 const corruptText = (text: string): string => {
@@ -52,6 +63,8 @@ export const HotspotButton: React.FC<HotspotButtonProps> = ({
   y,
   size = 28,
   state = 'available',
+  opened = false,
+  featured = false,
   onClick,
   onPointerDown,
   onPointerCancel,
@@ -134,7 +147,29 @@ export const HotspotButton: React.FC<HotspotButtonProps> = ({
       className={`hotspot-btn pointer-events-auto absolute group flex items-center justify-center transition-all duration-300 w-12 h-12 md:w-9 md:h-9 z-40 focus-visible:outline-none`}
       aria-label={label}
     >
-      <div className={`relative flex items-center justify-center rounded-full border transition-all duration-300 ${buttonStyles.inner} ${buttonStyles.flicker}`}
+      {/* Room-remembers trace (#2b): once this artifact has been opened, a soft
+          warm lamp-glow lingers at its spot in the room — the drawer left ajar,
+          the lamp left on. Sits behind the ring in room space, so it reads as
+          the room changing, not UI. Decorative only. */}
+      {opened && (
+        <span
+          aria-hidden="true"
+          className="hotspot-opened-glow pointer-events-none absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ width: size * 2.6, height: size * 2.6 }}
+        />
+      )}
+      {/* Variable Signal tell (#6): the day's hot hotspot carries a cool,
+          slowly-breathing "live signal" halo — reads as a fresh carrier
+          reaching this spot, distinct from the warm opened lamp-glow above.
+          Decorative only; the content behind it is always confirmed by opening. */}
+      {featured && state !== 'locked' && (
+        <span
+          aria-hidden="true"
+          className="hotspot-featured-glow pointer-events-none absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ width: size * 2.9, height: size * 2.9 }}
+        />
+      )}
+      <div data-hotspot-core className={`relative flex items-center justify-center rounded-full border transition-all duration-300 ${buttonStyles.inner} ${buttonStyles.flicker}`}
            style={{ width: size, height: size }}>
 
         {/* Resting state: pulsing core dot; hover swaps it for the line icon */}

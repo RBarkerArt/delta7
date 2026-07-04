@@ -14,9 +14,17 @@ export interface RoomFxChannels {
     glitch: number;
     /** Attention pull toward the focal plane. 0..1 */
     focusPull: number;
+    /**
+     * Persistent "inhabited" warmth: once panels have been opened, the room
+     * carries a faint lasting lamp-lift as if someone left a light on. Unlike
+     * the other channels this one is meant to *stay set* across a session
+     * (driven from recoveredItems), not decay to 0 — a lasting trace, not an
+     * event. 0..1
+     */
+    disturbed: number;
 }
 
-const ZERO: RoomFxChannels = { dim: 0, fogBoost: 0, pulse: 0, glitch: 0, focusPull: 0 };
+const ZERO: RoomFxChannels = { dim: 0, fogBoost: 0, pulse: 0, glitch: 0, focusPull: 0, disturbed: 0 };
 const CHANNELS = Object.keys(ZERO) as Array<keyof RoomFxChannels>;
 
 // Per-second approach rates. Pulse decays faster so light sweeps read as events.
@@ -26,6 +34,9 @@ const APPROACH_RATE: RoomFxChannels = {
     pulse: 2.6,
     glitch: 8,
     focusPull: 6,
+    // Eases in slowly so a freshly-opened panel warms the room over ~1s rather
+    // than snapping; never eases back down on its own (target holds).
+    disturbed: 1.2,
 };
 
 const SNAP_EPSILON = 0.001;
@@ -77,6 +88,15 @@ export function setFocusPull(value: number): void {
     roomFx.target.focusPull = clamp01(value);
 }
 
+/**
+ * Set the persistent "inhabited" warmth level (see RoomFxChannels.disturbed).
+ * App wires this from the count of read:* traces so the room stays subtly warmer
+ * once panels have been opened — a lasting change, not an event pulse.
+ */
+export function setDisturbed(value: number): void {
+    roomFx.target.disturbed = clamp01(value);
+}
+
 /** Fire a light sweep: jumps `current` up and lets it decay back toward 0. */
 export function pulseRoomFx(intensity = 1): void {
     roomFx.current.pulse = clamp01(Math.max(roomFx.current.pulse, intensity));
@@ -116,9 +136,15 @@ export function getCoherenceBonus(): number {
     return bonusAmount * (1 - elapsed / bonusDurationMs);
 }
 
-/** Zero both targets and currents, e.g. on room unmount. */
+// Channels that survive a reset: `disturbed` is a lasting trace driven from
+// persisted state, not a scripted event — wiping it on room unmount would cost
+// the room its warmth on every room switch until the trace count next changes.
+const PERSISTENT_CHANNELS: ReadonlySet<keyof RoomFxChannels> = new Set(['disturbed']);
+
+/** Zero transient targets and currents, e.g. on room unmount. */
 export function resetRoomFx(): void {
     for (const channel of CHANNELS) {
+        if (PERSISTENT_CHANNELS.has(channel)) continue;
         roomFx.target[channel] = 0;
         roomFx.current[channel] = 0;
     }

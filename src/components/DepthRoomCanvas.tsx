@@ -63,6 +63,9 @@ uniform vec2 uRes, uOff, uWinMin, uWinMax;
 uniform float uTime, uCoh, uVideoMix, uHasGlow, uHasWindow;
 // roomFx bus channels (story events -> renderer), each 0..1.
 uniform float uDim, uFogBoost, uPulse, uEventGlitch;
+// uDisturbed: persistent "someone was here" warmth once panels have been
+// opened. A faint lasting lamp-lift, not an event — see roomFx.disturbed.
+uniform float uDisturbed;
 uniform float uMoteBoost;
 
 const float FOCUS = 0.45;
@@ -187,6 +190,15 @@ void main(){
     float pr = length((uv - pulseCenter) * vec2(1.0, TEX_ASPECT));
     float pulseFall = smoothstep(0.85, 0.0, pr);
     col += vec3(1.0, 0.96, 0.86) * uPulse * pulseFall * 0.6;
+  }
+
+  // uDisturbed: a lasting, very faint warm lamp-lift on the near (foreground)
+  // depths — the drawers/desk you've been into read as if a light was left on.
+  // Weighted toward near depth so it settles on the furniture, not the far wall,
+  // and kept subtle (inhabited, not a spotlight).
+  if (uDisturbed > 0.001) {
+    float nearW = smoothstep(0.15, 0.62, sceneD);
+    col += vec3(0.09, 0.065, 0.035) * uDisturbed * (0.35 + 0.65 * nearW);
   }
 
   vec2 vq = vUv - 0.5;
@@ -434,7 +446,7 @@ export const DepthRoomCanvas: React.FC<DepthRoomCanvasProps> = ({
 
       const names = ['uDecayed', 'uDepth', 'uStable', 'uGlow', 'uVideoA', 'uVideoB',
         'uRes', 'uOff', 'uWinMin', 'uWinMax', 'uTime', 'uCoh', 'uVideoMix', 'uHasGlow', 'uHasWindow',
-        'uDim', 'uFogBoost', 'uPulse', 'uEventGlitch', 'uMoteBoost'];
+        'uDim', 'uFogBoost', 'uPulse', 'uEventGlitch', 'uDisturbed', 'uMoteBoost'];
       const uniforms: GlState['uniforms'] = {};
       for (const n of names) uniforms[n] = gl.getUniformLocation(prog, n);
       state = {
@@ -597,6 +609,7 @@ export const DepthRoomCanvas: React.FC<DepthRoomCanvasProps> = ({
         gl.uniform1f(uniforms.uFogBoost, fx.fogBoost);
         gl.uniform1f(uniforms.uPulse, fx.pulse);
         gl.uniform1f(uniforms.uEventGlitch, fx.glitch);
+        gl.uniform1f(uniforms.uDisturbed, fx.disturbed);
         gl.uniform1f(uniforms.uMoteBoost, MOTE_BOOST);
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         if (!firstFrameFiredRef.current) {

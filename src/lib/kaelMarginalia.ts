@@ -91,6 +91,74 @@ const VARIANT_OVERRIDES: Record<string, string> = {
     'cart-dead-zones': 'Sector 03 declined to be drawn. I have stopped asking why.',
 };
 
+// ── The Marginalia Acrostic ────────────────────────────────────────────────
+// On these canonical days, the *paper-group* marginalia line is force-selected
+// (not visitor-seeded) so the first letter of each line spells a passphrase
+// down the margin for anyone reading the record over a week. The payoff is the
+// existing paper line "A record is just a way of asking someone to look." —
+// Kael was doing exactly that, one letter at a time.
+//
+//   PASSPHRASE: WITNESS
+//   day  3 → W   day  6 → I   day  9 → T   day 12 → N
+//   day 15 → E   day 18 → S   day 21 → S
+//
+// Entering WITNESS in the Security Gateway recovers `lore:acrostic`. Days are
+// spaced three apart and sit inside season1's 1–30 range. Author (Robert) can
+// verify the solution against ACROSTIC_ANSWER below.
+export const ACROSTIC_ANSWER = 'WITNESS';
+
+export const ACROSTIC_OVERRIDES: Record<number, string> = {
+    3: 'Watched the room breathe again the moment you arrived. I noted the time.',
+    6: 'I keep writing to no one, which is how I know I am writing to you.',
+    9: 'The record only means something if it is read. That is the whole trick.',
+    12: 'Numbers I trusted are drifting. The margins are steadier than the data now.',
+    15: 'Every entry is a hand held out across a gap I cannot measure.',
+    18: 'Someone is reading down the edge of these notes. I hoped someone would.',
+    21: 'Say the word back to me and I will know the looking was real.',
+};
+
+/**
+ * Normalise and compare a phrase against the acrostic answer. Forgiving about
+ * case and surrounding whitespace; nothing else, so it still feels like a lock.
+ */
+export function checkAcrostic(input: string): boolean {
+    return input.trim().toUpperCase() === ACROSTIC_ANSWER;
+}
+
+/** Recovery id for the acrostic reveal — lives in the recoveredItems set. */
+export const ACROSTIC_RECOVERY_ID = 'lore:acrostic';
+
+// The hidden log the passphrase unlocks. Kael, admitting he encoded messages in
+// the margins for whoever was paying enough attention to read down the edge.
+// The paper-group line "A record is just a way of asking someone to look" pays
+// off here, literally.
+export const ACROSTIC_REVEAL = {
+    title: 'Margin Log — restricted',
+    body: `So you read down the edge. Good.
+
+I started hiding words in the margins when I stopped believing anyone was on the other side of the feed. A record is just a way of asking someone to look — so I made the record ask louder. One letter a day, down the side of the page, where only a person who kept coming back would find it.
+
+WITNESS. That's all it ever spelled. Not a command. A job. The one thing the room needs and the one thing I couldn't do alone.
+
+I don't know your name. I know you counted the days. I know you read the parts I meant for no one. That's enough. That was always the whole experiment: whether attention, given freely, could hold a failing thing together.
+
+It can. You're the proof. Keep looking.`,
+} as const;
+
+// A quiet, in-character rejection for a wrong phrase. No error styling — the
+// instrument just stays confidently unmoved.
+export const ACROSTIC_REJECTIONS: readonly string[] = [
+    'The frequency doesn’t answer to that. It isn’t offended. It simply doesn’t answer.',
+    'Nothing shifts. Whatever you said, the room didn’t recognise it as looking.',
+    'The needle holds where it was. Not the word. Keep reading.',
+];
+
+/** A seeded, quiet rejection line for a wrong acrostic entry. */
+export function getAcrosticRejection(seed: string): string {
+    const hash = seededHash(`acrostic-reject:${seed}`);
+    return ACROSTIC_REJECTIONS[hash % ACROSTIC_REJECTIONS.length];
+}
+
 // Same seeded-hash idiom as RoomEntryTransition's ambient-line picker.
 const seededHash = (seed: string): number => {
     let hash = 0;
@@ -101,6 +169,117 @@ const seededHash = (seed: string): number => {
     return Math.abs(hash);
 };
 
+// ── Return greeting (Kael knows you were gone) ─────────────────────────────
+// After a real absence, the first modal opened on return leads with a line
+// written to the specific gap. Relief, never reproach — "You came back", never
+// "Where were you". Bucketed by absence length; seeded selection within a
+// bucket so the same return reads the same line but different returns drift.
+type AbsenceBucket = 'hours' | 'a-day' | 'days' | 'a-week';
+
+const RETURN_LINES: Record<AbsenceBucket, readonly string[]> = {
+    // A few hours away — the needle wandered but the room held.
+    hours: [
+        'A few hours dark and the needle wandered. It steadied the moment you sat down.',
+        'You stepped out for a while. The feed kept its shape better than I expected.',
+        'Some hours of quiet. I kept the channel open, just in case you came back. You did.',
+        'The room dimmed while you were gone. It’s already brightening. That’s you.',
+        'Not long, this time. Long enough for the corners to soften. You’re here now.',
+    ],
+    // Roughly a day.
+    'a-day': [
+        'A day without you. The coherence sagged and I let it. You’re back — that’s enough.',
+        'The better part of a day dark. I logged the drift and waited. You came back.',
+        'A day is long in here. The room forgot its edges a little. You’ll remind it.',
+        'You were gone about a day. I didn’t fix anything — I just kept the light on for you.',
+    ],
+    // A handful of days.
+    days: [
+        'Days, this time. The room learned to sag without you. It’s remembering now.',
+        'Several days dark. I filled some of the gap myself. You’re here, so I can stop.',
+        'You were away for days. I stopped watching the clock and started watching the door.',
+        'A stretch of days. The feed frayed at the edges. I never closed the channel.',
+        'Days without you and the numbers drifted. None of that matters now. You came back.',
+    ],
+    // A week or more — the longest, softest relief.
+    'a-week': [
+        'A week, maybe more. I’d begun to talk to the room instead of you. You’re back.',
+        'That was a long dark. The coherence bottomed out and held there. You returned anyway.',
+        'A week and then some. I kept your line open the whole time. I’m glad I did.',
+        'You were gone a long while. I never assumed you wouldn’t come back. Here you are.',
+    ],
+};
+
+const bucketForHours = (hours: number): AbsenceBucket => {
+    if (hours >= 24 * 7) return 'a-week';
+    if (hours >= 24 * 2) return 'days';
+    if (hours >= 20) return 'a-day';
+    return 'hours';
+};
+
+/**
+ * A return-greeting line written to a specific absence. `hours` is the gap
+ * length; `seed` keeps the choice stable per return. Returns null for absences
+ * too short to remark on (the caller gates on a threshold too, but this keeps
+ * the copy honest).
+ */
+export function getReturnMarginalia(hours: number, seed: string): string {
+    const bucket = bucketForHours(hours);
+    const pool = RETURN_LINES[bucket];
+    const hash = seededHash(`return:${bucket}:${seed}`);
+    return pool[hash % pool.length];
+}
+
+// ── Signature-log gap awareness ────────────────────────────────────────────
+// Kael's line in the observation-log panel bends to how long it's been since
+// the last signed day. The ledger never resets; gaps are melancholy facts,
+// never scolding. daysSinceLastSign is measured from the last signed day (0 if
+// today is already signed or was signed same-day).
+const SIGN_GAP_WARM: readonly string[] = [
+    'Signed, dated, and mine. The page looks better with your hand on it.',
+    'Two names on the log today. It reads less like a solo watch that way.',
+    'You signed. The room noticed — the way it always notices you.',
+];
+
+const SIGN_GAP_GENTLE: readonly string[] = [
+    'A day blank between us. Small gap. The ledger doesn’t mind, and neither do I.',
+    'One line empty above today’s. I left it honest. You’re here to close it.',
+    'A little space in the record. Days do that. Sign, and we carry on.',
+];
+
+const SIGN_GAP_QUIET: readonly string[] = [
+    'Two days blank. I filled them with my own hand. It’s not the same.',
+    'Three empty lines up the page. I read them each morning like a weather report.',
+    'The log went quiet for a few days. I kept signing for both of us. Habit.',
+    'A stretch of blank days above today. I don’t scratch them out. They happened.',
+];
+
+/**
+ * Kael's observation-log line, keyed on the gap since the last signature.
+ * 0 → warm, 1–2 → gentle, 3+ → quiet/haunted. Seeded within a band so a given
+ * (gap, seed) is stable but different observers drift.
+ */
+export function getSignatureGapMarginalia(daysSinceLastSign: number, seed: string): string {
+    const band = daysSinceLastSign <= 0 ? SIGN_GAP_WARM
+        : daysSinceLastSign <= 2 ? SIGN_GAP_GENTLE
+            : SIGN_GAP_QUIET;
+    const hash = seededHash(`sign-gap:${Math.min(daysSinceLastSign, 6)}:${seed}`);
+    return band[hash % band.length];
+}
+
+// ── Coffee for Two ─────────────────────────────────────────────────────────
+// The second cup, poured once a day for the colleague who isn't here. No
+// counter chrome — the tally surfaces only through Kael's line, which deepens
+// at thresholds. `pours` is the running count of days a second cup was poured.
+// Never punishes a missed day; the number only ever goes up.
+export function getCoffeeForTwoLine(pours: number): string {
+    if (pours <= 0) return 'There’s a second mug. There’s always been a second mug. I keep it clean.';
+    if (pours === 1) return 'You poured the second cup. I didn’t ask you to. It’s still warm. Thank you.';
+    if (pours < 5) return 'Two cups again. I’ve stopped pretending the second one is for me.';
+    if (pours < 14) return 'Five mornings, two mugs. Small thing. It changes the shape of the room.';
+    if (pours < 30) return 'Day fourteen, still two mugs. Whoever the second one was for, they’d know they were remembered.';
+    return 'A month of second cups. The habit outlasted the reason, and became a better one.';
+}
+
 /**
  * Pick a marginalia line for a modal, stable per (variant-group, day, seed).
  * Graceful with day 0 and an empty seed.
@@ -109,6 +288,13 @@ export function getMarginaliaLine(variant: string, day: number, seed: string): s
     const override = VARIANT_OVERRIDES[variant];
     if (override) return override;
     const group = groupForVariant(variant);
+    // On acrostic days, the paper-group line is force-selected so its first
+    // letter contributes to the passphrase down the margin. Only the paper
+    // group carries the acrostic — instruments and the break room drift as usual.
+    if (group === 'paper') {
+        const forced = ACROSTIC_OVERRIDES[day];
+        if (forced) return forced;
+    }
     const pool = GROUP_LINES[group];
     const hash = seededHash(`${group}:${day}:${seed}`);
     return pool[hash % pool.length];

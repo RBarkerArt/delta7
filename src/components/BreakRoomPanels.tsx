@@ -6,6 +6,9 @@ import { SignalIcon } from './SignalIcon';
 import { AnimatedCounter } from './ui/AnimatedCounter';
 import { TypeOn } from './ui/TypeOn';
 import { db, functions } from '../lib/firebase';
+import { corruptClockString } from '../lib/textCorruption';
+import { getCoffeeForTwoLine } from '../lib/kaelMarginalia';
+import { triggerRecoverySurge } from '../lib/recoverySurge';
 import { useAuth } from '../hooks/useAuth';
 import { useCoherence } from '../hooks/useCoherence';
 import {
@@ -143,21 +146,6 @@ export const useObserverBreakRoomState = (visitorId: string | null) => {
   }, [visitorId]);
 
   return state;
-};
-
-const GLITCH_GLYPHS = '0189▒█/\\';
-
-/** Corrupt a few characters of a clock string, leaving separators intact. */
-const corruptClockString = (value: string): string => {
-  const chars = value.split('');
-  const corruptions = 1 + Math.floor(Math.random() * 3);
-  for (let i = 0; i < corruptions; i += 1) {
-    const idx = Math.floor(Math.random() * chars.length);
-    if (/[0-9]/.test(chars[idx])) {
-      chars[idx] = GLITCH_GLYPHS[Math.floor(Math.random() * GLITCH_GLYPHS.length)];
-    }
-  }
-  return chars.join('');
 };
 
 export const BreakRoomClockPanel: React.FC = () => {
@@ -309,7 +297,7 @@ type CoffeePhase = 'idle' | 'pouring' | 'done' | 'error';
 
 export const BreakRoomCoffeePanel: React.FC = () => {
   const { visitorId } = useAuth();
-  const { currentDay, ensureUser } = useCoherence();
+  const { currentDay, ensureUser, recoveredItems, markRecovered } = useCoherence();
   const { config, loading } = useBreakRoomConfig();
   const observerState = useObserverBreakRoomState(visitorId);
   const [message, setMessage] = useState<string | null>(null);
@@ -319,6 +307,26 @@ export const BreakRoomCoffeePanel: React.FC = () => {
   const alreadyPoured = observerState.lastCoffeeSignalDay === currentDay;
   const totalMilligrams = observerState.milligrams || 0;
   const coffeeValue = config.coffeeValue || 1.42;
+
+  // Coffee for Two: a once-per-day ritual, separate from the mg claim above.
+  // Pouring the second cup writes `pour:day:${day}` to recoveredItems; the tally
+  // of such ids drives Kael's line at 1/5/14/30 thresholds. No penalty for a
+  // missed day, no counter chrome — the number only ever surfaces in his words.
+  const secondCupPouredToday = recoveredItems.includes(`pour:day:${currentDay}`);
+  const totalPours = useMemo(
+    () => recoveredItems.filter(id => id.startsWith('pour:day:')).length,
+    [recoveredItems]
+  );
+  const [secondCupFilling, setSecondCupFilling] = useState(false);
+  const secondCupFilled = secondCupPouredToday || secondCupFilling;
+
+  const pourSecondCup = async () => {
+    if (!visitorId || secondCupPouredToday || secondCupFilling) return;
+    setSecondCupFilling(true);
+    await markRecovered(`pour:day:${currentDay}`);
+    // Fires the same quiet stabilize beat the room uses for small recoveries.
+    triggerRecoverySurge();
+  };
 
   const isPouring = phase === 'pouring';
   // Cup reads full once today's pour is done (or was done on a previous visit).
@@ -508,6 +516,53 @@ export const BreakRoomCoffeePanel: React.FC = () => {
           />
         </div>
       )}
+
+      {/* Coffee for Two — the second mug, for the one who isn't here. Once a day.
+          No tally chrome; the count lives only in Kael's line below. */}
+      <div className="border border-[#f2ead0]/14 bg-[#11110e]/72 p-4">
+        <style>{`
+          @media (prefers-reduced-motion: reduce) {
+            .second-cup-liquid { transition-duration: 1ms !important; }
+          }
+        `}</style>
+        <div className="flex items-center gap-4">
+          <svg viewBox="0 0 80 120" className="h-16 w-auto shrink-0 select-none" aria-label="Second mug">
+            <clipPath id="second-cup-clip">
+              <path d="M 22 40 L 26 100 Q 26.5 104 31 104 L 55 104 Q 59.5 104 60 100 L 64 40 Z" />
+            </clipPath>
+            <g clipPath="url(#second-cup-clip)">
+              <rect
+                x="20" y="0" width="48" height="108" fill="#6f4426"
+                className="second-cup-liquid"
+                style={{
+                  transform: `translateY(${secondCupFilled ? 96 : 120}px)`,
+                  transition: `transform ${secondCupFilling && !secondCupPouredToday ? 1600 : 1}ms cubic-bezier(0.3, 0.6, 0.4, 1)`,
+                }}
+              />
+            </g>
+            <path
+              d="M 22 40 L 26 100 Q 26.5 104 31 104 L 55 104 Q 59.5 104 60 100 L 64 40 Z"
+              fill="rgba(242,234,208,0.04)" stroke="rgba(242,234,208,0.5)" strokeWidth="1.4"
+            />
+            <path d="M 63 48 Q 74 48 73 58 Q 72 67 61 66" fill="none" stroke="rgba(242,234,208,0.42)" strokeWidth="1.4" />
+          </svg>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-100/58">The second cup</div>
+            <p className="mt-1.5 font-['EB_Garamond'] text-[12px] italic leading-snug text-[#d1d1c7]/70">
+              {getCoffeeForTwoLine(totalPours)}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={pourSecondCup}
+          disabled={!visitorId || secondCupPouredToday || secondCupFilling}
+          className="mt-3 flex w-full items-center justify-center gap-2 border border-[#f2ead0]/20 bg-[#f2ead0]/8 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#fff7df] transition-colors hover:bg-[#f2ead0]/14 disabled:cursor-not-allowed disabled:bg-black/28 disabled:text-[#d8d2bd]/42"
+        >
+          <SignalIcon name="coffee" size={14} useFilter={false} />
+          {secondCupPouredToday ? 'Poured for two' : 'Pour the second cup'}
+        </button>
+      </div>
     </div>
   );
 };

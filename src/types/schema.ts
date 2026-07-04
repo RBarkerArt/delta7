@@ -61,6 +61,18 @@ export interface DayLog {
         id: string;
         body: string;
         severity: CoherenceState;
+        /**
+         * Torn Halves (#7): two fragments sharing a pairId are two halves of one
+         * document. Each renders torn (legible top, ragged edge, "[remainder
+         * filed elsewhere]") until BOTH are recovered, then they knit together.
+         */
+        pairId?: string;
+        /**
+         * Fragment Sets (#7): the named collection this fragment belongs to
+         * (keyed to a set defined in lib/fragmentSets.ts). Filled slots render
+         * legible; empty slots render as titled silhouettes in the archive.
+         */
+        set?: string;
     }>;
     images?: Array<{
         id: string;

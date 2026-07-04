@@ -15,6 +15,7 @@ import { TerminalOverlay } from './components/TerminalOverlay';
 import { RoomModal } from './components/RoomModal';
 import { PrologueViewerPanel } from './components/PrologueViewerPanel';
 import { SecurityGatewayPanel } from './components/SecurityGatewayPanel';
+import { SignatureLog } from './components/SignatureLog';
 import { SupportRelayPanel } from './components/SupportRelayPanel';
 import { ArchiveShelfPanel } from './components/ArchiveShelfPanel';
 import { ReturnSignalPanel } from './components/ReturnSignalPanel';
@@ -25,6 +26,11 @@ import { CartographyCompassPanel } from './components/CartographyCompassPanel';
 import { AnimatedCounter } from './components/ui/AnimatedCounter';
 import { TypeOn } from './components/ui/TypeOn';
 import { DecodeText } from './components/ui/DecodeText';
+import { FlipCard } from './components/ui/FlipCard';
+import { RevealMask } from './components/ui/RevealMask';
+import { SignalLockPanel } from './components/SignalLockPanel';
+import { TheAlmost } from './components/TheAlmost';
+import { ROOM_HOTSPOTS } from './lib/roomDefinitions';
 import { RoomEntryTransition } from './components/RoomEntryTransition';
 
 import { ScreenEffects } from './components/ScreenEffects';
@@ -39,9 +45,11 @@ import { useSound } from './hooks/useSound';
 import { getAudioOptIn, setAudioOptIn, openAudioChannel } from './lib/audioUnlock';
 import { startStormDirector, stopStormDirector } from './lib/stormDirector';
 import { startAbsenceWatcher, stopAbsenceWatcher } from './lib/absenceWatcher';
-import { setRoomFxTarget } from './lib/roomFx';
+import { setRoomFxTarget, setDisturbed } from './lib/roomFx';
 import { soundEngine } from './lib/SoundEngine';
-import { onRecoverySurge } from './lib/recoverySurge';
+import { onRecoverySurge, triggerRecoverySurge } from './lib/recoverySurge';
+import { ACROSTIC_RECOVERY_ID } from './lib/kaelMarginalia';
+import { armReturnGreeting } from './lib/returnGreeting';
 import { runDeadZoneSwallow } from './lib/deadZoneSwallow';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { getWillowRestorationState, isVideoSource, selectAvailableWillowState, toStoragePath, WILLOW_VIDEO_VARIANTS, type WillowEvidenceState } from './lib/roomMedia';
@@ -112,10 +120,72 @@ const VALID_POPUP_IDS = new Set<ActivePopup>([
 // markRecovered on first open; presence in recoveredItems disables the takeover.
 const DEAD_ZONE_SWALLOW_ID = 'event_dead_zone_swallow';
 
+// Read-trace (dog-ears): papery panels earn a folded corner once opened;
+// instruments a faint fingerprint. Purely decorative persistence keyed on the
+// resolved modal variant via `read:${variant}` in recoveredItems. `window` and
+// door/index shells carry no trace (they're live feeds, not artifacts to leave).
+const PAPER_READ_TRACE_VARIANTS = new Set<string>([
+  'drawer', 'archive', 'prologue', 'support', 'blackboard', 'lore',
+  'cart-notes', 'break-bulletin',
+]);
+const INSTRUMENT_READ_TRACE_VARIANTS = new Set<string>([
+  'security', 'break-clock', 'break-coffee', 'break-fridge',
+  'cart-compass', 'cart-route-trace', 'cart-sector-scan', 'cart-relay-tuning',
+]);
+const readTraceKindForVariant = (variant: string): 'unread' | 'paper' | 'instrument' => {
+  if (PAPER_READ_TRACE_VARIANTS.has(variant)) return 'paper';
+  if (INSTRUMENT_READ_TRACE_VARIANTS.has(variant)) return 'instrument';
+  return 'unread';
+};
+
 const getRoomSceneId = (room: ActiveRoom): RoomSceneId => {
   if (room === 'lab') return 'lab';
   if (room === 'break-room') return 'break-room';
   return 'signal-cartography';
+};
+
+// Variable Signal (#6): action ids that never carry the day's featured content —
+// doors and the room-index/signal panels are navigation, not story surfaces.
+const FEATURED_INELIGIBLE_ACTIONS = new Set<string>([
+  'return-door', 'next-room-door', 'room-signal', 'cart-room-index', 'cart-unmarked-door',
+]);
+
+// Small string hash mirroring the per-day seeding idiom used across the panels
+// (CartographyCompassPanel, SignalLockPanel).
+const hashSeedString = (value: string): number => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+};
+
+/**
+ * Pick the 1–2 hotspots that carry the day's freshest content, seeded by
+ * (day + observer) over the current room's eligible actionIds. Stable per
+ * observer/day; deterministically distinct picks. Returns the featured
+ * *action ids* (matched against hotspot.actionId in the room).
+ */
+const selectFeaturedActionIds = (sceneId: RoomSceneId, day: number, visitorId: string | null): Set<string> => {
+  const eligible = (ROOM_HOTSPOTS[sceneId] ?? [])
+    .map((hs) => hs.actionId)
+    .filter((actionId) => !FEATURED_INELIGIBLE_ACTIONS.has(actionId));
+  // De-dupe (some rooms map two hotspots to the same actionId, e.g. `window`).
+  const pool = Array.from(new Set(eligible));
+  if (pool.length === 0) return new Set();
+
+  const seed = hashSeedString(`featured:${sceneId}:${day}:${visitorId || 'anon'}`);
+  const count = pool.length >= 4 ? 1 + (seed % 2) : 1; // 1–2 hot per day
+  const featured = new Set<string>();
+  let cursor = seed % pool.length;
+  for (let i = 0; i < count && featured.size < pool.length; i++) {
+    // Step by a seed-derived stride so the two picks are rarely adjacent.
+    while (featured.has(pool[cursor])) cursor = (cursor + 1) % pool.length;
+    featured.add(pool[cursor]);
+    cursor = (cursor + 1 + (seed % 3)) % pool.length;
+  }
+  return featured;
 };
 
 const getRoomPath = (room: ActiveRoom): string => {
@@ -293,6 +363,10 @@ const LabInterface: React.FC = () => {
   const [isRoomTransitioning, setIsRoomTransitioning] = useState(false);
   const [pendingRoomReadyTarget, setPendingRoomReadyTarget] = useState<ActiveRoom | null>(null);
   const [activePopup, setActivePopup] = useState<ActivePopup | null>(null);
+  // Origin Flight (#1): the on-screen box of the hotspot that opened the current
+  // popup, so the modal springs out of it and closes back into it. Null for
+  // programmatic opens (which keep the centered fade).
+  const [popupOriginRect, setPopupOriginRect] = useState<DOMRect | null>(null);
   const [loreContent, setLoreContent] = useState<{ title: string; body: string } | null>(null);
   const [observationVideoSrc, setObservationVideoSrc] = useState<Partial<Record<WillowEvidenceState, string>>>({});
   const [cartMapUrl, setCartMapUrl] = useState<string>('');
@@ -612,7 +686,11 @@ const LabInterface: React.FC = () => {
       'break-refrigerator': getStatus(observerState.lastFridgeSignalDay === currentDay ? 'used' : 'available'),
     };
   }, [dailyRecovery, dayData, hasNextRoomAccess, hasSignalRoomAccess, observerState, currentDay, score]);
-  const handleHotspotAction = useCallback((hotspot: RoomHotspotDefinition) => {
+  const handleHotspotAction = useCallback((hotspot: RoomHotspotDefinition, originRect?: DOMRect) => {
+    // Origin Flight (#1): stash the clicked hotspot's box so RoomModal can spring
+    // out of it. Cleared on close. The monitor terminal and dead-zone swallow run
+    // their own transitions, so we only set it for RoomModal-backed opens.
+    setPopupOriginRect(originRect ?? null);
     switch (hotspot.actionId) {
       case 'monitor':
         void markRecovered(`vm:${resolvedDay}`);
@@ -850,6 +928,79 @@ const LabInterface: React.FC = () => {
       if (timer) window.clearTimeout(timer);
     };
   }, [returnSignalKey]);
+
+  // Arm Kael's return greeting off the same signal: after a real absence, the
+  // first modal opened on return leads with a line written to the gap. The
+  // greeting module gates on its own threshold and dedupes on returnSignalKey.
+  useEffect(() => {
+    if (!returnSignal || !returnSignalKey) return;
+    armReturnGreeting(returnSignal.absenceMs, returnSignalKey);
+  }, [returnSignal, returnSignalKey]);
+
+  // The resolved modal variant (door/index shells collapse to cart-room-index,
+  // mirroring the RoomModal `variant` prop below) and its read-trace state.
+  const resolvedPopupVariant = activePopup
+    ? (activePopup === 'return-door' || activePopup === 'next-room-door' || activePopup === 'room-signal'
+        ? 'cart-room-index'
+        : activePopup)
+    : null;
+  // Frozen at open: the marking effect below updates recoveredItems while the
+  // panel is up, and the fold must not ink in mid-read — it appears next visit.
+  const popupReadTrace = useMemo<'unread' | 'paper' | 'instrument'>(
+    () => resolvedPopupVariant && recoveredItems.includes(`read:${resolvedPopupVariant}`)
+      ? readTraceKindForVariant(resolvedPopupVariant)
+      : 'unread',
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [resolvedPopupVariant]
+  );
+
+  // Dog-ear persistence: first open of a papery/instrument panel leaves a
+  // permanent physical trace. Marked one frame after open so the fresh panel
+  // shows clean, then carries the fold on every subsequent visit.
+  useEffect(() => {
+    if (!resolvedPopupVariant) return;
+    if (readTraceKindForVariant(resolvedPopupVariant) === 'unread') return;
+    const id = `read:${resolvedPopupVariant}`;
+    if (recoveredItems.includes(id)) return;
+    void markRecovered(id);
+  }, [resolvedPopupVariant, recoveredItems, markRecovered]);
+
+  // Room-remembers (#2b): the *room* carries a lasting warmth once panels have
+  // been opened — as if lights were left on / a drawer left ajar. Driven purely
+  // off the persisted read:* traces (no new storage), so it survives reloads.
+  // The count of opened artifacts eases a faint persistent lamp-lift into the
+  // depth shader; per-hotspot glow is placed in the room plane (see
+  // openedHotspotIds → LabObserverRoom). Kept subtle — inhabited, not a trophy.
+  const openedTraceCount = useMemo(
+    () => recoveredItems.filter(item => item.startsWith('read:')).length,
+    [recoveredItems]
+  );
+  useEffect(() => {
+    // Saturates around ~5 opened panels; a room that's been fully explored
+    // reads clearly inhabited without ever looking lit-up.
+    setDisturbed(Math.min(0.55, openedTraceCount * 0.13));
+  }, [openedTraceCount]);
+
+  // Opened-artifact action ids (== the read:{variant} suffix, which is the
+  // hotspot actionId). Passed to the room so it can place a faint lasting glow
+  // at each opened hotspot's exact position — the drawer left ajar, the lamp
+  // left on. Positions live with the hotspots in the room plane, so the glow
+  // tracks pan/zoom/tilt for free.
+  const openedHotspotActionIds = useMemo(() => {
+    const opened = new Set<string>();
+    for (const item of recoveredItems) {
+      if (item.startsWith('read:')) opened.add(item.slice('read:'.length));
+    }
+    return opened;
+  }, [recoveredItems]);
+
+  // Variable Signal (#6): the day's 1–2 "hot" hotspots for the current room,
+  // seeded per day+observer. Diegetic tell only — the floor guarantee (every
+  // panel always carries marginalia) means no open is ever a blank.
+  const featuredHotspotActionIds = useMemo(
+    () => selectFeaturedActionIds(getRoomSceneId(activeRoom), currentDay, visitorId),
+    [activeRoom, currentDay, visitorId]
+  );
 
   useEffect(() => {
     if (isPrologueActive || dataLoading) return;
@@ -1258,6 +1409,8 @@ const LabInterface: React.FC = () => {
               roomRestoration={roomRestoration}
               willowVideoSources={observationVideoSrc}
               hotspotStates={hotspotStates}
+              openedHotspotActionIds={openedHotspotActionIds}
+              featuredHotspotActionIds={featuredHotspotActionIds}
               onSceneReady={() => {
                 setIsRoomSceneLive(true);
                 handleRoomSceneReady(activeRoom);
@@ -1323,7 +1476,12 @@ const LabInterface: React.FC = () => {
             maxWidth={activePopup === 'archive' || activePopup === 'prologue' || activePopup === 'break-bulletin' || activePopup === 'break-fridge' || activePopup === 'cart-map' ? 'max-w-4xl' : activePopup === 'security' || activePopup === 'cart-notes' ? 'max-w-3xl' : activePopup === 'break-clock' || activePopup === 'break-coffee' || activePopup === 'cart-compass' || activePopup === 'cart-dead-zones' || activePopup === 'cart-relay-tuning' || activePopup === 'cart-route-trace' || activePopup === 'cart-unmarked-door' || activePopup === 'cart-sector-scan' ? 'max-w-xl' : 'max-w-2xl'}
             variant={activePopup === 'return-door' || activePopup === 'next-room-door' || activePopup === 'room-signal' ? 'cart-room-index' : activePopup}
             marginaliaDay={currentDay}
-            onClose={() => setActivePopup(null)}
+            readTrace={popupReadTrace}
+            originRect={popupOriginRect}
+            onClose={() => {
+              setActivePopup(null);
+              setPopupOriginRect(null);
+            }}
           >
             <>
               {activePopup === 'lore' && (
@@ -1403,17 +1561,41 @@ const LabInterface: React.FC = () => {
                   <div className="text-[10px] uppercase tracking-[0.2em] text-emerald-100/58">
                     Field note filed
                   </div>
-                  <div className="italic text-sm border-l border-emerald-200/25 pl-4 py-1 space-y-2 leading-relaxed max-h-[40vh] overflow-y-auto">
-                    {dayData?.narrativeSummary ? (
-                      <p className="select-text text-[#f2ead0]">
-                        <TypeOn text={`"${dayData.narrativeSummary}"`} speed={14} startDelay={300} />
-                      </p>
-                    ) : (
-                      <p className="text-[#d8d2bd]/60">
-                        <TypeOn text="Scattered papers show fragment records and mathematical drafts referencing the 1.42Hz frequency, but the pages are too degraded to resolve completely." speed={8} startDelay={300} showCursor={false} />
-                      </p>
-                    )}
-                  </div>
+                  {/* The filed note is a physical page (#8): drag it sideways —
+                      or use the affordance — to turn it over. Kael writes where
+                      the log can't see. */}
+                  <FlipCard
+                    flipLabel="Turn the note over"
+                    minHeight={180}
+                    front={
+                      <div className="flex min-h-[180px] flex-col justify-center border border-[#f2ead0]/12 bg-black/24 p-4">
+                        <div className="italic text-sm border-l border-emerald-200/25 pl-4 py-1 space-y-2 leading-relaxed max-h-[40vh] overflow-y-auto">
+                          {dayData?.narrativeSummary ? (
+                            <p className="select-text text-[#f2ead0]">
+                              <TypeOn text={`"${dayData.narrativeSummary}"`} speed={14} startDelay={300} />
+                            </p>
+                          ) : (
+                            <p className="text-[#d8d2bd]/60">
+                              <TypeOn text="Scattered papers show fragment records and mathematical drafts referencing the 1.42Hz frequency, but the pages are too degraded to resolve completely." speed={8} startDelay={300} showCursor={false} />
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    }
+                    back={
+                      <div className="flex h-full min-h-[180px] flex-col justify-between border border-[#f2ead0]/12 bg-[#16150f] p-4">
+                        <p className="font-['EB_Garamond'] text-base italic leading-relaxed text-[#e8e0c8]/85">
+                          The front of the page is for the record. The back is for whoever thinks to turn it over. Until now, that has been no one.
+                        </p>
+                        <div
+                          aria-hidden="true"
+                          className="mt-4 inline-block max-w-max -rotate-3 border-2 border-[#b04a3a]/45 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.3em] text-[#b04a3a]/60"
+                        >
+                          Δ-7 CONTINUITY ARCHIVE · FILED UNREAD
+                        </div>
+                      </div>
+                    }
+                  />
                 </div>
               )}
 
@@ -1423,6 +1605,19 @@ const LabInterface: React.FC = () => {
                     The viewport mirrors the room's exterior feed. Current evidence state: <span className="uppercase tracking-[0.18em] text-emerald-100/70">{activeWillowEvidenceState}</span>.
                   </p>
 
+                  {/* Hold-to-the-light (#8): condensation keeps forming on the
+                      inside of the viewport glass. Sweep a finger/cursor across
+                      the feed to wipe it clear and find what Kael wrote there. */}
+                  <RevealMask
+                    toggleLabel="Wipe the glass"
+                    hidden={
+                      <div className="h-full w-full bg-[radial-gradient(circle_at_50%_60%,rgba(190,205,198,0.16),rgba(190,205,198,0.05)_70%)]">
+                        <p className="absolute bottom-8 left-5 right-5 font-['EB_Garamond'] text-lg italic leading-snug tracking-wide text-[#eef4ec]/85 [text-shadow:0_0_12px_rgba(238,244,236,0.35)]">
+                          the fog isn&rsquo;t weather. it&rsquo;s the room forgetting.
+                        </p>
+                      </div>
+                    }
+                  >
                   <div
                     className="relative aspect-video w-full overflow-hidden border border-white/10 bg-black shadow-[0_0_24px_rgba(16,185,129,0.08)]"
                   >
@@ -1464,6 +1659,20 @@ const LabInterface: React.FC = () => {
 
                     <div className="pointer-events-none absolute inset-0 bg-scanlines opacity-[0.12]" />
 
+                    {/* The Almost (#10): a near-miss (or, on the pity floor, a
+                        catch) drifts through the feed. Sits inside the feed's
+                        children — above the video, below RevealMask's hidden
+                        condensation layer — so wiping the glass still works and
+                        the catch never blocks the feed. */}
+                    <TheAlmost
+                      key={`almost-${activeWillowEvidenceState}-${activePopup}`}
+                      alreadyCaught={recoveredItems.includes('lore:the-almost')}
+                      onCatch={() => {
+                        void markRecovered('lore:the-almost');
+                        showTelemetry('EXTERIOR CONTACT — ONE FRAME RESOLVED');
+                      }}
+                    />
+
                     {isObservationVideoReady && (
                       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-3 py-2 text-[9px] uppercase tracking-[0.22em] text-emerald-100/75">
                         <span className="flex items-center gap-1.5">
@@ -1474,6 +1683,11 @@ const LabInterface: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  </RevealMask>
+
+                  <p className="text-[10px] italic tracking-wide text-[#d8d2bd]/42">
+                    Condensation keeps forming on the inside of the glass.
+                  </p>
                 </div>
               )}
 
@@ -1489,6 +1703,11 @@ const LabInterface: React.FC = () => {
                   score={score}
                   state={state}
                   recoveredCount={recoveredItems.length}
+                  acrosticSolved={recoveredItems.includes(ACROSTIC_RECOVERY_ID)}
+                  onAcrosticSolved={() => {
+                    void markRecovered(ACROSTIC_RECOVERY_ID);
+                    triggerRecoverySurge();
+                  }}
                   onTune={() => {
                     setActivePopup(null);
                     setIsTuningOpen(true);
@@ -1515,7 +1734,7 @@ const LabInterface: React.FC = () => {
               )}
 
               {activePopup === 'archive' && (
-                <ArchiveShelfPanel currentDay={currentDay} recoveredItems={recoveredItems} />
+                <ArchiveShelfPanel currentDay={currentDay} recoveredItems={recoveredItems} markRecovered={markRecovered} />
               )}
 
               {activePopup === 'support' && (
@@ -1527,7 +1746,14 @@ const LabInterface: React.FC = () => {
               )}
 
               {activePopup === 'break-bulletin' && (
-                <BreakRoomBulletinPanel />
+                <div className="space-y-6">
+                  {/* The observation log clips to the corkboard above the notices —
+                      the daily signing ritual lives on the break-room board. */}
+                  <SignatureLog />
+                  <div className="border-t border-[#f2ead0]/12 pt-5">
+                    <BreakRoomBulletinPanel />
+                  </div>
+                </div>
               )}
 
               {activePopup === 'break-coffee' && (
@@ -1715,6 +1941,25 @@ const LabInterface: React.FC = () => {
               )}
 
               {activePopup === 'cart-relay-tuning' && (
+                <div className="flex flex-col">
+                  {/* Signal Lock (#5): phase-match the carrier to decode a
+                      day-gated Kael transmission. Lives at the top of the relay
+                      panel; the residue-mass economy stays below the divider. */}
+                  <SignalLockPanel
+                    visitorId={visitorId}
+                    currentDay={currentDay}
+                    alreadyLocked={recoveredItems.includes(`relay-frag-${currentDay}`)}
+                    onLock={() => {
+                      void markRecovered(`relay-frag-${currentDay}`);
+                      showTelemetry('CARRIER LOCKED — TRANSMISSION RESOLVED');
+                    }}
+                  />
+
+                  <div className="mx-4 my-2 border-t border-emerald-500/10" />
+                  <div className="px-4 pt-1 text-[9px] font-mono uppercase tracking-widest text-emerald-100/35">
+                    RESIDUE RECLAMATION // SECONDARY COIL
+                  </div>
+
                 <div className="flex flex-col p-4 space-y-6">
                   <div className={`flex justify-between items-center border bg-black/40 p-3 rounded transition-colors duration-500 ${isTuningRelay ? 'border-cyan-300/45' : 'border-emerald-500/25'}`}>
                     <span className="font-mono text-xs text-emerald-100/60 uppercase">RESIDUE MASS</span>
@@ -1780,6 +2025,7 @@ const LabInterface: React.FC = () => {
                     </div>
                     <div className="pointer-events-none absolute inset-0 bg-scanlines opacity-[0.05]" />
                   </div>
+                </div>
                 </div>
               )}
 

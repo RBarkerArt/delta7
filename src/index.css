@@ -1002,6 +1002,112 @@ body {
   animation: hotspot-pulse-micro 2s ease-in-out infinite;
 }
 
+/* Room-remembers trace (#2b): a soft, warm lamp-glow that lingers at a hotspot
+   once its artifact has been opened. Very low opacity + a slow breathing pulse
+   so it reads as ambient room light left on, not a UI badge. It sits behind the
+   hotspot ring in the room plane, so it pans/zooms with the room. */
+@keyframes hotspot-opened-breathe {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.96); }
+  50% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.06); }
+}
+
+.hotspot-opened-glow {
+  background: radial-gradient(circle,
+    rgba(255, 214, 150, 0.20) 0%,
+    rgba(255, 198, 120, 0.10) 38%,
+    transparent 70%);
+  mix-blend-mode: screen;
+  animation: hotspot-opened-breathe 6.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hotspot-opened-glow {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* Variable Signal tell (#6): a cooler emerald/cyan halo that breathes slightly
+   faster than the warm opened-glow — reads as a live carrier reaching this
+   spot today, not a lamp left on. Sits behind the ring in room space. Never a
+   badge; the hot content is always confirmed by opening. */
+@keyframes hotspot-featured-breathe {
+  0%, 100% { opacity: 0.42; transform: translate(-50%, -50%) scale(0.94); }
+  50% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.08); }
+}
+
+.hotspot-featured-glow {
+  background: radial-gradient(circle,
+    rgba(94, 234, 212, 0.24) 0%,
+    rgba(110, 231, 183, 0.12) 40%,
+    transparent 72%);
+  mix-blend-mode: screen;
+  animation: hotspot-featured-breathe 4.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hotspot-featured-glow {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+
+/* The Almost (#10): a blurred shape drifts across the feed edge and exits in
+   ~2.5s — something you almost saw. Transform/opacity only, no new assets. */
+@keyframes almost-drift-across {
+  0% { left: -18%; opacity: 0; transform: translateY(-50%) scale(0.9); }
+  18% { opacity: 0.85; }
+  82% { opacity: 0.8; }
+  100% { left: 108%; opacity: 0; transform: translateY(-50%) scale(1.05); }
+}
+.almost-drift {
+  left: -18%;
+  animation: almost-drift-across 2.5s ease-in-out forwards;
+}
+@keyframes almost-caption-in {
+  0% { opacity: 0; }
+  20% { opacity: 0.9; }
+  100% { opacity: 0.55; }
+}
+.almost-caption { animation: almost-caption-in 2.6s ease-out both; }
+
+/* The catch: the shape lingers center-frame, breathing, until resolved. */
+@keyframes almost-catch-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.97); }
+  50% { opacity: 0.85; transform: scale(1.04); }
+}
+.almost-catch { animation: almost-catch-breathe 2.2s ease-in-out infinite; }
+.almost-resolved { animation: fragment-knit-in 1.1s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .almost-drift, .almost-catch, .almost-caption, .almost-resolved { animation: none; }
+}
+
+/* Torn Halves (#7): a paired fragment whose partner is still missing renders
+   torn — a ragged bottom edge clipped off, as if the page was pulled apart.
+   The zigzag polygon leaves the top legible and eats the lower edge. */
+.fragment-torn > p:first-child {
+  clip-path: polygon(
+    0 0, 100% 0, 100% 82%,
+    94% 88%, 88% 80%, 82% 90%, 76% 82%, 70% 92%, 64% 83%, 58% 91%,
+    52% 82%, 46% 90%, 40% 81%, 34% 91%, 28% 83%, 22% 90%, 16% 81%,
+    10% 89%, 4% 82%, 0 88%
+  );
+  padding-bottom: 0.4rem;
+}
+
+/* Knit: when both halves are recovered, the joined fragment eases in whole —
+   a brief settle, as if the tear closed. Reduced-motion shows it instantly. */
+@keyframes fragment-knit-in {
+  0% { opacity: 0.2; transform: translateY(3px); letter-spacing: 0.06em; }
+  100% { opacity: 0.9; transform: translateY(0); letter-spacing: normal; }
+}
+.fragment-knit {
+  animation: fragment-knit-in 0.85s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fragment-knit { animation: none; }
+}
+
 /* Cartography Map & Compass animations */
 @keyframes compass-spin {
   from { transform: rotate(0deg); }
@@ -1167,6 +1273,17 @@ body {
 
 .room-modal-panel-exit {
   animation: room-modal-panel-out 160ms ease-in both;
+}
+
+/* ---- Storm-reactive modal flicker (wave 2) ---- */
+/* The 1-2px panel shiver runs via WAAPI on the `translate` property inside
+   RoomModal — out of both the pointer-tilt transform and the CSS animation
+   cascade (which the instrument-bloom rule owns on that element). Only the
+   content dim lives here: --storm-dim is set on the panel during a strike and
+   inherited. A brightness dip, not a fade — text stays readable throughout. */
+.room-modal-content-storm {
+  filter: brightness(var(--storm-dim, 1));
+  transition: filter 180ms ease-out;
 }
 
 /* ---- World recedes while a modal is open (C1) ---- */

@@ -71,7 +71,8 @@
                 "kind": ".vm5",
                 "title": "vm5:0002 (partial)",
                 "severity": "fraying",
-                "body": "\u2026calling it coherence\u2026 the room\u2019s rules sharpen when you are here\u2026"
+                "body": "\u2026calling it coherence\u2026 the room\u2019s rules sharpen when you are here\u2026",
+                "set": "coherence-thesis"
             }
         ],
         "images": [
@@ -181,7 +182,8 @@
                 "kind": ".vm5",
                 "title": "vm5:0004 (partial)",
                 "severity": "fraying",
-                "body": "\u2026note on my desk\u2026 1.42Hz\u2026 strengthens when you are present\u2026"
+                "body": "\u2026note on my desk\u2026 1.42Hz\u2026 strengthens when you are present\u2026",
+                "pairId": "pair-carrier-note"
             }
         ],
         "images": [
@@ -236,7 +238,8 @@
                 "kind": ".vm5",
                 "title": "vm5:0005 (partial)",
                 "severity": "fraying",
-                "body": "\u2026system refuses to let you become an object\u2026 purpose is a force\u2026"
+                "body": "\u2026system refuses to let you become an object\u2026 purpose is a force\u2026",
+                "set": "coherence-thesis"
             }
         ],
         "images": [
@@ -346,7 +349,8 @@
                 "kind": ".vm5",
                 "title": "vm5:0007 (partial)",
                 "severity": "fraying",
-                "body": "\u2026the network went quiet\u2026 without witness, systems become dreams\u2026"
+                "body": "\u2026the network went quiet\u2026 without witness, systems become dreams\u2026",
+                "pairId": "pair-witness-dream"
             }
         ],
         "images": [
@@ -401,7 +405,8 @@
                 "kind": ".vm5",
                 "title": "vm5:0008 (partial)",
                 "severity": "fragmented",
-                "body": "\u2026the overlap is fragile\u2026 it doesn\u2019t like being alone\u2026"
+                "body": "\u2026the overlap is fragile\u2026 it doesn\u2019t like being alone\u2026",
+                "set": "coherence-thesis"
             }
         ],
         "images": [
@@ -456,7 +461,8 @@
                 "kind": ".vm5",
                 "title": "vm5:0009 (partial)",
                 "severity": "fraying",
-                "body": "\u2026your attention is structural\u2026 the room\u2019s geometry depends on it\u2026"
+                "body": "\u2026your attention is structural\u2026 the room\u2019s geometry depends on it\u2026",
+                "set": "coherence-thesis"
             }
         ],
         "images": [
@@ -566,7 +572,8 @@
                 "kind": ".vm5",
                 "title": "vm5:0011 (partial)",
                 "severity": "fragmented",
-                "body": "\u2026second stabilization event\u2026 less than a second\u2026 not alone on this channel\u2026"
+                "body": "\u2026second stabilization event\u2026 less than a second\u2026 not alone on this channel\u2026",
+                "pairId": "pair-carrier-note"
             }
         ],
         "images": [
@@ -683,7 +690,8 @@
                 "kind": ".vm5",
                 "title": "vm5:0013 (partial)",
                 "severity": "fraying",
-                "body": "\u2026the lab made sounds\u2026 like a blink\u2026 capable of choosing\u2026"
+                "body": "\u2026the lab made sounds\u2026 like a blink\u2026 capable of choosing\u2026",
+                "pairId": "pair-witness-dream"
             }
         ],
         "images": [
@@ -793,7 +801,8 @@
                 "kind": ".vm5",
                 "title": "vm5:0015 (partial)",
                 "severity": "fragmented",
-                "body": "\u2026feed requires an external witness\u2026 cannot stabilize myself\u2026"
+                "body": "\u2026feed requires an external witness\u2026 cannot stabilize myself\u2026",
+                "set": "coherence-thesis"
             }
         ],
         "images": [

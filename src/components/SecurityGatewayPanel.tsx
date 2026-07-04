@@ -2,6 +2,9 @@ import React from 'react';
 import { Archive, KeyRound, Radio, ShieldAlert, ShieldCheck } from 'lucide-react';
 import type { CoherenceState } from '../types/schema';
 import { DecodeText } from './ui/DecodeText';
+import { TypeOn } from './ui/TypeOn';
+import { checkAcrostic, getAcrosticRejection, ACROSTIC_REVEAL } from '../lib/kaelMarginalia';
+import { getObserverSession } from '../lib/visitor';
 
 interface SecurityGatewayPanelProps {
     accessCode: string | null;
@@ -10,6 +13,10 @@ interface SecurityGatewayPanelProps {
     score: number;
     state: CoherenceState;
     recoveredCount: number;
+    /** True once `lore:acrostic` has been recovered — reveals the hidden log. */
+    acrosticSolved: boolean;
+    /** Called on a correct override phrase; recovers the acrostic lore. */
+    onAcrosticSolved: () => void;
     onAnchor: () => void;
     onTune: () => void;
 }
@@ -21,9 +28,29 @@ export const SecurityGatewayPanel: React.FC<SecurityGatewayPanelProps> = ({
     score,
     state,
     recoveredCount,
+    acrosticSolved,
+    onAcrosticSolved,
     onAnchor,
     onTune
 }) => {
+    // The override-phrase surface. Diegetic: restoring a frequency that only the
+    // margins carried. A wrong entry gets a quiet, unstyled rejection; a correct
+    // one recovers the hidden Kael log. Never blocks anything — pure bonus.
+    const [phrase, setPhrase] = React.useState('');
+    const [rejection, setRejection] = React.useState<string | null>(null);
+    const seed = getObserverSession().visitorId;
+
+    const submitPhrase = (event: React.FormEvent) => {
+        event.preventDefault();
+        if (acrosticSolved) return;
+        if (checkAcrostic(phrase)) {
+            setRejection(null);
+            onAcrosticSolved();
+        } else {
+            setRejection(getAcrosticRejection(seed + phrase.trim().toUpperCase()));
+        }
+    };
+
     return (
         <div className="space-y-6 text-[#f7f1dc]">
             <div className="grid gap-3 sm:grid-cols-3">
@@ -84,6 +111,53 @@ export const SecurityGatewayPanel: React.FC<SecurityGatewayPanelProps> = ({
                     {isAnchored ? <ShieldCheck size={15} /> : <ShieldAlert size={15} />}
                     {isAnchored ? 'View Anchor' : 'Anchor Record'}
                 </button>
+            </div>
+
+            {/* Override phrase — the margins carried a word for anyone reading down
+                the edge. Restoring it here recovers what Kael was really doing. */}
+            <div className="border-t border-[#f2ead0]/14 pt-5">
+                {acrosticSolved ? (
+                    <div className="border border-emerald-100/25 bg-[#11110e]/72 p-4">
+                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-emerald-100/58">
+                            <Radio size={13} />
+                            {ACROSTIC_REVEAL.title}
+                        </div>
+                        <p className="mt-3 whitespace-pre-wrap font-['EB_Garamond'] text-sm italic leading-relaxed text-[#f2ead0]/82">
+                            <TypeOn text={ACROSTIC_REVEAL.body} speed={9} startDelay={200} showCursor={false} />
+                        </p>
+                    </div>
+                ) : (
+                    <form onSubmit={submitPhrase} className="space-y-2">
+                        <label className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-[#f7f1dc]/50" htmlFor="override-phrase">
+                            <Radio size={13} className="text-emerald-100/60" />
+                            Override Phrase
+                        </label>
+                        <div className="flex gap-2">
+                            <input
+                                id="override-phrase"
+                                type="text"
+                                value={phrase}
+                                onChange={(e) => { setPhrase(e.target.value); setRejection(null); }}
+                                autoComplete="off"
+                                autoCapitalize="characters"
+                                spellCheck={false}
+                                placeholder="restore frequency…"
+                                className="min-w-0 flex-1 border border-[#f2ead0]/16 bg-black/28 px-3 py-2 font-mono text-sm uppercase tracking-[0.16em] text-[#fff7df] placeholder:text-[#f7f1dc]/28 outline-none transition-colors focus:border-emerald-100/40"
+                            />
+                            <button
+                                type="submit"
+                                className="shrink-0 border border-emerald-100/30 bg-emerald-100/12 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-50 transition-colors hover:bg-emerald-100/22"
+                            >
+                                Send
+                            </button>
+                        </div>
+                        {rejection && (
+                            <p className="font-['EB_Garamond'] text-[12px] italic leading-snug text-[#d1d1c7]/62">
+                                {rejection}
+                            </p>
+                        )}
+                    </form>
+                )}
             </div>
 
             <div className="grid gap-3 border-t border-[#f2ead0]/14 pt-5 text-xs text-[#f7f1dc]/72 sm:grid-cols-2">

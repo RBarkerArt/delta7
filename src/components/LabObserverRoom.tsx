@@ -308,12 +308,28 @@ const shouldUseLightweightRoom = () => {
 
 interface LabObserverRoomProps {
   roomId?: RoomSceneId;
-  /** Single entry point for every hotspot interaction, keyed by hotspot.actionId. */
-  onHotspotAction: (hotspot: RoomHotspotDefinition) => void;
+  /**
+   * Single entry point for every hotspot interaction, keyed by hotspot.actionId.
+   * `originRect` is the clicked hotspot's on-screen box at click time, so the
+   * modal can spring geometrically out of it (#1 Origin Flight).
+   */
+  onHotspotAction: (hotspot: RoomHotspotDefinition, originRect?: DOMRect) => void;
   isZoomed: boolean;
   roomRestoration: number;
   willowVideoSources?: Partial<Record<WillowEvidenceState, string>>;
   hotspotStates?: Partial<Record<string, RoomHotspotStatus>>;
+  /**
+   * Action ids whose artifact has been opened at least once. The room glows
+   * faintly at each — a lasting "someone was here" trace (#2b). Persisted
+   * upstream via read:* recovery ids.
+   */
+  openedHotspotActionIds?: ReadonlySet<string>;
+  /**
+   * Action ids carrying the day's freshest content (Variable Signal, #6). The
+   * room shows a cool "live signal" glow at each — a diegetic tell, not a badge.
+   * Seeded per day+observer upstream; excludes doors/room-signal.
+   */
+  featuredHotspotActionIds?: ReadonlySet<string>;
   onSceneReady?: () => void;
 }
 
@@ -324,6 +340,8 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
   roomRestoration,
   willowVideoSources = {},
   hotspotStates = {},
+  openedHotspotActionIds,
+  featuredHotspotActionIds,
   onSceneReady,
 }) => {
   const { score } = useCoherence();
@@ -739,7 +757,7 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
     }
   };
 
-  const triggerHotspot = (callback?: () => void) => (event: React.MouseEvent<HTMLButtonElement>) => {
+  const triggerHotspot = (callback?: (originRect?: DOMRect) => void) => (event: React.MouseEvent<HTMLButtonElement>) => {
     const start = pointerStart.current;
     pointerStart.current = null;
 
@@ -755,8 +773,14 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
       return;
     }
 
+    // Capture the hotspot's on-screen box at click time so the modal can spring
+    // out of it (#1). We measure the inner state ring, not the padded 48px touch
+    // target, so the flight origin matches the visible glyph the user tapped.
+    const inner = event.currentTarget.querySelector<HTMLElement>('[data-hotspot-core]');
+    const originRect = (inner ?? event.currentTarget).getBoundingClientRect();
+
     void initializeAudio(false).then(() => playClick());
-    callback?.();
+    callback?.(originRect);
   };
 
   // Hotspot definitions live in src/lib/roomDefinitions.ts and can be tuned
@@ -807,7 +831,9 @@ export const LabObserverRoom: React.FC<LabObserverRoomProps> = ({
             y={`${hs.y}%`}
             size={hs.size || 28}
             state={hotspotState}
-            onClick={() => onHotspotAction(hs)}
+            opened={openedHotspotActionIds?.has(hs.actionId) ?? false}
+            featured={featuredHotspotActionIds?.has(hs.actionId) ?? false}
+            onClick={(originRect?: DOMRect) => onHotspotAction(hs, originRect)}
             onPointerDown={(event) => {
               pointerStart.current = { x: event.clientX, y: event.clientY };
             }}
