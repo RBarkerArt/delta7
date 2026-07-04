@@ -17,6 +17,11 @@
 //   brew:done:${day}      — the Deep Decode payload for that started-day was read
 //   night:day:${day}      — the break-room clock's Night Log viewed that night
 //   lore:observer-record  — the Observer Record (Behavioral Echo) first viewed
+// Wave 4 additions (community puzzles — Compass Triangulation / Dead-Zone
+// Heartbeat / Sector 03 Naming), same recoveredItems set:
+//   lore:sector03_named   — Sector 03 was named (WILLOW / WLW); gates the
+//                           capstone reveal, the swapped dead-zones marginalia,
+//                           the map's "W." annotation, and the compass hint swap
 // Pre-existing ids (note:day, vm:, fragment:, return:day, evidence:, catchup:day)
 // live in dailyRecovery.ts and stay as they are.
 

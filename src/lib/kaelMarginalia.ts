@@ -90,9 +90,23 @@ const groupForVariant = (variant: string): MarginaliaGroup => {
 // Curated variant-specific overrides: a fixed line that always wins over the
 // seeded group pool for panels with their own singular note. The dead-zones
 // panel earns one after the void refuses to be drawn (see deadZoneSwallow).
-const VARIANT_OVERRIDES: Record<string, string> = {
-    'cart-dead-zones': 'Sector 03 declined to be drawn. I have stopped asking why.',
-};
+// cart-dead-zones is intentionally omitted here — its line is CONDITIONAL on the
+// Sector 03 naming and resolved in getMarginaliaLine below (see
+// DEAD_ZONE_MARGINALIA), so naming her can swap the permanent note.
+const VARIANT_OVERRIDES: Record<string, string> = {};
+
+// The dead-zones marginalia bends on the Wave 4 naming capstone. Before: the
+// void declined to be drawn and Kael stopped asking. After WILLOW/WLW is named,
+// the line admits the space let itself be drawn once it was known.
+const DEAD_ZONE_MARGINALIA = {
+    unnamed: 'Sector 03 declined to be drawn. I have stopped asking why.',
+    named: 'It let itself be drawn, once you knew what it was. Sector 03. Willow. I can write it down now.',
+} as const;
+
+// The recovery id, duplicated here to keep kaelMarginalia dependency-free of the
+// triangulation module (which imports nothing from here). Kept in lockstep with
+// SECTOR03_NAMED_ID in sectorTriangulation.ts.
+const SECTOR03_NAMED_ID = 'lore:sector03_named';
 
 // ── The Marginalia Acrostic ────────────────────────────────────────────────
 // On these canonical days, the *paper-group* marginalia line is force-selected
@@ -497,9 +511,23 @@ export function getCoffeeForTwoLine(pours: number): string {
 
 /**
  * Pick a marginalia line for a modal, stable per (variant-group, day, seed).
- * Graceful with day 0 and an empty seed.
+ * Graceful with day 0 and an empty seed. `recoveredItems` is optional and only
+ * consulted for recovery-conditional overrides (the Sector 03 naming swaps the
+ * dead-zones note) — omitting it keeps every existing call site working, and
+ * pre-naming falls back to the "declined to be drawn" line either way.
  */
-export function getMarginaliaLine(variant: string, day: number, seed: string): string {
+export function getMarginaliaLine(
+    variant: string,
+    day: number,
+    seed: string,
+    recoveredItems: readonly string[] = [],
+): string {
+    // Recovery-conditional override: the dead-zones note bends on the naming.
+    if (variant === 'cart-dead-zones') {
+        return recoveredItems.includes(SECTOR03_NAMED_ID)
+            ? DEAD_ZONE_MARGINALIA.named
+            : DEAD_ZONE_MARGINALIA.unnamed;
+    }
     const override = VARIANT_OVERRIDES[variant];
     if (override) return override;
     const group = groupForVariant(variant);

@@ -157,7 +157,7 @@ export const RoomModal: React.FC<RoomModalProps> = ({
     originRect = null
 }) => {
     const { playClick, playModalOpen, duck, releaseDuck } = useSound();
-    const { score } = useCoherence();
+    const { score, recoveredItems } = useCoherence();
 
     // On the FIRST modal opened after a real absence, the return greeting is
     // consumed exactly once at mount and leads in place of the normal line —
@@ -176,8 +176,8 @@ export const RoomModal: React.FC<RoomModalProps> = ({
     const marginaliaLine = React.useMemo(() => {
         const seed = getObserverSession().visitorId;
         if (returnHours !== null) return getReturnMarginalia(returnHours, seed);
-        return getMarginaliaLine(variant, marginaliaDay ?? 0, seed);
-    }, [variant, marginaliaDay, returnHours]);
+        return getMarginaliaLine(variant, marginaliaDay ?? 0, seed, recoveredItems);
+    }, [variant, marginaliaDay, returnHours, recoveredItems]);
     const marginaliaFrayed = score < 45;
     const panelRef = React.useRef<HTMLDivElement>(null);
     // Outer wrapper that carries the Origin Flight transform + drag offset. Kept

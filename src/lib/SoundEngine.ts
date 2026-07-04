@@ -1332,6 +1332,65 @@ class SoundEngine {
         } catch { /* best effort */ }
     }
 
+    /**
+     * Void pattern: the dead-zone listening post. Taps a sequence of sub-bass
+     * pulses (the WLW callsign in Morse) as timed swells on the same ~40Hz sine
+     * idiom as playVoidHeartbeat. `windows` are ON periods {at, dur} in seconds
+     * from now; the caller (buildHeartbeatSchedule) owns the Morse timing. One
+     * oscillator runs for the whole loop; its gain is scheduled up/down per
+     * window so the pulses share a single, continuous sub-bass voice.
+     *
+     * Returns a stop function so the caller can cut the loop short — the modal
+     * closing mid-listen must not leave the void thumping over the room.
+     * Undefined when audio isn't available.
+     */
+    public playVoidPattern(windows: ReadonlyArray<{ at: number; dur: number }>): (() => void) | undefined {
+        if (!this.isReady() || !this.ctx || !this.masterGain || this.muted) return undefined;
+        if (windows.length === 0) return undefined;
+        try {
+            const ctx = this.ctx;
+            const now = ctx.currentTime;
+            const bus = this.sfxGain ?? this.masterGain;
+
+            const last = windows[windows.length - 1];
+            const total = last.at + last.dur + 0.3;
+
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(40, now);
+
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.0001, now);
+
+            const attack = 0.045; // soft edges so each tap swells rather than clicks
+            const release = 0.08;
+            for (const w of windows) {
+                const start = now + w.at;
+                const end = start + w.dur;
+                gain.gain.setValueAtTime(0.0001, start);
+                gain.gain.linearRampToValueAtTime(0.06, start + attack);
+                gain.gain.setValueAtTime(0.06, Math.max(start + attack, end - release));
+                gain.gain.exponentialRampToValueAtTime(0.0008, end);
+            }
+
+            osc.connect(gain);
+            gain.connect(bus);
+            osc.start(now);
+            osc.stop(now + total);
+
+            return () => {
+                try {
+                    const t = ctx.currentTime;
+                    gain.gain.cancelScheduledValues(t);
+                    gain.gain.setValueAtTime(Math.max(gain.gain.value, 0.0001), t);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
+                    osc.stop(t + 0.15);
+                } catch { /* already stopped */ }
+            };
+        } catch { /* best effort */ }
+        return undefined;
+    }
+
     public dispose() {
         try {
             if (this.currentProfile) {

@@ -23,6 +23,9 @@ import { InlineAutoplayVideo } from './components/InlineAutoplayVideo';
 import { RoomIndexPanel } from './components/RoomIndexPanel';
 import { BreakRoomBulletinPanel, BreakRoomClockPanel, BreakRoomCoffeePanel, BreakRoomRefrigeratorPanel, useObserverBreakRoomState } from './components/BreakRoomPanels';
 import { CartographyCompassPanel } from './components/CartographyCompassPanel';
+import { DeadZoneListeningPanel } from './components/DeadZoneListeningPanel';
+import { SectorGridOverlay } from './components/SectorGridOverlay';
+import { relayCellFor, formatCell, SECTOR03_NAMED_ID } from './lib/sectorTriangulation';
 import { AnimatedCounter } from './components/ui/AnimatedCounter';
 import { TypeOn } from './components/ui/TypeOn';
 import { DecodeText } from './components/ui/DecodeText';
@@ -1795,6 +1798,16 @@ const LabInterface: React.FC = () => {
                       <>
                         <img src={cartMapUrl} alt="Facility Map" className="map-blueprint-in w-full max-h-[60vh] object-contain select-none" />
                         <div className="map-survey-line pointer-events-none absolute inset-x-0 h-px bg-emerald-300/70 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                        {/* Triangulation grid: only surfaces once the compass has been
+                            opened at least once (read:cart-compass) — you need a bearing
+                            before a grid means anything. Marks your relay cell, and the
+                            target's "W." once Sector 03 is named. */}
+                        {recoveredItems.includes('read:cart-compass') && (
+                          <SectorGridOverlay
+                            relayLabel={formatCell(relayCellFor(visitorId))}
+                            named={recoveredItems.includes(SECTOR03_NAMED_ID)}
+                          />
+                        )}
                       </>
                     ) : (
                       <div className="flex aspect-[1.6] w-full items-center justify-center text-xs uppercase tracking-widest text-emerald-500/50 animate-pulse">
@@ -1806,10 +1819,11 @@ const LabInterface: React.FC = () => {
               )}
 
               {activePopup === 'cart-compass' && (
-                <CartographyCompassPanel 
+                <CartographyCompassPanel
                   visitorId={visitorId}
                   currentDay={currentDay}
                   readout={getDailyCompassReadout()}
+                  recoveredItems={recoveredItems}
                 />
               )}
 
@@ -1873,6 +1887,14 @@ const LabInterface: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Wave 4: the listening post (Dead-Zone Heartbeat cipher) + the
+                      Sector 03 naming capstone. Pure bonus, never blocks anything. */}
+                  <DeadZoneListeningPanel
+                    recoveredItems={recoveredItems}
+                    markRecovered={(id) => { void markRecovered(id); }}
+                    seed={visitorId || 'anon'}
+                  />
                 </div>
               )}
 

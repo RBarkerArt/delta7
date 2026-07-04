@@ -1,10 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { TypeOn } from './ui/TypeOn';
+import {
+    formatCell,
+    relayCellFor,
+    settledBearingFor,
+    SECTOR03_NAMED_ID,
+} from '../lib/sectorTriangulation';
 
 interface CartographyCompassPanelProps {
     visitorId: string | null;
     currentDay: number;
     readout: string;
+    /** Full recovery set — the compass hint line changes once Sector 03 is named. */
+    recoveredItems: string[];
 }
 
 type CompassPhase = 'calibrating' | 'settling' | 'locked' | 'sweeping';
@@ -42,9 +50,20 @@ export const CartographyCompassPanel: React.FC<CartographyCompassPanelProps> = (
     visitorId,
     currentDay,
     readout,
+    recoveredItems,
 }) => {
     const seed = hashSeed(`${visitorId || 'anon'}-${currentDay}`);
-    const dailyAngle = 30 + (seed % 300);
+    // The needle no longer settles on hash noise. Its bearing is the true
+    // compass heading from this observer's relay cell to Sector 03, plus a small
+    // seeded per-day wobble — a confidently-wrong instrument whose lie secretly
+    // agrees with every other observer's. The panel never announces this.
+    const relayCell = React.useMemo(() => relayCellFor(visitorId), [visitorId]);
+    const relayLabel = formatCell(relayCell);
+    const dailyAngle = React.useMemo(
+        () => settledBearingFor(visitorId, currentDay),
+        [visitorId, currentDay]
+    );
+    const sectorNamed = recoveredItems.includes(SECTOR03_NAMED_ID);
 
     const [reducedMotion] = useState(
         () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -267,6 +286,12 @@ export const CartographyCompassPanel: React.FC<CartographyCompassPanelProps> = (
                     <span>TELESCOPIC AZIMUTH DEVIATION</span>
                     <span className={STATUS_TONE[phase]}>{STATUS_LABEL[phase]}</span>
                 </div>
+                {/* Relay readout — where this observer's ray starts. Quiet, presented
+                    as an instrument fact, never flagged as load-bearing. */}
+                <div className="flex justify-between items-center text-[9px] uppercase tracking-[0.18em] text-emerald-100/45">
+                    <span>RELAY POSITION</span>
+                    <span className="text-emerald-300/80 tracking-[0.22em]">{relayLabel}</span>
+                </div>
                 <p className="text-emerald-100/80 leading-relaxed select-text min-h-[40px]">
                     {isCalibrating ? (
                         <span className="opacity-60 italic">Reading magnetospheric telemetry vectors...</span>
@@ -277,6 +302,13 @@ export const CartographyCompassPanel: React.FC<CartographyCompassPanelProps> = (
                 <div className="text-[8px] uppercase tracking-[0.2em] text-emerald-100/35">
                     Rotate housing to verify bearing — readings non-binding
                 </div>
+                {/* A deniable, pointed marginalia-adjacent line. Before the naming
+                    it hints the needle isn't random; after, it admits it never lied. */}
+                <p className="border-t border-emerald-500/10 pt-2 font-['EB_Garamond'] text-[11px] italic leading-snug text-emerald-100/45 select-text">
+                    {sectorNamed
+                        ? 'The needle was never lying. It pointed at her the whole time, from wherever you stood.'
+                        : 'Every relay lies from where it stands. Mine included. Ask them all the same question and see where the lies cross.'}
+                </p>
             </div>
         </div>
     );

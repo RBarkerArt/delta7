@@ -211,8 +211,15 @@ return-driver in the set; the pity timer and meaningful catch keep it honest.
   signal day), the Waking Panel night log (break clock 02:00–05:00,
   `night:day:*`, dev hook `__night`), Behavioral Echo Observer Record
   (Security Gateway, `lore:observer-record`, traits from existing ids only).
-- Wave 4 (community puzzles): not started — parked until the observer
-  community is large enough to compare notes.
+- **Wave 4 — SHIPPED 2026-07-03**: Compass Triangulation (per-visitor relay
+  cell on an A–J/1–8 grid, needle secretly bears on SECTOR03_CELL=C3 ±4°
+  wobble, grid overlay in cart-map gated on `read:cart-compass`), Dead-Zone
+  Heartbeat cipher (listening post plays WLW in Morse — `.-- .-.. .--`,
+  240ms unit, 9.6s loop — with a printed-dashes fallback), and the Sector 03
+  Naming capstone (WILLOW/WLW accepted, `lore:sector03_named`, permanent
+  dead-zones marginalia swap, "W." map annotation, DEV hook `__sector`).
+  The answer is WILLOW — the unmappable sector and the erased colleague are
+  the same absence.
 
 ## Suggested build order
 
