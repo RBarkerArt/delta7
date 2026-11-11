@@ -6,7 +6,7 @@ import TopBar from './shell/TopBar'
 import HomePager from './shell/HomePager'
 import PageDots from './shell/PageDots'
 import NotificationBanner from './shell/NotificationBanner'
-import AppHost from './windows/AppHost'
+import WindowLayer from './windows/WindowLayer'
 import { useGlobalKeys } from './shell/useGlobalKeys'
 import { useIsMobile } from './store/device'
 import { useCurrentPage } from './store/layout'
@@ -37,7 +37,7 @@ export default function OSApp() {
           </main>
           <PageDots isMobile={isMobile} />
           <div className="pointer-events-none absolute inset-0 z-30 isolate">
-            <AppHost isMobile={isMobile} />
+            <WindowLayer isMobile={isMobile} />
           </div>
           <TopBar isMobile={isMobile} />
           <NotificationBanner />
