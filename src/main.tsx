@@ -1,19 +1,13 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
-import { initAnalytics } from './lib/analytics'
+// Entry switch. Picks the legacy tree or the OS shell by path BEFORE importing
+// anything heavy, so the OS bundle never pulls in Firebase or the legacy CSS.
+const LEGACY_PREFIXES = ['/legacy', '/admin', '/rooms', '/privacy', '/terms']
 
-if (import.meta.env.VITE_ENABLE_APP_CHECK === 'true') {
-  void import('./lib/appCheck').then(({ initAppCheck }) => initAppCheck());
-} else if (import.meta.env.DEV) {
-  console.info('[Delta-7] App Check disabled. Set VITE_ENABLE_APP_CHECK=true after Firebase App Check is configured.');
+function isLegacyPath(pathname: string): boolean {
+  return LEGACY_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'))
 }
 
-void initAnalytics();
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+if (isLegacyPath(window.location.pathname)) {
+  void import('./legacyEntry')
+} else {
+  void import('./os/entry')
+}
