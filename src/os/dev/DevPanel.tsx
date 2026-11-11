@@ -8,6 +8,7 @@ import { WALLPAPER_NAMES, setWallpaper, useSettings } from '../store/settings'
 import type { WallpaperName } from '../store/settings'
 import { setForceMobile, useForceMobile } from '../store/device'
 import { setDay, setDevOpen, useDay } from '../store/dev'
+import { relock } from '../boot/lockState'
 
 const field = 'rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white outline-none focus:ring-1 focus:ring-white/40'
 const btn = 'rounded bg-white/10 px-2 py-0.5 text-[11px] hover:bg-white/20 focus-visible:ring-1 focus-visible:ring-white/50 outline-none'
@@ -134,6 +135,11 @@ export default function DevPanel() {
                 </option>
               ))}
             </select>
+          </Row>
+          <Row label="lock screen">
+            <button type="button" className={btn} onClick={relock} data-testid="dev-lock">
+              lock
+            </button>
           </Row>
           <Row label="force mobile">
             <input type="checkbox" checked={forceMobile} onChange={(e) => setForceMobile(e.target.checked)} data-testid="dev-force-mobile" />

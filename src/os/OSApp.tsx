@@ -10,6 +10,7 @@ import WindowLayer from './windows/WindowLayer'
 import { useGlobalKeys } from './shell/useGlobalKeys'
 import { useIsMobile } from './store/device'
 import { useCurrentPage } from './store/layout'
+import { useSheetRaised } from './store/ui'
 import { devEnabled, useDevOpen } from './store/dev'
 import { useReducedMotionPref } from './lib/useReducedMotionPref'
 
@@ -20,6 +21,7 @@ export default function OSApp() {
   const page = useCurrentPage()
   const reduced = useReducedMotionPref()
   const devOpen = useDevOpen()
+  const sheetRaised = useSheetRaised()
   useGlobalKeys()
 
   return (
@@ -36,7 +38,7 @@ export default function OSApp() {
             <HomePager isMobile={isMobile} />
           </main>
           <PageDots isMobile={isMobile} />
-          <div className="pointer-events-none absolute inset-0 z-30 isolate">
+          <div className={`pointer-events-none absolute inset-0 isolate ${sheetRaised ? 'z-[45]' : 'z-30'}`}>
             <WindowLayer isMobile={isMobile} />
           </div>
           <TopBar isMobile={isMobile} />

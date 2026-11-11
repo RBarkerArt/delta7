@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { nextPage, prevPage } from '../store/layout'
 import { closePopover, uiStore } from '../store/ui'
 import { devEnabled, toggleDevOpen } from '../store/dev'
+import { isLocked } from '../boot/lockState'
 
 function isTypingTarget(t: EventTarget | null): boolean {
   if (!(t instanceof HTMLElement)) return false
@@ -20,6 +21,8 @@ export function useGlobalKeys() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return
+      // Booting / locked / mid-unlock: the home is not interactive.
+      if (isLocked()) return
       if (e.key === 'Escape') {
         if (uiStore.get().popover) {
           e.preventDefault()

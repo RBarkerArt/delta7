@@ -132,6 +132,7 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
     return () => window.removeEventListener('resize', onResize)
   }, [frame, def.minSize])
 
+  // Hidden (minimized / closing): the frame follows the surface's fade too, so a parked window is truly invisible.
   const hidden = app.minimized || !isPresent
   return (
     <motion.section
@@ -146,7 +147,7 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
         if (!hidden) focusApp(app.id)
       }}
       className={`absolute left-0 top-0 ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}
-      style={{ x: fx, y: fy, width: fw, height: fh, zIndex: app.z }}
+      style={{ x: fx, y: fy, width: fw, height: fh, zIndex: app.z, opacity: hidden ? pose.values.o : 1 }}
     >
       <motion.div
         className={`relative flex h-full w-full flex-col overflow-hidden bg-os-cream font-os-sans text-os-ink ${focused ? 'os-window' : 'os-window os-window-idle'}`}

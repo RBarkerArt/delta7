@@ -19,3 +19,12 @@ export function writeJSON(key: string, value: unknown): void {
     /* storage unavailable */
   }
 }
+
+/** Safe localStorage delete. */
+export function removeKey(key: string): void {
+  try {
+    window.localStorage.removeItem(PREFIX + key)
+  } catch {
+    /* storage unavailable */
+  }
+}

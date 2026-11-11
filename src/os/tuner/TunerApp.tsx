@@ -56,8 +56,10 @@ export default function TunerApp({ isMobile }: AppProps) {
       ref={ref}
       data-testid="tuner-root"
       data-locked={locked ? 'true' : 'false'}
-      className="tuner-root relative h-full w-full overflow-y-auto overflow-x-hidden bg-os-cream font-os-sans text-os-ink"
+      className="tuner-root relative h-full w-full overflow-y-auto overflow-x-hidden bg-os-cream/[0.97] font-os-sans text-os-ink"
     >
+      {/* Not quite opaque on purpose: Chromium treats a fully opaque, composited (canvas inside) card as covering its whole
+          rectangle and skips drawing the window below at the parent's rounded corners → square wallpaper "triangles". */}
       {/* Warm wash: grows faintly with the signal, settles in fully at the lock. */}
       <div
         aria-hidden="true"

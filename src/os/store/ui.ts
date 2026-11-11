@@ -6,9 +6,11 @@ interface UIState {
   popover: Popover
   /** Search query; non-empty switches the home grid to a flat list of matches. */
   query: string
+  /** Phone: a sheet is being swiped/flown above its normal box, so it must pass OVER the top bar, not under it. */
+  sheetRaised: boolean
 }
 
-export const uiStore = createStore<UIState>({ popover: null, query: '' })
+export const uiStore = createStore<UIState>({ popover: null, query: '', sheetRaised: false })
 
 export function usePopover(): Popover {
   return uiStore.use((s) => s.popover)
@@ -29,4 +31,10 @@ export function useSearchQuery(): string {
 }
 export function setSearchQuery(query: string) {
   uiStore.set({ query })
+}
+export function useSheetRaised(): boolean {
+  return uiStore.use((s) => s.sheetRaised)
+}
+export function setSheetRaised(sheetRaised: boolean) {
+  uiStore.set({ sheetRaised })
 }

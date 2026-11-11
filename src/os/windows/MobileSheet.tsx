@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
-import { motion, usePresence } from 'motion/react'
+import { motion, useMotionValueEvent, usePresence } from 'motion/react'
 import AppBody from './AppBody'
 import LaunchVeil from './LaunchVeil'
 import { CloseGlyph } from './controlGlyphs'
@@ -11,6 +11,7 @@ import { getApp } from '../apps/registry'
 import { closeApp, getOpenApps, getVisibleIconRect } from '../store/windows'
 import type { OpenApp } from '../store/windows'
 import { haptic } from '../store/settings'
+import { setSheetRaised } from '../store/ui'
 import { useReducedMotionPref } from '../lib/useReducedMotionPref'
 import { fadeFast } from '../lib/motion'
 
@@ -44,6 +45,11 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
   )
 
   const gestures = useSheetGestures({ pose, radius: RADIUS, reduced, getSize: getBox, onClose })
+
+  // While the sheet's top edge rides above its box (swipe up, fly home), lift the window layer over the top bar so the
+  // cream clock/icons never sit on the cream sheet. Purely geometric, so gestures and closes need no extra bookkeeping.
+  useMotionValueEvent(pose.values.y, 'change', (y) => setSheetRaised(y < -0.5))
+  useEffect(() => () => setSheetRaised(false), [])
 
   // Zoom out of the icon.
   const launched = useRef(false)
