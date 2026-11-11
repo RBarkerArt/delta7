@@ -46,3 +46,24 @@ brain/
 implementation_plan.md
 task.md
 walkthrough.md
+
+# 3D POC raw texture downloads (regenerate via Poly Haven URLs in blender/ATTRIBUTION.md)
+# blender/assets_src/**/*.jpg
+
+# Delta7 2.0 — local only
+assets/
+docs/DELTA7_BIBLE.md
+
+# legacy story copy (kept locally)
+# NOTE: these are already tracked by git, so this has no effect until they are untracked
+# (git rm --cached + commit). The first four are imported at build time; untracking them
+# would break fresh clones and builds.
+src/season1_days.json
+src/season1_prologues.json
+src/lib/kaelMarginalia.ts
+src/lib/fragmentSets.ts
+docs/MODAL_INTERACTIVITY_PLAN.md
+
+# Local research (spoilers, never commit)
+docs/research/
+docs/DELTA7_BIBLE.backup-*.md
