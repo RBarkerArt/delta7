@@ -1,0 +1,150 @@
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import { motion, usePresence } from 'motion/react'
+import AppBody from './AppBody'
+import LaunchVeil from './LaunchVeil'
+import { CloseGlyph } from './controlGlyphs'
+import { centrePose, iconRadius, identityPose, landSpring, launchSpring, poseOnto } from './pose'
+import { usePose } from './usePose'
+import { useSheetGestures } from './useSheetGestures'
+import type { Fling } from './useSheetGestures'
+import { getApp } from '../apps/registry'
+import { closeApp, getOpenApps, getVisibleIconRect } from '../store/windows'
+import type { OpenApp } from '../store/windows'
+import { haptic } from '../store/settings'
+import { useReducedMotionPref } from '../lib/useReducedMotionPref'
+import { fadeFast } from '../lib/motion'
+
+const RADIUS = 18
+const MOBILE_GLYPH = Math.round(66 * 0.42) // glyph size on a phone icon tile
+
+/**
+ * A full-screen app on a phone. Zooms out of its icon, and closes back into it by swiping up from the home indicator
+ * or dragging down from the top strip. Can be driven from outside by closing the app in the store.
+ */
+export default function MobileSheet({ app }: { app: OpenApp }) {
+  const def = getApp(app.id)
+  const reduced = useReducedMotionPref()
+  const [isPresent, safeToRemove] = usePresence()
+  const boxRef = useRef<HTMLDivElement>(null)
+  const flingRef = useRef<Fling | null>(null)
+  const pose = usePose({ ...identityPose(RADIUS), o: 0 })
+
+  const getBox = useCallback(() => {
+    const r = boxRef.current?.getBoundingClientRect()
+    return r ?? { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight }
+  }, [])
+
+  const onClose = useCallback(
+    (fling: Fling) => {
+      flingRef.current = fling
+      haptic()
+      closeApp(app.id)
+    },
+    [app.id],
+  )
+
+  const gestures = useSheetGestures({ pose, radius: RADIUS, reduced, getSize: getBox, onClose })
+
+  // Zoom out of the icon.
+  const launched = useRef(false)
+  useLayoutEffect(() => {
+    if (launched.current) return // plays once per opening
+    launched.current = true
+    const box = getBox()
+    if (reduced) {
+      pose.set({ ...identityPose(RADIUS), o: 0 })
+      void pose.to(identityPose(RADIUS), fadeFast)
+      return
+    }
+    const icon = getVisibleIconRect(app.id)
+    pose.set(icon ? poseOnto(icon, box, iconRadius(icon)) : centrePose(box, 0.9, RADIUS))
+    void pose.to(identityPose(RADIUS), launchSpring, { opacity: { duration: icon ? 0.06 : 0.2 } })
+  }, [app.id, getBox, pose, reduced])
+
+  // Leaving: closed → fly back into the icon (carrying any flick velocity); backgrounded → just go.
+  useEffect(() => {
+    if (isPresent) return
+    const done = () => safeToRemove?.()
+    if (getOpenApps().some((a) => a.id === app.id)) {
+      done()
+      return
+    }
+    const box = getBox()
+    const icon = getVisibleIconRect(app.id)
+    const fling = flingRef.current
+    flingRef.current = null
+    if (reduced) {
+      void pose.to({ ...pose.get(), o: 0 }, fadeFast).then(done)
+      return
+    }
+    const velocity = fling ? { x: fling.vx * 0.3, y: fling.vy } : undefined
+    if (icon) {
+      void pose.to(poseOnto(icon, box, iconRadius(icon), 0), landSpring, { opacity: { duration: 0.1, delay: 0.26 }, velocity }).then(done)
+    } else {
+      void pose.to(centrePose(box, 0.86, RADIUS), landSpring, { opacity: { duration: 0.2 }, velocity }).then(done)
+    }
+  }, [isPresent, safeToRemove, app.id, getBox, pose, reduced])
+
+  return (
+    <div
+      ref={boxRef}
+      data-testid={`mobile-sheet-${app.id}`}
+      data-os-window={app.id}
+      aria-label={def.label}
+      role="dialog"
+      inert={!isPresent}
+      className={`absolute inset-x-0 bottom-0 ${isPresent ? 'pointer-events-auto' : 'pointer-events-none'}`}
+      style={{ top: 'calc(env(safe-area-inset-top, 0px) + 48px)', zIndex: app.z }}
+    >
+      <motion.section
+        data-testid={`window-${app.id}`}
+        className="os-sheet relative flex h-full w-full flex-col overflow-hidden bg-os-cream font-os-sans text-os-ink"
+        style={{
+          x: pose.values.x,
+          y: pose.values.y,
+          scaleX: pose.values.sx,
+          scaleY: pose.values.sy,
+          opacity: pose.values.o,
+          borderRadius: pose.radius,
+          originX: 0,
+          originY: 0,
+          willChange: 'transform',
+        }}
+      >
+        <div
+          data-testid={`mobile-top-strip-${app.id}`}
+          onPointerDown={gestures.onStripPointerDown}
+          className="relative flex h-12 shrink-0 items-center justify-center border-b border-os-ink/[0.08] bg-[#ebe3d8] px-12"
+          style={{ touchAction: 'none' }}
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            <def.Glyph size={16} strokeWidth={1.5} className="shrink-0 text-os-ink/75" />
+            <h2 className="truncate font-os-mono text-[13px] lowercase tracking-[0.03em] text-os-ink">{def.label}</h2>
+          </div>
+          <button
+            type="button"
+            aria-label={`close ${def.label}`}
+            data-testid={`window-close-${app.id}`}
+            onClick={() => closeApp(app.id)}
+            className="absolute right-1.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-[10px] text-os-ink/65 outline-none active:bg-os-ink/[0.06] focus-visible:ring-2 focus-visible:ring-os-ink/30"
+          >
+            <CloseGlyph />
+          </button>
+        </div>
+        <div className="os-selectable relative min-h-0 flex-1 overflow-auto overscroll-contain">
+          <AppBody app={app} isMobile />
+        </div>
+        <div
+          data-testid="mobile-home-indicator"
+          aria-hidden="true"
+          onPointerDown={gestures.onIndicatorPointerDown}
+          className="relative flex shrink-0 items-start justify-center bg-os-cream"
+          style={{ touchAction: 'none', height: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' }}
+        >
+          <span className="mt-[9px] block h-[5px] w-[118px] rounded-full bg-os-ink/25" />
+        </div>
+        <LaunchVeil def={def} pose={pose} glyph={MOBILE_GLYPH} />
+      </motion.section>
+    </div>
+  )
+}

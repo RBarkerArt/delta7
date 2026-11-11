@@ -1,29 +1,27 @@
+import { useEffect } from 'react'
 import { AnimatePresence } from 'motion/react'
-import AppBody from './AppBody'
 import DesktopWindow from './DesktopWindow'
+import MobileSheet from './MobileSheet'
 import { useWindowKeys } from './useWindowKeys'
-import { useFocusedAppId, useOpenApps } from '../store/windows'
+import { backgroundAllExcept, useFocusedAppId, useOpenApps } from '../store/windows'
 
 /**
  * Where open apps live. Desktop: free windows (minimized ones stay mounted so they keep their state).
- * Phone: plain full-screen panel for the front app (the real mobile presentation lands in phase 3).
+ * Phone: one full-screen sheet for the front app; other open apps are backgrounded in the store.
  */
 export default function WindowLayer({ isMobile }: { isMobile: boolean }) {
   const apps = useOpenApps()
   const focused = useFocusedAppId()
   useWindowKeys(!isMobile)
 
+  const front = isMobile ? apps.find((a) => a.id === focused && !a.minimized) : undefined
+  const othersVisible = isMobile && front ? apps.some((a) => a.id !== front.id && !a.minimized) : false
+  useEffect(() => {
+    if (othersVisible && front) backgroundAllExcept(front.id)
+  }, [othersVisible, front])
+
   if (isMobile) {
-    const front = apps.find((a) => a.id === focused && !a.minimized)
-    return front ? (
-      <section
-        data-testid={`window-${front.id}`}
-        data-os-window={front.id}
-        className="pointer-events-auto absolute inset-x-0 bottom-0 top-12 overflow-auto rounded-t-[18px] bg-os-cream text-os-ink"
-      >
-        <AppBody app={front} isMobile />
-      </section>
-    ) : null
+    return <AnimatePresence>{front ? <MobileSheet key={front.id} app={front} /> : null}</AnimatePresence>
   }
   return (
     <AnimatePresence>
