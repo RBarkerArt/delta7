@@ -34,6 +34,7 @@ export default function DevPanel() {
   const [collapsed, setCollapsed] = useState(false)
   // Local slider value so dragging is smooth even though the store publishes ~4×/s.
   const [slider, setSlider] = useState<number | null>(null)
+  const [dragging, setDragging] = useState(false)
   const [clockText, setClockText] = useState(override ?? '')
   const shown = slider ?? coherence
 
@@ -67,13 +68,26 @@ export default function DevPanel() {
             value={shown}
             data-testid="dev-coherence"
             aria-label="coherence"
+            onPointerDown={() => setDragging(true)}
             onChange={(e) => {
               const v = Number(e.target.value)
-              setSlider(v)
+              // Hold a local value only while the pointer is down; keyboard/scripted
+              // changes read straight from the store so recovery stays visible.
+              setSlider(dragging ? v : null)
               setCoherence(v)
             }}
-            onPointerUp={() => setSlider(null)}
-            onBlur={() => setSlider(null)}
+            onPointerUp={() => {
+              setDragging(false)
+              setSlider(null)
+            }}
+            onPointerCancel={() => {
+              setDragging(false)
+              setSlider(null)
+            }}
+            onBlur={() => {
+              setDragging(false)
+              setSlider(null)
+            }}
             className="mb-1 w-full accent-white/80"
           />
           <Row label="bad stretch">

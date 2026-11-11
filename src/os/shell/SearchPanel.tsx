@@ -53,6 +53,9 @@ export default function SearchPanel({ anchorRef }: { anchorRef: RefObject<HTMLBu
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
+              // Stop the follow-up keypress: focus returns to the search button on close,
+              // and Enter would otherwise "click" it and reopen this panel.
+              e.preventDefault()
               const id = firstMatch(uiStore.get().query)
               if (id) {
                 closePopover()
