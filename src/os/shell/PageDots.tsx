@@ -4,14 +4,15 @@ import { useSearchQuery } from '../store/ui'
 import { springs } from '../lib/motion'
 
 /**
- * Bottom-centre page dots. Nothing else lives at the bottom. With a single page the lone dot still shows (the spec's
- * "bottom: page dots only"); hidden only while searching.
+ * Bottom-centre page dots. Nothing else lives at the bottom. With a single page there are no dots at all (nothing to
+ * focus or announce); hidden too while searching. The band they sit in stays reserved either way (see OSApp), so the
+ * icons never move when the dots come or go.
  */
 export default function PageDots({ isMobile }: { isMobile: boolean }) {
   const count = usePageCount()
   const page = useCurrentPage()
   const query = useSearchQuery()
-  if (query.trim()) return null
+  if (count < 2 || query.trim()) return null
   return (
     <nav
       aria-label="pages"

@@ -9,6 +9,7 @@ import { useWindowFocus } from './useWindowFocus'
 import { windowTitleId } from './titleId'
 import { useSheetGestures } from './useSheetGestures'
 import type { Fling } from './useSheetGestures'
+import { SHEET_CLOSE_HIT_PX, SHEET_STRIP_PX, SHEET_TOP_CSS } from './sheetLayout'
 import { getApp } from '../apps/registry'
 import { closeApp, getOpenApps, getVisibleIconRect } from '../store/windows'
 import type { OpenApp } from '../store/windows'
@@ -104,7 +105,7 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
       tabIndex={-1}
       inert={!isPresent}
       className={`absolute inset-x-0 bottom-0 outline-none ${isPresent ? 'pointer-events-auto' : 'pointer-events-none'}`}
-      style={{ top: 'calc(env(safe-area-inset-top, 0px) + 48px)', zIndex: app.z }}
+      style={{ top: SHEET_TOP_CSS, zIndex: app.z }}
     >
       <motion.section
         data-testid={`window-${app.id}`}
@@ -124,8 +125,8 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
         <div
           data-testid={`mobile-top-strip-${app.id}`}
           onPointerDown={gestures.onStripPointerDown}
-          className="relative z-10 flex h-9 shrink-0 items-center justify-center border-b border-os-ink/[0.08] bg-[#ebe3d8]"
-          style={{ touchAction: 'none' }}
+          className="relative z-10 flex shrink-0 items-center justify-center border-b border-os-ink/[0.08] bg-[#ebe3d8]"
+          style={{ touchAction: 'none', height: SHEET_STRIP_PX }}
         >
           {/* The OS top bar already says where you are: the strip is just a grab handle + close. Title stays for AT. */}
           <h2 id={windowTitleId(app.id)} className="sr-only">
@@ -139,7 +140,8 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
             aria-label={`close ${def.label}`}
             data-testid={`window-close-${app.id}`}
             onClick={() => closeApp(app.id)}
-            className="group absolute right-1 top-0 flex h-11 w-11 items-start justify-center pt-[6px] text-os-ink/70 outline-none"
+            className="group absolute right-1 top-0 flex items-start justify-center pt-[6px] text-os-ink/70 outline-none"
+            style={{ width: SHEET_CLOSE_HIT_PX, height: SHEET_CLOSE_HIT_PX }}
           >
             <span className="flex h-6 w-6 items-center justify-center rounded-[8px] group-active:bg-os-ink/[0.08] group-focus-visible:ring-2 group-focus-visible:ring-os-ink/30">
               <CloseGlyph />

@@ -33,7 +33,7 @@ export default function AppIcon({ appId, isMobile }: Props) {
   const phase = useLockPhase()
   const behindLock = phase === 'boot' || phase === 'lock'
 
-  useHeartbeat(beatRef, haloRef, { active: isDelta7 && hasNew && !behindLock, badStretch, reduced, nonce })
+  useHeartbeat(beatRef, haloRef, { active: isDelta7 && hasNew && !behindLock, awake: isDelta7 && !behindLock, badStretch, reduced, nonce })
 
   const tile = isMobile ? 66 : 112
   const glyph = Math.round(tile * 0.42)

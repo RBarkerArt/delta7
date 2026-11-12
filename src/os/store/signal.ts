@@ -9,7 +9,10 @@ interface SignalState {
   /** Drives the Delta7 icon heartbeat. */
   hasNew: boolean
   notification: OSNotification | null
-  /** Bumped by triggerPulse so the heartbeat can restart its cycle. */
+  /**
+   * Bumped to ask for a beat right away: restarts a running heartbeat's cycle, or (heartbeat idle) plays one single
+   * beat. Bumped by triggerPulse, showNotification and showHeldNotification.
+   */
   pulseNonce: number
 }
 
@@ -52,11 +55,11 @@ export function showNotification() {
 }
 
 /**
- * The quiet first-lock banner (same in-OS banner, other text). Only the banner: it leaves the Delta7 icon's heartbeat
- * as it is (the lock itself already steadies it).
+ * The quiet first-lock banner (same in-OS banner, other text). It gives the Delta7 icon exactly one soft beat (the
+ * pulse nonce) but leaves `hasNew` as it is, so no continuous heartbeat starts (the lock itself already steadies it).
  */
 export function showHeldNotification() {
-  signalStore.set({ notification: { id: nextId++, text: HELD_NOTIFICATION_TEXT } })
+  signalStore.set((s) => ({ notification: { id: nextId++, text: HELD_NOTIFICATION_TEXT }, pulseNonce: s.pulseNonce + 1 }))
 }
 export function dismissNotification() {
   signalStore.set({ notification: null })
