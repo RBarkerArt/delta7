@@ -1,9 +1,5 @@
-// Placeholder content for the ordinary OS apps. Neutral, file-ish names only.
-// TODO(copy): every string in this file is filler and gets replaced by real copy later.
-
-const FILLER = 'placeholder text. TODO(copy)'
-const FILLER_LONG =
-  'placeholder text, a few quiet lines standing in for the real thing. nothing here is final. TODO(copy)'
+// Stand-in content for the ordinary OS apps: mundane, generic, spoiler-free.
+// TODO(copy): every string in this file is a stand-in and gets replaced by real copy later.
 
 export interface Message {
   from: 'them' | 'me'
@@ -21,23 +17,34 @@ export interface Thread {
 export const THREADS: Thread[] = [
   {
     id: 'thread_01',
-    label: 'thread_01',
+    label: 'deliveries',
     unread: true,
     messages: [
-      { from: 'them', text: FILLER, time: '02:09' },
-      { from: 'them', text: 'placeholder. TODO(copy)', time: '02:12' },
+      { from: 'them', text: 'your parcel is out for delivery today.', time: '09:12' },
+      { from: 'them', text: 'delivered. left with the building reception.', time: '13:40' },
     ],
   },
   {
     id: 'thread_02',
-    label: 'thread_02',
+    label: 'reminders',
     messages: [
-      { from: 'me', text: FILLER, time: '23:40' },
-      { from: 'them', text: FILLER_LONG, time: '23:52' },
+      { from: 'them', text: 'water the plants.', time: '08:00' },
+      { from: 'them', text: 'bins go out tonight.', time: '19:30' },
     ],
   },
-  { id: 'thread_03', label: 'thread_03', messages: [{ from: 'them', text: FILLER, time: '18:05' }] },
-  { id: 'thread_04', label: 'thread_04', messages: [{ from: 'me', text: 'placeholder. TODO(copy)', time: '09:31' }] },
+  {
+    id: 'thread_03',
+    label: 'building notices',
+    messages: [{ from: 'them', text: 'the lift will be serviced on tuesday morning. thanks for your patience.', time: '10:05' }],
+  },
+  {
+    id: 'thread_04',
+    label: 'book club',
+    messages: [
+      { from: 'them', text: 'next one is the short one with the green cover.', time: '20:14' },
+      { from: 'me', text: 'got it. halfway through already.', time: '20:31' },
+    ],
+  },
 ]
 
 export interface Note {
@@ -49,11 +56,21 @@ export interface Note {
 
 // TODO(copy)
 export const NOTES: Note[] = [
-  { id: 'note_0614', title: 'note_0614.txt', date: '06.14', body: [FILLER_LONG, FILLER, FILLER_LONG] },
-  { id: 'untitled_02', title: 'untitled_02.txt', date: '06.20', body: [FILLER] },
-  { id: 'list_03', title: 'list_03.txt', date: '07.01', body: ['- placeholder', '- placeholder', '- placeholder', FILLER] },
-  { id: 'note_0702', title: 'note_0702.txt', date: '07.02', body: [FILLER_LONG, FILLER_LONG] },
-  { id: 'note_0711', title: 'note_0711.txt', date: '07.11', body: [FILLER] },
+  {
+    id: 'note_0614',
+    title: 'note_0614.txt',
+    date: '06.14',
+    body: ['shopping: oats, lemons, rice, dish soap, coffee filters.', 'pick up the jacket from the cleaners.', 'return the library books before the weekend.'],
+  },
+  { id: 'untitled_02', title: 'untitled_02.txt', date: '06.20', body: ['book the boiler service.'] },
+  { id: 'list_03', title: 'list_03.txt', date: '07.01', body: ['- water the plants', '- change the bed sheets', '- defrost the freezer', 'small jobs for sunday.'] },
+  {
+    id: 'note_0702',
+    title: 'note_0702.txt',
+    date: '07.02',
+    body: ['soup: soften an onion, add lentils and stock, simmer twenty minutes. a squeeze of lemon at the end.', 'doubles easily. freezes well.'],
+  },
+  { id: 'note_0711', title: 'note_0711.txt', date: '07.11', body: ['spare batteries are in the kitchen drawer.'] },
 ]
 
 export interface FileItem {
@@ -113,8 +130,8 @@ export interface Album {
 // TODO(copy)
 export const ALBUMS: Album[] = [
   { id: 'all', label: 'all', count: 24 },
-  { id: 'album_01', label: 'album_01', count: 8 },
-  { id: 'album_02', label: 'album_02', count: 5 },
+  { id: 'album_01', label: 'garden', count: 8 },
+  { id: 'album_02', label: 'food', count: 5 },
   { id: 'saved', label: 'saved', count: 3 },
 ]
 
@@ -170,25 +187,24 @@ export const ARCHIVE: Section[] = [
 export const LAB: Section[] = [
   {
     id: 'sets',
-    label: 'sets',
+    label: 'budget',
     rows: [
-      { name: 'set_01.csv', date: '05.11', size: '14 kb' },
-      { name: 'set_02.csv', date: '05.18', size: '16 kb' },
-      { name: 'set_03.csv', date: '05.25', size: '11 kb' },
+      { name: 'budget_05.csv', date: '05.11', size: '14 kb' },
+      { name: 'budget_06.csv', date: '05.18', size: '16 kb' },
+      { name: 'bills.csv', date: '05.25', size: '11 kb' },
     ],
   },
   {
     id: 'readings',
-    label: 'readings',
+    label: 'lists',
     rows: [
-      { name: 'reading_0601.txt', date: '06.01', size: '3 kb' },
-      { name: 'reading_0608.txt', date: '06.08', size: '3 kb' },
+      { name: 'packing_list.txt', date: '06.01', size: '3 kb' },
+      { name: 'groceries.txt', date: '06.08', size: '3 kb' },
     ],
   },
   { id: 'misc', label: 'misc', rows: [{ name: 'untitled_04.txt', date: '06.30', size: '1 kb' }] },
 ]
 
 // TODO(copy)
-export const KEEP_ITEMS: string[] = ['saved_01', 'saved_02', 'saved_03', 'note_0614.txt', 'still_03.jpg']
+export const KEEP_ITEMS: string[] = ['recipe_soup.txt', 'plant_care.txt', 'bus_timetable.pdf', 'note_0614.txt', 'still_03.jpg']
 
-export { FILLER, FILLER_LONG }

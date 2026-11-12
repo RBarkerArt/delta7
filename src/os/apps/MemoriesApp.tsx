@@ -8,9 +8,9 @@ import type { AppProps } from '../types'
 export default function MemoriesApp({ isMobile }: AppProps) {
   const [id, setId] = useState(ALBUMS[0].id)
   const album = ALBUMS.find((a) => a.id === id) ?? ALBUMS[0]
-  // TODO(copy): placeholder file names.
+  // TODO(copy): stand-in file names.
   const stills = useMemo(
-    () => Array.from({ length: album.count }, (_, i) => ({ name: `${album.id === 'all' ? 'still' : album.id}_${String(i + 1).padStart(2, '0')}.jpg` })),
+    () => Array.from({ length: album.count }, (_, i) => ({ name: `${album.id === 'all' ? 'still' : album.label}_${String(i + 1).padStart(2, '0')}.jpg` })),
     [album],
   )
   return (

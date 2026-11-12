@@ -1,5 +1,6 @@
 import { createStore } from './createStore'
 import { clearNew } from './signal'
+import { removeKeysWithPrefix } from '../lib/storage'
 import type { AppId, AppParams } from '../types'
 
 export interface OpenApp {
@@ -174,4 +175,22 @@ export function getVisibleIconRect(id: AppId): DOMRect | null {
   if (r.width < 4 || r.height < 4) return null
   if (r.left < 0 || r.top < 0 || r.right > window.innerWidth || r.bottom > window.innerHeight) return null
   return r
+}
+
+/* ---------- reset window positions (menu) ---------- */
+
+const resetListeners = new Set<() => void>()
+
+/** Open desktop windows subscribe here to spring back to their default cascade frame. */
+export function onResetWindowPositions(cb: () => void): () => void {
+  resetListeners.add(cb)
+  return () => {
+    resetListeners.delete(cb)
+  }
+}
+
+/** Forgets every remembered window frame (`d7os:win:<id>`) and sends open windows back to their defaults. */
+export function resetWindowPositions() {
+  removeKeysWithPrefix('win:')
+  resetListeners.forEach((cb) => cb())
 }

@@ -13,7 +13,7 @@ import { windowTitleId } from './titleId'
 import { animateFrame, readFrame, useFrameGestures, writeFrame } from './useFrameGestures'
 import type { FrameValues } from './useFrameGestures'
 import { getApp } from '../apps/registry'
-import { closeApp, focusApp, getVisibleIconRect, minimizeApp } from '../store/windows'
+import { closeApp, focusApp, getVisibleIconRect, minimizeApp, onResetWindowPositions } from '../store/windows'
 import type { OpenApp } from '../store/windows'
 import { useReducedMotionPref } from '../lib/useReducedMotionPref'
 import { fadeFast } from '../lib/motion'
@@ -125,6 +125,24 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
     else if (icon) void pose.to(poseOnto(icon, box, iconRadius(icon), 0), landSpring, { opacity: { duration: 0.1, delay: 0.24 } }).then(done)
     else void pose.to(centrePose(box, 0.92, RADIUS), landSpring, { opacity: { duration: 0.16 } }).then(done)
   }, [isPresent, safeToRemove, app.id, frame, pose, reduced])
+
+  // Menu → "Reset window positions": saved frames are already gone; spring back to the default cascade, un-maximized.
+  // Nothing is saved here, so the defaults stay un-remembered until the user moves the window again.
+  const cascadeRef = useRef(cascadeIndex)
+  useEffect(() => {
+    cascadeRef.current = cascadeIndex
+  }, [cascadeIndex])
+  useEffect(
+    () =>
+      onResetWindowPositions(() => {
+        const to = initialFrame(def, cascadeRef.current, viewport())
+        restoreRef.current = null
+        setMaximized(false)
+        if (app.minimized) writeFrame(frame, to)
+        else void animateFrame(frame, to, reduced)
+      }),
+    [def, frame, reduced, setMaximized, app.minimized],
+  )
 
   // Keep the window inside the viewport when the viewport changes.
   useEffect(() => {

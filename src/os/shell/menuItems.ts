@@ -9,7 +9,8 @@ export type MenuItem =
   | { kind: 'account'; id: string; label: string }
   | { kind: 'wallpaper'; id: string; label: string }
   | { kind: 'toggle'; id: string; label: string; setting: keyof Pick<Settings, 'sound' | 'reduceMotion' | 'vibrate'>; hint?: string }
-  | { kind: 'about'; id: string; label: string; text: string }
+  | { kind: 'about'; id: string; label: string; text: string; version: string }
+  | { kind: 'action'; id: string; label: string; action: 'reset-windows' }
   | { kind: 'separator'; id: string }
 
 export const MENU_ITEMS: MenuItem[] = [
@@ -21,9 +22,10 @@ export const MENU_ITEMS: MenuItem[] = [
   { kind: 'toggle', id: 'sound', label: 'Sound', setting: 'sound' },
   { kind: 'toggle', id: 'reduce-motion', label: 'Reduce motion', setting: 'reduceMotion' },
   { kind: 'toggle', id: 'haptics', label: 'Haptics', setting: 'vibrate', hint: 'phones' },
+  { kind: 'action', id: 'reset-windows', label: 'Reset window positions', action: 'reset-windows' },
   { kind: 'separator', id: 's2' },
   { kind: 'link', id: 'privacy', label: 'Privacy', href: '/privacy' },
   { kind: 'link', id: 'terms', label: 'Terms', href: '/terms' },
-  // TODO(copy): about text is placeholder.
-  { kind: 'about', id: 'about', label: 'About Delta7', text: 'Delta7 OS shell · preview build' },
+  // TODO(copy): about text is a stand-in.
+  { kind: 'about', id: 'about', label: 'About Delta7', text: 'a quiet place for your things.', version: 'version 1.0' },
 ]

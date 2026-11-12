@@ -124,21 +124,26 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
         <div
           data-testid={`mobile-top-strip-${app.id}`}
           onPointerDown={gestures.onStripPointerDown}
-          className="relative flex h-12 shrink-0 items-center justify-center border-b border-os-ink/[0.08] bg-[#ebe3d8] px-12"
+          className="relative z-10 flex h-9 shrink-0 items-center justify-center border-b border-os-ink/[0.08] bg-[#ebe3d8]"
           style={{ touchAction: 'none' }}
         >
-          <div className="flex min-w-0 items-center gap-2">
-            <def.Glyph size={16} strokeWidth={1.5} className="shrink-0 text-os-ink/75" />
-            <h2 id={windowTitleId(app.id)} className="truncate font-os-mono text-[13px] lowercase tracking-[0.03em] text-os-ink">{def.label}</h2>
-          </div>
+          {/* The OS top bar already says where you are: the strip is just a grab handle + close. Title stays for AT. */}
+          <h2 id={windowTitleId(app.id)} className="sr-only">
+            {def.label}
+          </h2>
+          <span aria-hidden="true" className="block h-[4px] w-9 rounded-full bg-os-ink/20" />
+          {/* 44×44 hit area anchored to the strip's top edge (never reaches up into the top bar); the × is drawn in
+              the strip's centre line and the box reaches a few px below the strip. */}
           <button
             type="button"
             aria-label={`close ${def.label}`}
             data-testid={`window-close-${app.id}`}
             onClick={() => closeApp(app.id)}
-            className="absolute right-1.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-os-ink/65 outline-none active:bg-os-ink/[0.06] focus-visible:ring-2 focus-visible:ring-os-ink/30"
+            className="group absolute right-1 top-0 flex h-11 w-11 items-start justify-center pt-[6px] text-os-ink/70 outline-none"
           >
-            <CloseGlyph />
+            <span className="flex h-6 w-6 items-center justify-center rounded-[8px] group-active:bg-os-ink/[0.08] group-focus-visible:ring-2 group-focus-visible:ring-os-ink/30">
+              <CloseGlyph />
+            </span>
           </button>
         </div>
         <div className="os-selectable relative min-h-0 flex-1 overflow-auto overscroll-contain">

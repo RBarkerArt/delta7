@@ -52,7 +52,7 @@ export default function AudioApp({ isMobile }: AppProps) {
       <div className="flex h-full flex-col">
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-8">
           <p className="font-os-mono text-[13px] lowercase text-os-ink">{clip.name}</p>
-          <p className="font-os-mono text-[11.5px] os-text-soft">TODO(copy)</p>
+          <p className="font-os-mono text-[11.5px] os-text-soft">recording · {mmss(clip.seconds)}</p>
         </div>
         <div className="flex shrink-0 items-center gap-3 border-t border-os-ink/[0.08] bg-[#efe8de] px-4 py-3" data-testid="audio-player">
           <button

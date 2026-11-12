@@ -28,3 +28,18 @@ export function removeKey(key: string): void {
     /* storage unavailable */
   }
 }
+
+/** Safe delete of every `d7os:<prefix>…` key. */
+export function removeKeysWithPrefix(prefix: string): void {
+  try {
+    const ls = window.localStorage
+    const doomed: string[] = []
+    for (let i = 0; i < ls.length; i++) {
+      const k = ls.key(i)
+      if (k && k.startsWith(PREFIX + prefix)) doomed.push(k)
+    }
+    doomed.forEach((k) => ls.removeItem(k))
+  } catch {
+    /* storage unavailable */
+  }
+}

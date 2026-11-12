@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { motion } from 'motion/react'
 import Switch from './Switch'
@@ -7,6 +7,7 @@ import { MENU_ITEMS } from './menuItems'
 import type { MenuItem } from './menuItems'
 import { usePopoverDismiss } from './usePopoverDismiss'
 import { closePopover } from '../store/ui'
+import { resetWindowPositions } from '../store/windows'
 import { setReduceMotion, setSound, setVibrate, useSettings } from '../store/settings'
 import type { Settings } from '../store/settings'
 import { springs, fadeFast } from '../lib/motion'
@@ -31,6 +32,37 @@ function ToggleRow({ item }: { item: Extract<MenuItem, { kind: 'toggle' }> }) {
       </span>
       <Switch checked={value} onChange={SETTERS[item.setting]} label={item.label} testId={`menu-toggle-${item.id}`} />
     </div>
+  )
+}
+
+const ACTIONS: Record<Extract<MenuItem, { kind: 'action' }>['action'], () => void> = {
+  'reset-windows': resetWindowPositions,
+}
+
+/** A plain command row; confirms quietly in place (the label reads `done` for a moment). */
+function ActionRow({ item }: { item: Extract<MenuItem, { kind: 'action' }> }) {
+  const [done, setDone] = useState(false)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current)
+    },
+    [],
+  )
+  return (
+    <button
+      type="button"
+      className={`${row} ${rowHover}`}
+      data-testid={`menu-${item.id}`}
+      onClick={() => {
+        ACTIONS[item.action]()
+        setDone(true)
+        if (timer.current) clearTimeout(timer.current)
+        timer.current = setTimeout(() => setDone(false), 1400)
+      }}
+    >
+      <span aria-live="polite">{done ? 'done' : item.label}</span>
+    </button>
   )
 }
 
@@ -77,6 +109,8 @@ function Item({ item }: { item: MenuItem }) {
       )
     case 'toggle':
       return <ToggleRow item={item} />
+    case 'action':
+      return <ActionRow item={item} />
     case 'about':
       return (
         <div>
@@ -89,7 +123,12 @@ function Item({ item }: { item: MenuItem }) {
           >
             {item.label}
           </button>
-          {aboutOpen ? <p className="px-3 pb-2 font-os-mono text-[11.5px] os-text-soft">{item.text}</p> : null}
+          {aboutOpen ? (
+            <div className="px-3 pb-2 font-os-mono text-[11.5px] os-text-soft" data-testid="menu-about-text">
+              <p>{item.text}</p>
+              <p className="mt-0.5">{item.version}</p>
+            </div>
+          ) : null}
         </div>
       )
   }
