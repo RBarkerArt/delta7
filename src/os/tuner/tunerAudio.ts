@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { tunerStore } from '../store/tuner'
 import { settingsStore } from '../store/settings'
+import { coherenceStore } from '../store/coherence'
 import { TARGET, lockStrength } from './tunerMath'
 
 /**
@@ -21,6 +22,10 @@ interface Voice {
 }
 
 const MASTER = 0.07
+/** Base tone: a plain G (G3). It detunes gently with distance from the target. */
+const TONE_HZ = 196
+/** Extra static during a bad stretch. */
+const BAD_STRETCH_STATIC = 0.12
 const RAMP = 0.12 // setTargetAtTime time constant (s): no clicks
 
 let voice: Voice | null = null
@@ -57,7 +62,7 @@ function build(): Voice | null {
 
   const tone = ctx.createOscillator()
   tone.type = 'sine'
-  tone.frequency.value = 142
+  tone.frequency.value = TONE_HZ
   // A slow vibrato that is wide off-lock and dies away at the lock.
   const wobble = ctx.createOscillator()
   wobble.frequency.value = 5.5
@@ -88,10 +93,11 @@ function sync() {
   const s = locked ? 1 : lockStrength(value)
   const now = v.ctx.currentTime
   v.master.gain.setTargetAtTime(audible ? MASTER : 0, now, RAMP)
-  v.noiseGain.gain.setTargetAtTime(0.55 * (1 - s) ** 1.5 + 0.02, now, RAMP)
+  const bad = !locked && coherenceStore.get().badStretch
+  v.noiseGain.gain.setTargetAtTime(0.55 * (1 - s) ** 1.5 + 0.02 + (bad ? BAD_STRETCH_STATIC : 0), now, RAMP)
   v.noiseFilter.frequency.setTargetAtTime(900 + 2200 * (1 - s), now, RAMP)
   v.toneGain.gain.setTargetAtTime(0.08 + 0.55 * s * s, now, RAMP)
-  v.tone.frequency.setTargetAtTime(142 + (value - TARGET) * 60, now, RAMP)
+  v.tone.frequency.setTargetAtTime(TONE_HZ + (value - TARGET) * 80, now, RAMP)
   v.wobbleDepth.gain.setTargetAtTime(locked ? 0 : 9 * (1 - s), now, RAMP)
   if (audible && v.ctx.state === 'suspended') void v.ctx.resume().catch(() => {})
 }
@@ -112,7 +118,7 @@ function close() {
 export function useTunerAudio() {
   useEffect(() => {
     mounts++
-    const unsubs = [tunerStore.subscribe(sync), settingsStore.subscribe(sync)]
+    const unsubs = [tunerStore.subscribe(sync), settingsStore.subscribe(sync), coherenceStore.subscribe(sync)]
     document.addEventListener('visibilitychange', sync)
     sync()
     return () => {

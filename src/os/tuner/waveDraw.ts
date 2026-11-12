@@ -36,6 +36,8 @@ export interface WaveFrame {
   offset: number
   /** Jitter frame index: changes ~20×/s normally, slowly with reduced motion. */
   frame: number
+  /** Minimum static on the trace (0..1). Raised during a bad stretch until the lock lands. */
+  noiseFloor: number
 }
 
 /** Carrier phase speed (rad/s): restless off-lock, a slow calm roll at the lock. */
@@ -44,7 +46,7 @@ export function carrierSpeed(strength: number): number {
 }
 
 export function drawWave(ctx: CanvasRenderingContext2D, f: WaveFrame) {
-  const { width: w, height: h, t, phase, strength: s, offset, frame } = f
+  const { width: w, height: h, t, phase, strength: s, offset, frame, noiseFloor } = f
   ctx.clearRect(0, 0, w, h)
   const mid = h / 2
   const pad = 14
@@ -57,7 +59,7 @@ export function drawWave(ctx: CanvasRenderingContext2D, f: WaveFrame) {
   ctx.lineTo(w - pad, mid + 0.5)
   ctx.stroke()
 
-  const noiseAmt = (1 - s) ** 0.8
+  const noiseAmt = Math.max(noiseFloor, (1 - s) ** 0.8)
   const amp = Math.min(h * 0.26, 76) * (1 + 0.22 * s)
   // Off-lock the carrier is detuned (more, faster cycles); at the lock it slows to ~2 calm cycles.
   const cycles = 2 + Math.min(6, Math.abs(offset) * 22)

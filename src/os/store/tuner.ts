@@ -1,7 +1,7 @@
 import { createStore } from './createStore'
-import { setTunerLocked } from './coherence'
+import { coherenceStore, setTunerLocked } from './coherence'
 import { haptic } from './settings'
-import { HOLD_MS, TARGET, clampFreq, isInLockWindow, roundFreq } from '../tuner/tunerMath'
+import { HOLD_MS, TARGET, clampFreq, holdMsFor, isInLockWindow, roundFreq } from '../tuner/tunerMath'
 
 /**
  * Tuner state, shared by every mounted tuner (the tuner app and Delta7's tuner view).
@@ -16,6 +16,8 @@ interface TunerState {
   holding: boolean
   /** Date.now() when the current hold started (0 when not holding). */
   holdSince: number
+  /** Length of the current hold (longer during a bad stretch). */
+  holdMs: number
   transport: Transport
   /** Bumped on every lock, so the readout / lock icon can play their small bounce. */
   lockNonce: number
@@ -27,6 +29,7 @@ export const tunerStore = createStore<TunerState>({
   locked: false,
   holding: false,
   holdSince: 0,
+  holdMs: HOLD_MS,
   transport: 'stopped',
   lockNonce: 0,
 })
@@ -63,13 +66,14 @@ function evaluate() {
   }
   if (inWindow && armed) {
     if (s.holding) return
-    tunerStore.set({ holding: true, holdSince: Date.now() })
+    const holdMs = holdMsFor(coherenceStore.get().badStretch)
+    tunerStore.set({ holding: true, holdSince: Date.now(), holdMs })
     clearHold()
     holdTimer = setTimeout(() => {
       holdTimer = null
       const now = tunerStore.get()
       if (!now.locked && armed && isInLockWindow(now.value)) lock()
-    }, HOLD_MS)
+    }, holdMs)
   } else if (s.holding) {
     clearHold()
     tunerStore.set({ holding: false, holdSince: 0 })
@@ -157,6 +161,9 @@ export function useTunerHolding(): boolean {
 }
 export function useTunerHoldSince(): number {
   return tunerStore.use((s) => s.holdSince)
+}
+export function useTunerHoldMs(): number {
+  return tunerStore.use((s) => s.holdMs)
 }
 export function useTransport(): Transport {
   return tunerStore.use((s) => s.transport)

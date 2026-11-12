@@ -9,7 +9,7 @@ import TunerView from './TunerView'
 import { ArchiveView, FilesView, LogsView, MemoriesView, MessagesView } from './SectionViews'
 import { bucketOf, decayPlan } from './decay'
 import { useEscape } from './hooks'
-import { useCoherence, useDecayLevel } from '../store/coherence'
+import { useBadStretch, useCoherence, useDecayLevel } from '../store/coherence'
 import { useDay } from '../store/dev'
 import { useElementSize } from '../lib/useElementSize'
 import { useReducedMotionPref } from '../lib/useReducedMotionPref'
@@ -46,7 +46,8 @@ export default function Delta7App({ params, isMobile }: AppProps) {
   const reduced = useReducedMotionPref()
   const seed = `d7:${day}`
   const bucket = bucketOf(coherence)
-  const plan = useMemo(() => decayPlan(bucket, seed), [bucket, seed])
+  const badStretch = useBadStretch()
+  const plan = useMemo(() => decayPlan(bucket, seed, badStretch), [bucket, seed, badStretch])
 
   const select = (v: D7View) => {
     setView(v)
@@ -83,6 +84,7 @@ export default function Delta7App({ params, isMobile }: AppProps) {
       data-level={level}
       data-bucket={plan.bucket.toFixed(2)}
       data-compact={compact ? 'true' : 'false'}
+      data-bad-stretch={badStretch ? 'true' : 'false'}
       className={`d7 relative flex h-full w-full flex-col overflow-hidden font-os-sans ${reduced ? 'd7-reduced' : ''}`}
     >
       <Header compact={compact} drawerOpen={drawerOpen} onMenu={() => setDrawerOpen(true)} plan={plan} day={day} />

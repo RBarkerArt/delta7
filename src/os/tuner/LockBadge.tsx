@@ -1,12 +1,13 @@
 import { motion } from 'motion/react'
 import { Lock, LockOpen } from 'lucide-react'
 import { springs } from '../lib/motion'
-import { HOLD_MS } from './tunerMath'
 
 interface Props {
   locked: boolean
   holding: boolean
   holdSince: number
+  /** Length of the current hold in ms (the ring fills over it). */
+  holdMs: number
   lockNonce: number
   reduced: boolean
   size: number
@@ -14,8 +15,8 @@ interface Props {
 
 const WARM = '#B65A34'
 
-/** Lock state + quiet hold progress: the ring fills over the 1.5s hold, then the lock closes. */
-export default function LockBadge({ locked, holding, holdSince, lockNonce, reduced, size }: Props) {
+/** Lock state + quiet hold progress: the ring fills over the hold (≈1.5s, ≈3s in a bad stretch), then the lock closes. */
+export default function LockBadge({ locked, holding, holdSince, holdMs, lockNonce, reduced, size }: Props) {
   const r = size / 2 - 2
   const c = size / 2
   return (
@@ -48,7 +49,7 @@ export default function LockBadge({ locked, holding, holdSince, lockNonce, reduc
             strokeLinecap="round"
             initial={{ pathLength: 0 }}
             animate={{ pathLength: 1 }}
-            transition={{ duration: HOLD_MS / 1000, ease: 'linear' }}
+            transition={{ duration: holdMs / 1000, ease: 'linear' }}
           />
         ) : null}
       </svg>

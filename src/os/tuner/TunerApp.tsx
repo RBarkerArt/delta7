@@ -1,9 +1,11 @@
 import './tuner.css'
 import { useElementSize } from '../lib/useElementSize'
 import { useReducedMotionPref } from '../lib/useReducedMotionPref'
+import { useBadStretch } from '../store/coherence'
 import {
   useLockNonce,
   useTransport,
+  useTunerHoldMs,
   useTunerHoldSince,
   useTunerHolding,
   useTunerLock,
@@ -30,6 +32,8 @@ export default function TunerApp({ isMobile }: AppProps) {
   const locked = useTunerLock()
   const holding = useTunerHolding()
   const holdSince = useTunerHoldSince()
+  const holdMs = useTunerHoldMs()
+  const badStretch = useBadStretch()
   const lockNonce = useLockNonce()
   const transport = useTransport()
   const reduced = useReducedMotionPref()
@@ -56,6 +60,7 @@ export default function TunerApp({ isMobile }: AppProps) {
       ref={ref}
       data-testid="tuner-root"
       data-locked={locked ? 'true' : 'false'}
+      data-bad-stretch={badStretch ? 'true' : 'false'}
       className="tuner-root relative h-full w-full overflow-y-auto overflow-x-hidden bg-os-cream/[0.97] font-os-sans text-os-ink"
     >
       {/* Not quite opaque on purpose: Chromium treats a fully opaque, composited (canvas inside) card as covering its whole
@@ -76,6 +81,7 @@ export default function TunerApp({ isMobile }: AppProps) {
             locked={locked}
             holding={holding}
             holdSince={holdSince}
+            holdMs={holdMs}
             lockNonce={lockNonce}
             reduced={reduced}
             size={compact ? 40 : 44}

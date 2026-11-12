@@ -110,7 +110,12 @@ export function tearPolygon(edge: 'bottom' | 'right', depth: number, rnd: () => 
   return `polygon(${pts.join(', ')})`
 }
 
-export function decayPlan(coherence: number, seed: string): DecayPlan {
+/** Extra misspellings during a bad stretch (2 or 3, fixed per seed). */
+export function badStretchMisspellings(seed: string): number {
+  return seeded(`${seed}:bad-stretch`)() < 0.5 ? 2 : 3
+}
+
+export function decayPlan(coherence: number, seed: string, badStretch = false): DecayPlan {
   const bucket = round(bucketOf(coherence))
   const level = levelFor(bucket)
   // severity: 0 at 0.9 and above → 1 at 0.
@@ -184,7 +189,11 @@ export function decayPlan(coherence: number, seed: string): DecayPlan {
   }
 
   /* ---- labels ---- */
-  const misspellCount = fragmented ? 5 : fraying ? (bucket < 0.65 ? 3 : 2) : 0
+  const labelKeys = Object.keys(D7_LABELS).length
+  const misspellCount = Math.min(
+    labelKeys,
+    (fragmented ? 5 : fraying ? (bucket < 0.65 ? 3 : 2) : 0) + (badStretch ? badStretchMisspellings(seed) : 0),
+  )
   const labels = { ...D7_LABELS } as Record<D7LabelKey, string>
   for (let i = 0; i < misspellCount; i++) {
     const key = labelOrder[i]

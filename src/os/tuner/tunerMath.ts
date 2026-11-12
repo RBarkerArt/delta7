@@ -9,6 +9,8 @@ export const TARGET = 1.42
 export const LOCK_WINDOW = 0.005
 /** Time the value must stay in the window before it locks. */
 export const HOLD_MS = 1500
+/** During a bad stretch the lock takes about twice as long to land. */
+export const BAD_STRETCH_HOLD_MS = 3000
 /** On release / wheel idle, values this close to TARGET glide into it. */
 export const MAGNET_RANGE = 0.02
 /** Half-width of the sticky "notch" around TARGET while dragging (see notch()). */
@@ -17,6 +19,11 @@ export const NOTCH_RANGE = 0.03
 export const LOCKED_DETENT = 0.02
 
 const STRENGTH_SIGMA = 0.1
+
+/** Hold time before the lock lands, for the current mood. */
+export function holdMsFor(badStretch: boolean): number {
+  return badStretch ? BAD_STRETCH_HOLD_MS : HOLD_MS
+}
 
 export function clampFreq(v: number): number {
   return v < FREQ_MIN ? FREQ_MIN : v > FREQ_MAX ? FREQ_MAX : v

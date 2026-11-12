@@ -126,7 +126,7 @@ export function setCoherence(v: number) {
   if (coherenceStore.get().tunerLocked) startTicker()
 }
 
-/** Lowers the absence floor; also read by the heartbeat. */
+/** Scripted bad stretch: changes the absence floor (never yanks the current value) and the mood (heartbeat, tuner, labels). */
 export function setBadStretch(on: boolean) {
   coherenceStore.set({ badStretch: on })
 }
@@ -150,7 +150,7 @@ export function useBadStretch(): boolean {
 export function useTunerLocked(): boolean {
   return coherenceStore.use((s) => s.tunerLocked)
 }
-/** Current absence floor (0.70, or 0.50 in a bad stretch). */
+/** Current absence floor (0.70, or 0.75 in a bad stretch). */
 export function getAbsenceFloor(): number {
   return floorFor(coherenceStore.get().badStretch)
 }
