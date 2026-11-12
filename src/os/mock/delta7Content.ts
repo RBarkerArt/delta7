@@ -40,10 +40,10 @@ export const D7_FILES: D7File[] = [
   { name: 'log_0611.txt', size: '6 KB', when: 'yesterday' },
 ]
 
-// TODO(copy) — lorem filler, word-split so the decay can fade single words.
+// TODO(copy) — neutral stand-in in the program's own plain voice; word-split so the decay can fade single words.
 export const D7_MESSAGE = {
   received: '02:12',
-  body: 'lorem ipsum dolor sit amet, consectetur adipiscing elit. sed do eiusmod tempor incididunt ut labore.',
+  body: 'nothing new since the last check. input open, buffer clean, decode waiting on a steady hold.',
 }
 
 /** Placeholder in log lines for the hold value: `?` until the first lock ever, then the target. */
@@ -85,12 +85,12 @@ export const D7_STATUS = {
 } as const
 export type D7Status = keyof typeof D7_STATUS
 
-// TODO(copy)
+// TODO(copy) — neutral stand-ins: status notes only.
 export const D7_MESSAGES_LIST = [
-  { title: 'lorem ipsum', when: '02:12' },
-  { title: 'dolor sit amet', when: '01:40' },
-  { title: 'consectetur', when: 'yesterday' },
-  { title: 'adipiscing elit', when: 'mon' },
+  { title: 'nothing new since the last check', when: '02:12' },
+  { title: 'buffer 3/4, still listening', when: '01:40' },
+  { title: 'decode: partial, try again later', when: 'yesterday' },
+  { title: 'input reopened', when: 'mon' },
 ]
 
 // TODO(copy)
