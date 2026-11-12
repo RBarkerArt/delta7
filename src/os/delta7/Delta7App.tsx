@@ -88,7 +88,7 @@ export default function Delta7App({ params, isMobile }: AppProps) {
       data-bad-stretch={badStretch ? 'true' : 'false'}
       className={`d7 relative flex h-full w-full flex-col overflow-hidden font-os-sans ${reduced ? 'd7-reduced' : ''}`}
     >
-      <Header compact={compact} drawerOpen={drawerOpen} onMenu={() => setDrawerOpen(true)} plan={plan} day={day} />
+      <Header compact={compact} view={view} drawerOpen={drawerOpen} onMenu={() => setDrawerOpen(true)} plan={plan} day={day} />
       <div className="relative flex min-h-0 flex-1">
         {wide ? <aside className="w-[164px] shrink-0 border-r border-[color:var(--d7-rule)] bg-[color:var(--d7-side)]">{nav}</aside> : null}
         <div className="relative min-h-0 min-w-0 flex-1">

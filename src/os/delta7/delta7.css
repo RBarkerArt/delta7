@@ -179,12 +179,6 @@
   pointer-events: none;
 }
 
-.d7-thumb-0 { background: linear-gradient(150deg, #c9a99f, #a07f86); }
-.d7-thumb-1 { background: linear-gradient(160deg, #b3a58f, #8c8473); }
-.d7-thumb-2 { background: linear-gradient(140deg, #c6a07c, #9b7a63); }
-.d7-thumb-3 { background: linear-gradient(170deg, #a9a1a8, #7d7279); }
-.d7-thumb-4 { background: linear-gradient(150deg, #b98f8c, #8e6a6c); }
-.d7-thumb-5 { background: linear-gradient(160deg, #9fb0ab, #74827f); }
 
 .d7-edge {
   touch-action: pan-y;

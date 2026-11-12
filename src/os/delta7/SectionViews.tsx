@@ -1,11 +1,14 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 import Panel from './Panel'
 import RewritingLine from './RewritingLine'
-import { D7_ARCHIVE, D7_FILES, D7_MEMORIES, D7_MESSAGES_LIST, D7_MESSAGE } from '../mock/delta7Content'
+import { thumbBackground } from '../apps/thumbStyle'
+import { D7_ARCHIVE, D7_FILES, D7_MEMORIES, D7_MESSAGES_LIST } from '../mock/delta7Content'
 import type { DecayPlan } from './decay'
 import { useD7Signal } from './hooks'
 
 // Simple placeholder views for the non-overview sections. All content TODO(copy).
+// Only message rows do something (they pick the preview); file, archive and memory rows are plain, inert rows.
 
 interface ViewProps {
   plan: DecayPlan
@@ -23,38 +26,55 @@ function Frame({ plan, wide, title, testId, children }: ViewProps & { title: str
   )
 }
 
-const row = 'd7-row flex w-full items-baseline gap-3 rounded-[3px] px-1.5 py-[5px] text-left text-[14px]'
+/** An inert row: no hover, no pointer, not focusable. */
+const row = 'flex w-full items-baseline gap-3 px-1.5 py-[5px] text-left text-[14px]'
+/** A real, selectable row (hover + focus ring; 48px tall on phones). */
+const pickRow = 'd7-row flex w-full items-baseline gap-3 rounded-[3px] px-1.5 py-[5px] text-left text-[14px]'
 const meta = 'shrink-0 text-[12px] text-[color:var(--d7-soft)]'
 
 export function MemoriesView(p: ViewProps) {
   return (
     <Frame {...p} title={p.plan.labels['nav.memories']} testId="d7-view-memories">
-      <div className={`grid gap-2.5 ${p.wide ? 'grid-cols-3' : 'grid-cols-2'}`}>
-        {D7_MEMORIES.map((m, i) => (
-          <button key={m} type="button" className="d7-row rounded-[3px] p-1 text-left" aria-label={m}>
-            <div className={`d7-thumb-${i % 6} aspect-[4/3] rounded-[2px]`} />
+      <ul className={`grid gap-2.5 ${p.wide ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {/* The same soft "photo" look as the gallery app, under the dashboard's own wash (decays with the rest). */}
+        {D7_MEMORIES.map((m) => (
+          <li key={m} className="min-w-0 p-1" data-testid="d7-memory-item">
+            <div className="relative aspect-[4/3] overflow-hidden rounded-[2px]" style={{ background: thumbBackground(m) }}>
+              <div className="d7-feed-wash d7-fx absolute inset-0" style={{ opacity: p.plan.wash }} aria-hidden="true" />
+            </div>
             <span className="mt-1 block truncate font-os-mono text-[12px] text-[color:var(--d7-soft)]">{m}</span>
-          </button>
+          </li>
         ))}
-      </div>
+      </ul>
     </Frame>
   )
 }
 
 export function MessagesView(p: ViewProps) {
+  const [picked, setPicked] = useState(0)
+  const shown = D7_MESSAGES_LIST[picked]
   return (
     <Frame {...p} title={p.plan.labels['nav.messages']} testId="d7-view-messages">
       <ul>
         {D7_MESSAGES_LIST.map((m, i) => (
           <li key={m.title}>
-            <button type="button" className={row}>
+            <button
+              type="button"
+              className={`${pickRow} ${i === picked ? 'bg-[rgba(155,94,94,0.09)]' : ''}`}
+              aria-current={i === picked ? 'true' : undefined}
+              data-testid={`d7-message-row-${i}`}
+              onClick={() => setPicked(i)}
+            >
               <span className={`min-w-0 flex-1 truncate ${i === 0 ? 'font-semibold' : ''}`}>{m.title}</span>
               <span className={meta}>{m.when}</span>
             </button>
           </li>
         ))}
       </ul>
-      <p className="mt-3 border-t border-[color:var(--d7-rule)] pt-3 text-[14px] leading-[1.5] text-[color:var(--d7-soft)]">{D7_MESSAGE.body}</p>
+      <div className="mt-3 border-t border-[color:var(--d7-rule)] pt-3" data-testid="d7-message-preview" data-index={picked}>
+        <p className="font-os-mono text-[11.5px] text-[color:var(--d7-soft)]">received {shown.when}</p>
+        <p className="mt-1 text-[14px] leading-[1.5] text-[color:var(--d7-ink)]">{shown.body}</p>
+      </div>
     </Frame>
   )
 }
@@ -65,11 +85,11 @@ export function FilesView(p: ViewProps) {
       <ul>
         {D7_FILES.map((f) => (
           <li key={f.name}>
-            <button type="button" className={row}>
+            <div className={row}>
               <span className="min-w-0 flex-1 truncate font-os-mono text-[13px]">{f.name}</span>
               <span className={meta}>{f.size}</span>
               <span className={`${meta} w-[66px] text-right`}>{f.when}</span>
-            </button>
+            </div>
           </li>
         ))}
       </ul>
@@ -83,10 +103,10 @@ export function ArchiveView(p: ViewProps) {
       <ul>
         {D7_ARCHIVE.map((a) => (
           <li key={a.name}>
-            <button type="button" className={row}>
+            <div className={row}>
               <span className="min-w-0 flex-1 truncate font-os-mono text-[13px]">{a.name}</span>
               <span className={meta}>{a.size}</span>
-            </button>
+            </div>
           </li>
         ))}
       </ul>

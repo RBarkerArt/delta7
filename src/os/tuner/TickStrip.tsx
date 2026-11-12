@@ -104,7 +104,7 @@ export default function TickStrip({ value, locked, pxPerUnit, ariaText }: Props)
       data-testid="tuner-slider"
       data-value={value.toFixed(3)}
       onKeyDown={onKeyDown}
-      className="tuner-strip relative cursor-grab select-none overflow-hidden rounded-[12px] outline-none active:cursor-grabbing focus-visible:ring-1 focus-visible:ring-os-ink/25"
+      className="tuner-strip relative shrink-0 cursor-grab select-none overflow-hidden rounded-[12px] outline-none active:cursor-grabbing focus-visible:ring-1 focus-visible:ring-os-ink/25"
       style={{ height: H + 8, touchAction: 'none' }}
     >
       <div className="tuner-strip-mask absolute inset-0">

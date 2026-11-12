@@ -38,6 +38,8 @@ export interface WaveFrame {
   frame: number
   /** Minimum static on the trace (0..1). Raised during a bad stretch until the lock lands. */
   noiseFloor: number
+  /** Overall height of the trace (1 = normal). A stopped tuner draws a low, flat-ish idle trace. */
+  ampScale?: number
 }
 
 /** Carrier phase speed (rad/s): restless off-lock, a slow calm roll at the lock. */
@@ -66,7 +68,7 @@ export function drawWave(ctx: CanvasRenderingContext2D, f: WaveFrame) {
   const crackle = Math.max(noiseFloor * 0.6, Math.max(0, 1 - s / 0.45) ** 1.5)
   const carrier = Math.max(0, Math.min(1, 0.06 + 0.94 * s ** 1.3 - noiseFloor * 0.3))
   const popEdge = 0.93 - 0.11 * crackle // more pops the more crackle there is
-  const amp = Math.min(h * 0.26, 76) * (1 + 0.22 * s)
+  const amp = Math.min(h * 0.26, 76) * (1 + 0.22 * s) * (f.ampScale ?? 1)
   // Off-lock the carrier is detuned (more, faster cycles); at the lock it slows to ~2 calm cycles.
   const cycles = 2 + 6 * Math.max(0, 1 - s / 0.9) ** 1.5
   const n = Math.max(32, Math.floor((w - pad * 2) / 2))

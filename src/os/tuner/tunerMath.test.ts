@@ -9,6 +9,7 @@ import {
   PULL_MAX_SPEED,
   PULL_RANGE,
   SIGNAL_TARGET,
+  START_VALUE,
   ZONE_CLEAR,
   ZONE_CLEARER,
   ZONE_FAINT,
@@ -28,7 +29,13 @@ import {
   roundFreq,
   stepOnGrid,
   unnotch,
+  WHEEL_NOTCH_STEP,
+  wheelNotches,
+  nextTransport,
+  transportAudible,
+  transportInputOpen,
 } from './tunerMath.ts'
+import type { Transport } from './tunerMath.ts'
 
 const T = SIGNAL_TARGET
 
@@ -229,4 +236,55 @@ test('degradeMessage is deterministic and keeps the redaction block', () => {
 test('degradeMessage is fully clear only at the lock', () => {
   assert.equal(degradeMessage(MSG, 1, 'seed'), MSG)
   for (const s of [0, 0.3, 0.6, 0.95, 0.999]) assert.notEqual(degradeMessage(MSG, s, 'seed'), MSG)
+})
+
+test('the dial starts in the upper band, outside every zone, so sweeping toward the low end passes the signal', () => {
+  assert.ok(START_VALUE > T + ZONE_FAINT, 'start is above the faint zone')
+  assert.ok(START_VALUE < FREQ_MAX && START_VALUE >= (FREQ_MIN + FREQ_MAX) / 2, 'start is in the upper part of the band')
+  assert.equal(clarityBucket(START_VALUE, false), 'none')
+  // A plain arrow-key / wheel-notch sweep down from the start lands exactly on the target.
+  let v = START_VALUE
+  let hit = false
+  for (let i = 0; i < 200 && v > FREQ_MIN; i++) {
+    v = stepOnGrid(v, WHEEL_NOTCH_STEP, -1)
+    if (v === roundFreq(T)) hit = true
+  }
+  assert.ok(hit, 'a downward 0.01 sweep from the start passes through the target')
+})
+
+test('wheelNotches: a clicky wheel is whole notches, trackpad pixel scrolling is not', () => {
+  assert.equal(WHEEL_NOTCH_STEP, 0.01)
+  // Chromium mouse wheel: 100px with a legacy wheelDelta of ±120 per notch.
+  assert.equal(wheelNotches({ deltaMode: 0, deltaX: 0, deltaY: 100, wheelDeltaY: -120 }), 1)
+  assert.equal(wheelNotches({ deltaMode: 0, deltaX: 0, deltaY: -100, wheelDeltaY: 120 }), -1)
+  assert.equal(wheelNotches({ deltaMode: 0, deltaX: 0, deltaY: 200, wheelDeltaY: -240 }), 2)
+  // Firefox: line mode, 3 lines a notch.
+  assert.equal(wheelNotches({ deltaMode: 1, deltaX: 0, deltaY: 3 }), 1)
+  assert.equal(wheelNotches({ deltaMode: 1, deltaX: 0, deltaY: -3 }), -1)
+  // Trackpad: small pixel deltas → proportional (0 notches).
+  assert.equal(wheelNotches({ deltaMode: 0, deltaX: 0, deltaY: 4.5, wheelDeltaY: -13.5 }), 0)
+  assert.equal(wheelNotches({ deltaMode: 0, deltaX: 12, deltaY: 1 }), 0)
+  assert.equal(wheelNotches({ deltaMode: 0, deltaX: 0, deltaY: 0 }), 0)
+})
+
+test('transport: silent until Play; tuning re-opens a stopped tuner without sound; stop closes input', () => {
+  const all: Transport[] = ['open', 'playing', 'paused', 'stopped']
+  // The start is `open`: input open, silent.
+  assert.equal(transportInputOpen('open'), true)
+  assert.equal(transportAudible('open', true), false)
+  // Only Play makes sound, and only with the Sound setting on.
+  for (const s of all) {
+    assert.equal(nextTransport(s, 'play'), 'playing')
+    assert.equal(transportAudible(s, false), false)
+    assert.equal(transportAudible(nextTransport(s, 'tune'), true), s === 'playing', `tuning from ${s} must not start sound`)
+    assert.equal(transportAudible(nextTransport(s, 'stop'), true), false)
+    assert.equal(transportAudible(nextTransport(s, 'pause'), true), false)
+  }
+  assert.equal(transportAudible('playing', true), true)
+  // Stop closes input; tuning re-opens it to the silent start state, not to playing.
+  assert.equal(transportInputOpen(nextTransport('playing', 'stop')), false)
+  assert.equal(nextTransport('stopped', 'tune'), 'open')
+  assert.equal(nextTransport('paused', 'tune'), 'paused')
+  assert.equal(nextTransport('playing', 'tune'), 'playing')
+  assert.equal(transportInputOpen('paused'), true)
 })

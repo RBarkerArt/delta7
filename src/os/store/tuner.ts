@@ -2,13 +2,30 @@ import { createStore } from './createStore'
 import { coherenceStore, setTunerLocked } from './coherence'
 import { haptic } from './settings'
 import { readJSON, removeKey, writeJSON } from '../lib/storage'
-import { HOLD_MS, START_VALUE, TARGET, clampFreq, holdComplete, holdMsFor, isInLockWindow, roundFreq } from '../tuner/tunerMath'
+import {
+  HOLD_MS,
+  START_VALUE,
+  TARGET,
+  clampFreq,
+  holdComplete,
+  holdMsFor,
+  isInLockWindow,
+  nextTransport,
+  roundFreq,
+  transportInputOpen,
+} from '../tuner/tunerMath'
+import type { Transport } from '../tuner/tunerMath'
 
 /**
  * Tuner state, shared by every mounted tuner (the tuner app and Delta7's tuner view).
  * Module-level on purpose: the lock keeps holding while the window is closed or minimised.
+ *
+ * Transport: `open` (the tuner starts this way: trace live, input open, silent, no transport button pressed),
+ * `playing` (Play tapped: the same, with sound if the Sound setting is on), `paused` (trace frozen, input still open)
+ * or `stopped` (lock released, input closed, silent, trace idle). Tuning input re-opens a stopped tuner to `open`
+ * (sound needs Play again); Play from anywhere → `playing`.
  */
-export type Transport = 'stopped' | 'playing' | 'paused'
+export type { Transport }
 
 interface TunerState {
   value: number
@@ -47,7 +64,7 @@ export const tunerStore = createStore<TunerState>({
   holding: false,
   holdSince: 0,
   holdMs: HOLD_MS,
-  transport: 'stopped',
+  transport: 'open',
   lockNonce: 0,
   touched: false,
   adjusting: false,
@@ -55,8 +72,18 @@ export const tunerStore = createStore<TunerState>({
 })
 
 let holdTimer: ReturnType<typeof setTimeout> | null = null
-/** After Stop the lock stays released until the next tuning input (or Play). */
-let armed = true
+
+/** Input is open (the lock can be found) unless the tuner is stopped. */
+function inputOpen(): boolean {
+  return transportInputOpen(tunerStore.get().transport)
+}
+
+/** Tuning input re-opens a stopped tuner. */
+function reopen() {
+  const s = tunerStore.get().transport
+  const next = nextTransport(s, 'tune')
+  if (next !== s) tunerStore.set({ transport: next })
+}
 
 function clearHold() {
   if (holdTimer) clearTimeout(holdTimer)
@@ -85,7 +112,7 @@ function evaluate() {
     if (!inWindow) unlock()
     return
   }
-  if (inWindow && armed) {
+  if (inWindow && inputOpen()) {
     if (s.holding) return
     const holdMs = holdMsFor(coherenceStore.get().badStretch)
     tunerStore.set({ holding: true, holdSince: Date.now(), holdMs })
@@ -94,7 +121,7 @@ function evaluate() {
       holdTimer = null
       const now = tunerStore.get()
       // +5ms: timers and Date.now() can disagree by a tick.
-      if (!now.locked && armed && isInLockWindow(now.value) && holdComplete(now.holdSince, Date.now() + 5, now.holdMs)) lock()
+      if (!now.locked && inputOpen() && isInLockWindow(now.value) && holdComplete(now.holdSince, Date.now() + 5, now.holdMs)) lock()
     }, holdMs)
   } else if (s.holding) {
     clearHold()
@@ -134,7 +161,7 @@ export function cancelGlide() {
 /** Eases the value to `target` (ease-out cubic). New input cancels it. */
 export function glideTo(target: number, ms = 420) {
   cancelGlide()
-  armed = true
+  reopen()
   markInput()
   const from = tunerStore.get().value
   const to = clampFreq(target)
@@ -158,10 +185,10 @@ export function getTuner(): TunerState {
   return tunerStore.get()
 }
 
-/** Direct tuning input (drag, wheel, keyboard). Cancels any glide and re-arms the lock after Stop. */
+/** Direct tuning input (drag, wheel, keyboard). Cancels any glide and re-opens input after Stop. */
 export function setTunerValue(v: number) {
   cancelGlide()
-  armed = true
+  reopen()
   markInput()
   apply(v)
 }
@@ -171,22 +198,20 @@ export function nudgeTuner(delta: number) {
 }
 
 export function playTuner() {
-  armed = true
-  tunerStore.set({ transport: 'playing' })
+  tunerStore.set((s) => ({ transport: nextTransport(s.transport, 'play') }))
   evaluate()
 }
 
 export function pauseTuner() {
-  tunerStore.set({ transport: 'paused' })
+  tunerStore.set((s) => ({ transport: nextTransport(s.transport, 'pause') }))
 }
 
-/** Releases the lock and silences. Tuning again (or Play) re-arms the lock. */
+/** Releases the lock, closes input and silences. Tuning again re-opens input (silent); Play re-opens and plays. */
 export function stopTuner() {
   cancelGlide()
-  armed = false
+  tunerStore.set((s) => ({ transport: nextTransport(s.transport, 'stop') }))
   if (tunerStore.get().locked) unlock()
   else evaluate()
-  tunerStore.set({ transport: 'stopped' })
 }
 
 /** Has the signal ever been found? (Non-React read.) */
@@ -203,9 +228,16 @@ export function forgetFirstLock() {
   clearHold()
   removeKey(SIGNAL_KEY)
   const wasLocked = tunerStore.get().locked
-  tunerStore.set({ everLocked: false, touched: false, value: START_VALUE, locked: false, holding: false, holdSince: 0 })
+  tunerStore.set({
+    everLocked: false,
+    touched: false,
+    value: START_VALUE,
+    locked: false,
+    holding: false,
+    holdSince: 0,
+    transport: 'open',
+  })
   if (wasLocked) setTunerLocked(false)
-  armed = true
 }
 
 export function useTunerValue(): number {

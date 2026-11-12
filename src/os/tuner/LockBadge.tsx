@@ -15,7 +15,11 @@ interface Props {
 
 const WARM = '#B65A34'
 
-/** Lock state + quiet hold progress: the ring fills over the hold (≈1.5s, ≈3s in a bad stretch), then the lock closes. */
+/**
+ * Lock state + quiet hold progress. Not a control (role="img"), so it doesn't look like one: unlocked and idle it is a
+ * faint glyph with no ring; holding, the ring appears and fills over the hold (≈1.5s, ≈3s in a bad stretch); locked,
+ * the ring is solid and the glyph closes.
+ */
 export default function LockBadge({ locked, holding, holdSince, holdMs, lockNonce, reduced, size }: Props) {
   const r = size / 2 - 2
   const c = size / 2
@@ -32,8 +36,8 @@ export default function LockBadge({ locked, holding, holdSince, holdMs, lockNonc
       animate={{ scale: 1 }}
       transition={{ ...springs.snappy, damping: 14 }}
     >
-      <svg width={size} height={size} className="absolute inset-0 -rotate-90" aria-hidden="true">
-        <circle cx={c} cy={c} r={r} fill="none" stroke="#3A3034" strokeOpacity={0.12} strokeWidth={1.5} />
+      <svg width={size} height={size} className="absolute inset-0 -rotate-90" aria-hidden="true" data-ring={locked ? 'solid' : holding ? 'progress' : 'none'}>
+        {holding && !locked ? <circle cx={c} cy={c} r={r} fill="none" stroke="#3A3034" strokeOpacity={0.12} strokeWidth={1.5} /> : null}
         {locked ? (
           <circle cx={c} cy={c} r={r} fill="none" stroke={WARM} strokeWidth={1.75} />
         ) : holding ? (
@@ -54,7 +58,8 @@ export default function LockBadge({ locked, holding, holdSince, holdMs, lockNonc
         ) : null}
       </svg>
       <span
-        className={`absolute inset-0 flex items-center justify-center transition-colors duration-500 ${locked ? 'text-[#A9502D]' : 'text-os-ink-soft'}`}
+        className={`absolute inset-0 flex items-center justify-center transition-[color,opacity] duration-500 ${locked ? 'text-[#A9502D]' : 'text-os-ink-soft'}`}
+        style={{ opacity: locked || holding ? 1 : 0.55 }}
       >
         {locked ? <Lock size={size * 0.4} strokeWidth={1.5} /> : <LockOpen size={size * 0.4} strokeWidth={1.5} />}
       </span>

@@ -1,6 +1,19 @@
 import { useEffect } from 'react'
 import { cancelGlide, getTuner, glideTo, setTunerValue } from '../store/tuner'
-import { FREQ_MAX, FREQ_MIN, LOCKED_DETENT, TARGET, clampFreq, fineGain, notch, pullTarget, unnotch } from './tunerMath'
+import {
+  FREQ_MAX,
+  FREQ_MIN,
+  LOCKED_DETENT,
+  TARGET,
+  WHEEL_NOTCH_STEP,
+  clampFreq,
+  fineGain,
+  notch,
+  pullTarget,
+  stepOnGrid,
+  unnotch,
+  wheelNotches,
+} from './tunerMath'
 
 /** Hand speed is measured over this window (ms). */
 const HAND_WINDOW_MS = 90
@@ -33,6 +46,7 @@ function dialSpeed(samples: Sample[], now: number, windowMs: number): number {
  *  - on a calm release / calm wheel idle / a tap, a dial within the range glides into the target (pullTarget),
  *  - a flick or a fast pass never glides anywhere: momentum just coasts and stops,
  *  - once locked, a drag has to travel past a small detent before the lock lets go.
+ * A mouse-wheel notch is a plain 0.01 grid step (like the arrow keys); trackpad scrolling is proportional.
  * A slowly inching hand moves the dial at fineGain() (everywhere on the dial, both ways): fine control on a thumb.
  */
 export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
@@ -162,6 +176,20 @@ export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
       e.preventDefault()
       e.stopPropagation()
       stopMomentum()
+      // A clicky mouse wheel: each notch is one 0.01 step on the arrow keys' grid (lands exactly, holds and locks like
+      // any other input). Trackpad pixel scrolling stays proportional (below).
+      const notches = wheelNotches(e as WheelEvent & { wheelDeltaX?: number; wheelDeltaY?: number })
+      if (notches !== 0) {
+        if (wheelTimer) clearTimeout(wheelTimer)
+        wheelTimer = null
+        wheelRaw = null
+        wheelSamples = []
+        cancelGlide()
+        let v = getTuner().locked ? TARGET : getTuner().value
+        for (let i = 0; i < Math.abs(notches); i++) v = stepOnGrid(v, WHEEL_NOTCH_STEP, notches > 0 ? 1 : -1)
+        setTunerValue(v)
+        return
+      }
       const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
       const d = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * scale
       const now = performance.now()

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { tunerStore } from '../store/tuner'
 import { settingsStore } from '../store/settings'
 import { coherenceStore } from '../store/coherence'
-import { TARGET, clarity } from './tunerMath'
+import { TARGET, clarity, transportAudible } from './tunerMath'
 
 /**
  * Tiny Web Audio voice for the tuner: band-passed static that thins out, and a soft low tone that
@@ -78,7 +78,7 @@ function build(): Voice | null {
   return { ctx, master, noiseGain, noiseFilter, toneGain, tone, wobble, wobbleDepth }
 }
 
-/** Call from the Play click handler only (a user gesture). */
+/** Call from the Play click handler only: muted until the player taps Play (autoplay rules; the OS is near silent). */
 export function ensureTunerAudio() {
   if (!voice) voice = build()
   if (voice && voice.ctx.state === 'suspended') void voice.ctx.resume().catch(() => {})
@@ -89,7 +89,7 @@ function sync() {
   const v = voice
   if (!v || v.ctx.state === 'closed') return
   const { value, transport, locked } = tunerStore.get()
-  const audible = transport === 'playing' && settingsStore.get().sound && document.visibilityState === 'visible'
+  const audible = transportAudible(transport, settingsStore.get().sound) && document.visibilityState === 'visible'
   const s = locked ? 1 : clarity(value)
   const now = v.ctx.currentTime
   v.master.gain.setTargetAtTime(audible ? MASTER : 0, now, RAMP)
@@ -126,11 +126,9 @@ export function useTunerAudio() {
       unsubs.forEach((u) => u())
       document.removeEventListener('visibilitychange', sync)
       mounts--
-      if (mounts === 0) {
-        close()
-        // Nothing is listening any more: leave the transport quiet (the lock itself keeps holding).
-        if (tunerStore.get().transport === 'playing') tunerStore.set({ transport: 'stopped' })
-      }
+      // Nothing is listening any more: close the voice. The transport keeps its state (the lock itself keeps holding);
+      // the voice comes back on the next Play tap.
+      if (mounts === 0) close()
     }
   }, [])
 }

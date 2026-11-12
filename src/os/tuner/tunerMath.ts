@@ -79,6 +79,65 @@ export function stepOnGrid(value: number, step: number, dir: 1 | -1): number {
   return roundFreq(clampFreq(next * step))
 }
 
+/** One mouse-wheel notch moves the dial this far, on the same fixed grid as the arrow keys. */
+export const WHEEL_NOTCH_STEP = 0.01
+
+/** The parts of a WheelEvent that tell a mouse wheel from a trackpad (`wheelDelta*` is non-standard, may be missing). */
+export interface WheelLike {
+  deltaMode: number
+  deltaX: number
+  deltaY: number
+  wheelDeltaX?: number
+  wheelDeltaY?: number
+}
+
+/**
+ * Signed number of mouse-wheel notches in a wheel event (positive → up the band), or 0 for smooth pixel scrolling
+ * (a trackpad), which stays proportional. A notch is a line/page-mode event, or a pixel event whose legacy
+ * `wheelDelta` is a whole multiple of 120 (what a clicky wheel reports). Says nothing about where the signal is.
+ */
+export function wheelNotches(e: WheelLike): number {
+  const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY)
+  const d = horizontal ? e.deltaX : e.deltaY
+  if (d === 0) return 0
+  const dir = d > 0 ? 1 : -1
+  if (e.deltaMode === 1 || e.deltaMode === 2) return dir * Math.max(1, Math.round(e.deltaMode === 1 ? Math.abs(d) / 3 : Math.abs(d)))
+  const legacy = horizontal ? e.wheelDeltaX : e.wheelDeltaY
+  if (legacy && Math.abs(legacy) >= 120 && legacy % 120 === 0) return dir * Math.round(Math.abs(legacy) / 120)
+  return 0
+}
+
+/**
+ * Transport: `open` (the start: trace live, input open, silent, no button pressed), `playing` (Play tapped: sound if
+ * the Sound setting is on), `paused` (trace frozen, input open) or `stopped` (input closed, silent, trace idle).
+ */
+export type Transport = 'open' | 'stopped' | 'playing' | 'paused'
+export type TransportEvent = 'play' | 'pause' | 'stop' | 'tune'
+
+/** Pure transport transitions. Tuning only re-opens a stopped tuner (to `open`: sound needs Play again). */
+export function nextTransport(state: Transport, event: TransportEvent): Transport {
+  switch (event) {
+    case 'play':
+      return 'playing'
+    case 'pause':
+      return 'paused'
+    case 'stop':
+      return 'stopped'
+    case 'tune':
+      return state === 'stopped' ? 'open' : state
+  }
+}
+
+/** Input is open (holds and locks can happen) unless stopped. */
+export function transportInputOpen(state: Transport): boolean {
+  return state !== 'stopped'
+}
+
+/** Sound only after Play, and only with the Sound setting on. */
+export function transportAudible(state: Transport, soundOn: boolean): boolean {
+  return state === 'playing' && soundOn
+}
+
 /** Tiny tolerance so values that sit exactly on a zone edge (float noise) count as inside it. */
 const EDGE_EPS = 1e-9
 

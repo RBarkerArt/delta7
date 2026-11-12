@@ -107,7 +107,7 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
           </p>
           <div className={`mt-auto flex items-center gap-2 ${wide ? 'pt-3' : 'pt-1'}`}>
             <button type="button" className="d7-hit" onClick={() => onNavigate('messages')} data-testid="d7-reply">
-              <span className="d7-btn">reply</span>
+              <span className="d7-btn">open</span>
             </button>
             <label className="d7-check ml-1 text-[13px] text-[color:var(--d7-soft)]">
               <input type="checkbox" checked={markRead} onChange={(e) => setMarkRead(e.target.checked)} data-testid="d7-mark-read" />
@@ -124,15 +124,12 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
           <ul className="mt-1.5">
             {D7_FILES.map((f) => (
               <li key={f.name}>
-                <button
-                  type="button"
-                  className="d7-row flex w-full items-baseline gap-2 rounded-[3px] px-1 py-[3px] text-left text-[13px]"
-                  onClick={() => onNavigate('files')}
-                >
+                {/* A plain listing row: nothing to open here. */}
+                <div className="flex w-full items-baseline gap-2 px-1 py-[3px] text-left text-[13px]">
                   <span className="min-w-0 flex-1 truncate font-os-mono text-[13px]">{f.name}</span>
                   <span className="shrink-0 text-[12px] text-[color:var(--d7-soft)]">{f.size}</span>
                   <span className="w-[66px] shrink-0 text-right text-[12px] text-[color:var(--d7-soft)]">{f.when}</span>
-                </button>
+                </div>
               </li>
             ))}
           </ul>

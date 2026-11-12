@@ -40,7 +40,7 @@ export function useHeartbeat(beatRef: RefObject<HTMLElement | null>, haloRef: Re
     const beat = () => {
       running.length = 0
       const t = getTuner()
-      const irregular = beatIrregularity(clarity(t.value), t.locked)
+      const irregular = beatIrregularity(t.transport === 'stopped' ? 0 : clarity(t.value), t.locked)
       if (!isSkippedBeat(index, badStretch)) {
         const soft = isSoftBeat(index, irregular)
         if (reduced) {

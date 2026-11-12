@@ -13,8 +13,12 @@ export const SIGNAL_TARGET = 1.42
 export const FREQ_MIN = 0.8
 export const FREQ_MAX = 2.2
 
-/** Where the dial sits before the player has touched it. TODO(engine): could come from the day script. */
-export const START_VALUE = 1.1
+/**
+ * Where the dial sits before the player has touched it: in the upper part of the band, well outside the faint zone,
+ * so the owner's note ("near the low end, keep sweeping") is honest from here: sweeping down passes the signal.
+ * TODO(engine): could come from the day script.
+ */
+export const START_VALUE = 1.85
 
 /** |value − target| ≤ this counts as "in the lock window". */
 export const LOCK_WINDOW = 0.005

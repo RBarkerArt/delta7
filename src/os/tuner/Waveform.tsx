@@ -1,19 +1,24 @@
 import { useEffect, useRef } from 'react'
 import { useElementSize } from '../lib/useElementSize'
 import { coherenceStore } from '../store/coherence'
-import { tunerStore } from '../store/tuner'
+import { tunerStore, useTransport } from '../store/tuner'
 import { TARGET, clarity } from './tunerMath'
 import { carrierSpeed, drawWave } from './waveDraw'
 
 const BAD_STRETCH_NOISE = 0.3
 
+/** A stopped tuner's trace: low, flat-ish static, frozen. */
+const IDLE_AMP = 0.3
+
 /**
  * The live trace. One rAF loop per mounted canvas, paused when the tab is hidden, the canvas is offscreen,
- * or the transport is paused (the trace freezes). Reads the store directly each frame (no React renders).
+ * or the transport is paused (the trace freezes). Stopped: one dim, low, frozen frame of plain static (idle).
+ * Reads the store directly each frame (no React renders).
  */
 export default function Waveform({ reduced }: { reduced: boolean }) {
   const { ref: boxRef, width, height } = useElementSize<HTMLDivElement>()
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const stopped = useTransport() === 'stopped'
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -38,6 +43,11 @@ export default function Waveform({ reduced }: { reduced: boolean }) {
 
     const render = () =>
       drawWave(ctx, { width, height, t, phase, strength, offset, noiseFloor, frame: Math.floor(t * (reduced ? 1.5 : 20)) })
+    const renderIdle = () => {
+      // Plain static, nothing of the signal: the next live frame eases back in from here.
+      strength = 0
+      drawWave(ctx, { width, height, t, phase, strength: 0, offset: 0, noiseFloor: 0, frame: Math.floor(t * 20), ampScale: IDLE_AMP })
+    }
 
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000)
@@ -58,8 +68,12 @@ export default function Waveform({ reduced }: { reduced: boolean }) {
     }
 
     const shouldRun = () =>
-      document.visibilityState === 'visible' && onScreen && tunerStore.get().transport !== 'paused'
+      document.visibilityState === 'visible' && onScreen && (tunerStore.get().transport === 'playing' || tunerStore.get().transport === 'open')
+    let idleDrawn = false
     const update = () => {
+      const stoppedNow = tunerStore.get().transport === 'stopped'
+      if (stoppedNow && !idleDrawn) renderIdle()
+      idleDrawn = stoppedNow
       const run = shouldRun()
       if (run && !raf) {
         last = performance.now()
@@ -70,7 +84,10 @@ export default function Waveform({ reduced }: { reduced: boolean }) {
       }
     }
 
-    render()
+    if (initial.transport === 'stopped') {
+      renderIdle()
+      idleDrawn = true
+    } else render()
     const io = new IntersectionObserver((entries) => {
       onScreen = entries.some((e) => e.isIntersecting)
       update()
@@ -89,7 +106,13 @@ export default function Waveform({ reduced }: { reduced: boolean }) {
   }, [width, height, reduced])
 
   return (
-    <div ref={boxRef} className="tuner-wave relative h-full w-full">
+    <div
+      ref={boxRef}
+      data-testid="tuner-wave"
+      data-idle={stopped ? 'true' : 'false'}
+      className="tuner-wave relative h-full w-full transition-opacity duration-500"
+      style={{ opacity: stopped ? 0.45 : 1 }}
+    >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-hidden="true" />
     </div>
   )
