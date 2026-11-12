@@ -62,7 +62,8 @@ export default function AppIcon({ appId, isMobile }: Props) {
         </motion.div>
       </div>
       <span
-        className={`os-label-shadow os-label-halo mt-2.5 max-w-full font-os-mono lowercase text-os-cream ${isMobile ? 'text-[12px]' : 'text-[13.5px] tracking-[0.02em]'}`}
+        data-label-pill=""
+        className={`os-label-pill font-os-mono lowercase text-os-cream ${isMobile ? 'mt-1.5 text-[12px]' : 'mt-2 text-[13.5px] tracking-[0.02em]'}`}
       >
         <span className="block truncate">{app.label}</span>
       </span>

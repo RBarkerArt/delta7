@@ -22,6 +22,9 @@ export default function TopBar({ isMobile }: { isMobile: boolean }) {
 
   return (
     <header
+      role="banner"
+      aria-label="top bar"
+      data-os-region="topbar"
       className="os-chrome absolute inset-x-0 top-0 z-40"
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >

@@ -55,7 +55,7 @@ export default function HomePager({ isMobile }: { isMobile: boolean }) {
           <IconPage apps={matches} isMobile={isMobile} />
         ) : (
           <div className="flex h-full items-center justify-center">
-            <p className="os-label-shadow os-label-halo font-os-mono text-sm lowercase text-os-cream">nothing here</p>
+            <p className="os-label-pill font-os-mono text-sm lowercase text-os-cream">nothing here</p>
           </div>
         )}
       </div>

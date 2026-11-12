@@ -38,7 +38,7 @@ export default function OSApp() {
           <Wallpaper />
           {/* First in the DOM so keyboard order on the home is top bar → icons → page dots (stacking is by z-index). */}
           <TopBar isMobile={isMobile} />
-          <main className={`absolute inset-x-0 ${isMobile ? 'bottom-[64px] top-12' : 'bottom-[64px] top-16'}`}>
+          <main aria-label="desktop" data-os-region="desktop" className={`absolute inset-x-0 ${isMobile ? 'bottom-[64px] top-12' : 'bottom-[64px] top-16'}`}>
             <HomePager isMobile={isMobile} />
           </main>
           <PageDots isMobile={isMobile} />

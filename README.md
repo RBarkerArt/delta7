@@ -119,6 +119,18 @@ builds, decided once at build time in `src/os/lib/devMode.ts`:
 | `?wallpaper=haze\|dusk\|ember\|fog` | wallpaper for this visit only (not saved) |
 | `?mobile=1` | force the phone layout on a desktop browser |
 
+**Keyboard.** The OS has three regions: the focused window (a full-screen sheet on phones), the top bar, and the
+desktop (home icons and page dots).
+
+| key | effect |
+| --- | --- |
+| `F6` / `Shift+F6` | move focus to the next / previous region: window → top bar → desktop → window. It returns to the window you last used; with no window open it switches between top bar and desktop; on a phone with an app open it switches between the sheet and the top bar |
+| ``Ctrl+` `` (or ``Alt+` ``) | cycle between open windows; from the top bar or desktop, go back into the front window |
+| `Esc` | close the open popover, then the focused window |
+| `Tab` / `Shift+Tab` | move inside the current region (a focused window keeps Tab inside itself; the top bar and desktop never tab into a window) |
+| `←` / `→` | page the home |
+| `Enter` | open the focused icon |
+
 **Where things live** (`src/os/`):
 
 - `OSApp.tsx`, `entry.tsx` — root component and its mount point

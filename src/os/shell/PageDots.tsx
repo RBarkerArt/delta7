@@ -12,6 +12,7 @@ export default function PageDots({ isMobile }: { isMobile: boolean }) {
   return (
     <nav
       aria-label="pages"
+      data-os-region="desktop"
       className="os-chrome absolute inset-x-0 flex justify-center"
       style={{ bottom: isMobile ? 'calc(env(safe-area-inset-bottom, 0px) + 34px)' : 30 }}
     >
