@@ -199,7 +199,7 @@ test('fine control: the hand gain is position-free, slower for an inching hand, 
   }
 })
 
-const MSG = 'you came back. the signal [▒▒▒▒] steadier when you stay.'
+const MSG = 'holding. [▒▒▒▒] steadier the longer you stay.'
 
 test('degradeMessage is deterministic and keeps the redaction block', () => {
   for (const s of [0, 0.2, 0.5, 0.9, 0.99, 1]) {

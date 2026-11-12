@@ -48,8 +48,9 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
             {decayedLabel(plan, 'status', D7_STATUS[signal.status], seed)}
           </span>
         </span>
+        {/* Never truncated: the newest log line wraps to a second line rather than losing its end. */}
         <span
-          className={`min-w-[132px] flex-1 font-os-mono text-[12px] text-[color:var(--d7-soft)] ${wide ? 'truncate' : 'basis-full py-1'}`}
+          className={`min-w-[132px] flex-1 whitespace-normal break-words font-os-mono text-[12px] leading-[1.45] text-[color:var(--d7-soft)] ${wide ? 'py-0.5' : 'basis-full py-1'}`}
           data-testid="d7-log-tail"
         >
           <RewritingLine text={tail.slice(10)} alt={plan.logRewrite?.alt ?? null} />

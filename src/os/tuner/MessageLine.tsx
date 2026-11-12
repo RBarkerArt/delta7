@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { degradeMessage } from './tunerMath'
 
-// TODO(copy): placeholder line; the real text comes from the story later.
-const MESSAGE = 'you came back. the signal [▒▒▒▒] steadier when you stay.'
+// TODO(copy): placeholder line about the signal itself; the real text comes from the story later.
+const MESSAGE = 'holding. [▒▒▒▒] steadier the longer you stay.'
 const SEED = 'tuner-message'
 
 /** The message line: clears in calm steps as the lock strengthens; fully clear (bar one redaction) at lock. */
