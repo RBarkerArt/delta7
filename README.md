@@ -139,5 +139,12 @@ builds, decided once at build time in `src/os/lib/devMode.ts`:
 screen's password and the menu's sign in / sign out; nothing is checked or sent anywhere), `TODO(copy)` (all text and file
 names inside apps) and `TODO(story)` (hooks such as search and bleeds for later).
 
+**Tests.** Unit tests for the pure logic (decay floors and recovery, tuner lock and clarity, decay plan, heartbeat) run on
+Node's built-in test runner — no extra dependency, not part of CI. Needs Node 22.18 or newer:
+
+```bash
+npm run test:os
+```
+
 **Rule:** `src/os/` never imports Firebase-touching modules (`src/lib/`, `src/context/`, `src/components/`, `src/hooks/`,
 `src/pages/`). The OS bundle stays free of Firebase and runs with no configuration.
