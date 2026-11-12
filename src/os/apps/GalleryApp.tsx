@@ -4,8 +4,8 @@ import ThumbGrid from './ThumbGrid'
 import { ALBUMS } from '../mock/placeholderContent'
 import type { AppProps } from '../types'
 
-/** Memories: albums on the left, a grid of soft gradient stills on the right. */
-export default function MemoriesApp({ isMobile }: AppProps) {
+/** Gallery: albums on the left, a grid of soft gradient stills on the right. */
+export default function GalleryApp({ isMobile }: AppProps) {
   const [id, setId] = useState(ALBUMS[0].id)
   const album = ALBUMS.find((a) => a.id === id) ?? ALBUMS[0]
   // TODO(copy): stand-in file names.

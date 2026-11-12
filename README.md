@@ -137,7 +137,8 @@ desktop (home icons and page dots).
 - `boot/` — boot animation, lock screen, "only asleep" session flag
 - `shell/` — top bar, four-dot menu, search, home pager, app icons, page dots, notification banner
 - `windows/` — desktop window manager (drag, resize, maximize, minimize) and full-screen phone sheets with close gestures
-- `apps/` — app registry and the stand-in apps
+- `apps/` — app registry and the stand-in apps. Home page one: delta7, tuner, gallery, video, messages, files, logs;
+  page two: audio, notes, lab, archive, keep (icon placement is data in `store/layout.ts`)
 - `delta7/` — the Delta7 dashboard and its coherence-driven decay
 - `tuner/` — the tuner (dial, waveform, lock at the target frequency, optional Web Audio)
 - `store/` — tiny `useSyncExternalStore` stores (settings, windows, layout, coherence, tuner, clock, …)

@@ -2,8 +2,9 @@ import { createStore } from './createStore'
 import type { AppId, IconPlacement } from '../types'
 
 /** Icon positions are DATA (page, index) so the story can move/add icons later. */
-const PAGE_1: AppId[] = ['delta7', 'tuner', 'audio', 'memories', 'messages', 'notes', 'files', 'lab', 'archive']
-const PAGE_2: AppId[] = ['keep', 'find']
+/** Page one: the apps the spec names. Page two: the ordinary extras. */
+const PAGE_1: AppId[] = ['delta7', 'tuner', 'gallery', 'video', 'messages', 'files', 'logs']
+const PAGE_2: AppId[] = ['audio', 'notes', 'lab', 'archive', 'keep']
 
 const DEFAULT_LAYOUT: IconPlacement[] = [
   ...PAGE_1.map((appId, index) => ({ appId, page: 0, index })),

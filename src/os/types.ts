@@ -3,15 +3,16 @@ import type { ComponentType, LazyExoticComponent } from 'react'
 export type AppId =
   | 'delta7'
   | 'tuner'
-  | 'audio'
-  | 'memories'
+  | 'gallery'
+  | 'video'
   | 'messages'
-  | 'notes'
   | 'files'
+  | 'logs'
+  | 'audio'
+  | 'notes'
   | 'lab'
   | 'archive'
   | 'keep'
-  | 'find'
 
 export type AppParams = Record<string, string>
 

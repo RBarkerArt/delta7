@@ -1,5 +1,5 @@
 // Desktop window geometry: bounds, clamping, rubber-banding, cascade, and per-app persistence. Pure helpers only.
-import { readJSON, writeJSON } from '../lib/storage'
+import { readJSON, removeKey, writeJSON } from '../lib/storage'
 import type { AppDefinition, AppId } from '../types'
 
 export interface Frame {
@@ -89,6 +89,15 @@ export function loadFrame(id: AppId): SavedFrame | null {
   if (!raw || !isFiniteNum(raw.x) || !isFiniteNum(raw.y) || !isFiniteNum(raw.w) || !isFiniteNum(raw.h)) return null
   return { x: raw.x, y: raw.y, w: raw.w, h: raw.h, maximized: raw.maximized === true }
 }
+
+/** The `memories` app is now `gallery` (its remembered frame moves with it) and `find` is gone. Runs once per load. */
+function migrateRenamedFrames() {
+  const old = readJSON<unknown>('win:memories', null)
+  if (old != null && readJSON<unknown>('win:gallery', null) == null) writeJSON('win:gallery', old)
+  removeKey('win:memories')
+  removeKey('win:find')
+}
+if (typeof window !== 'undefined') migrateRenamedFrames()
 
 export function saveFrame(id: AppId, f: SavedFrame) {
   writeJSON(`win:${id}`, {
