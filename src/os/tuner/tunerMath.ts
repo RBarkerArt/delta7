@@ -1,68 +1,122 @@
-import { mulberry32, hashString } from '../lib/seeded'
+import { mulberry32, hashString } from '../lib/seeded.ts'
+import {
+  BAD_STRETCH_HOLD_MS,
+  CLARITY_CLEAR,
+  CLARITY_CLEARER,
+  CLARITY_CORE_SIGMA,
+  CLARITY_FAINT,
+  CLARITY_WIDE_SIGMA,
+  CLARITY_WIDE_WEIGHT,
+  FREQ_MAX,
+  FREQ_MIN,
+  HOLD_MS,
+  LOCK_WINDOW,
+  NOTCH_RANGE,
+  SIGNAL_TARGET,
+} from './signalConfig.ts'
 
-/** Pure tuner helpers: no React, no DOM, deterministic. */
+/** Pure tuner helpers: no React, no DOM, deterministic. All constants live in `signalConfig.ts`. */
 
-export const FREQ_MIN = 0.8
-export const FREQ_MAX = 2.2
-export const TARGET = 1.42
-/** |value − TARGET| ≤ this counts as "in the lock window". */
-export const LOCK_WINDOW = 0.005
-/** Time the value must stay in the window before it locks. */
-export const HOLD_MS = 1500
-/** During a bad stretch the lock takes about twice as long to land. */
-export const BAD_STRETCH_HOLD_MS = 3000
-/** On release / wheel idle, values this close to TARGET glide into it. */
-export const MAGNET_RANGE = 0.02
-/** Half-width of the sticky "notch" around TARGET while dragging (see notch()). */
-export const NOTCH_RANGE = 0.03
-/** While locked, a drag must travel this far (in raw units) before the lock lets go. */
-export const LOCKED_DETENT = 0.02
+export {
+  BAD_STRETCH_HOLD_MS,
+  FREQ_MAX,
+  FREQ_MIN,
+  HOLD_MS,
+  LOCKED_DETENT,
+  LOCK_WINDOW,
+  MAGNET_RANGE,
+  NOTCH_RANGE,
+  SIGNAL_TARGET,
+  START_VALUE,
+} from './signalConfig.ts'
 
-const STRENGTH_SIGMA = 0.1
+/** Kept for existing imports: the same value as SIGNAL_TARGET. */
+export const TARGET = SIGNAL_TARGET
 
 /** Hold time before the lock lands, for the current mood. */
 export function holdMsFor(badStretch: boolean): number {
   return badStretch ? BAD_STRETCH_HOLD_MS : HOLD_MS
 }
 
+/**
+ * The hold-timer decision, pure: has a hold that started at `holdSince` lasted long enough to lock at `now`?
+ * (The store runs a timeout for `holdMs` and then double-checks with this.)
+ */
+export function holdComplete(holdSince: number, now: number, holdMs: number): boolean {
+  return holdSince > 0 && now - holdSince >= holdMs
+}
+
 export function clampFreq(v: number): number {
   return v < FREQ_MIN ? FREQ_MIN : v > FREQ_MAX ? FREQ_MAX : v
 }
 
-/** Rounds to 3 decimals so keyboard steps land exactly on 1.42. */
+/** Rounds to 3 decimals so 0.01 keyboard steps land exactly on the target. */
 export function roundFreq(v: number): number {
   return Math.round(v * 1000) / 1000
 }
 
-/** 0..1, exactly 1 at 1.42, gaussian falloff (≈0.37 at ±0.1, ≈0.002 at ±0.25). */
-export function lockStrength(value: number): number {
-  const d = (value - TARGET) / STRENGTH_SIGMA
-  return Math.exp(-d * d)
+/**
+ * How clear the signal is at `value`, 0..1: exactly 1 at the target, smooth and symmetric, a faint wide shoulder plus
+ * a narrow core (see signalConfig). The ONE source for every soft hint: the trace, the audio, the icon's heartbeat,
+ * the screen-reader words and the message line.
+ */
+export function clarity(value: number): number {
+  const d = value - SIGNAL_TARGET
+  const wide = Math.exp(-((d / CLARITY_WIDE_SIGMA) ** 2))
+  const core = Math.exp(-((d / CLARITY_CORE_SIGMA) ** 2))
+  return CLARITY_WIDE_WEIGHT * wide + (1 - CLARITY_WIDE_WEIGHT) * core
+}
+
+/** Kept for existing callers: lock strength IS clarity. */
+export const lockStrength = clarity
+
+export type ClarityBucket = 'none' | 'faint' | 'clearer' | 'clear' | 'locked'
+
+/** Coarse clarity, for words. Never says which way to go. */
+export function clarityBucket(c: number, locked: boolean): ClarityBucket {
+  if (locked) return 'locked'
+  if (c >= CLARITY_CLEAR) return 'clear'
+  if (c >= CLARITY_CLEARER) return 'clearer'
+  if (c >= CLARITY_FAINT) return 'faint'
+  return 'none'
+}
+
+const CLARITY_WORDS: Record<ClarityBucket, string> = {
+  none: 'no signal',
+  faint: 'signal faint',
+  clearer: 'signal clearer',
+  clear: 'signal clear',
+  locked: 'signal locked',
+}
+
+/** `signal faint` / `signal clearer` / … for the live region and the slider's aria-valuetext. */
+export function clarityWords(bucket: ClarityBucket): string {
+  return CLARITY_WORDS[bucket]
 }
 
 export function isInLockWindow(value: number): boolean {
-  // Small epsilon so 1.415 / 1.425 (float noise) still count.
-  return Math.abs(value - TARGET) <= LOCK_WINDOW + 1e-9
+  // Small epsilon so the window's exact edges (float noise) still count.
+  return Math.abs(value - SIGNAL_TARGET) <= LOCK_WINDOW + 1e-9
 }
 
 /**
- * Sticky notch around TARGET for pointer / wheel input: `raw` is where the hand is, the return value is
+ * Sticky notch around the target for pointer / wheel input: `raw` is where the hand is, the return value is
  * the tuned frequency. Inside ±NOTCH_RANGE the frequency moves quadratically slower near the centre, so
- * the ±0.005 lock window is ~2.4× wider for the hand. Continuous at the edges; identity outside.
+ * the lock window is ~2.4× wider for the hand. Continuous at the edges; identity outside.
  */
 export function notch(raw: number): number {
-  const d = raw - TARGET
+  const d = raw - SIGNAL_TARGET
   const a = Math.abs(d)
   if (a >= NOTCH_RANGE) return raw
-  return TARGET + Math.sign(d) * NOTCH_RANGE * (a / NOTCH_RANGE) ** 2
+  return SIGNAL_TARGET + Math.sign(d) * NOTCH_RANGE * (a / NOTCH_RANGE) ** 2
 }
 
 /** Inverse of notch(): the hand position that produces `value`. */
 export function unnotch(value: number): number {
-  const d = value - TARGET
+  const d = value - SIGNAL_TARGET
   const a = Math.abs(d)
   if (a >= NOTCH_RANGE) return value
-  return TARGET + Math.sign(d) * NOTCH_RANGE * Math.sqrt(a / NOTCH_RANGE)
+  return SIGNAL_TARGET + Math.sign(d) * NOTCH_RANGE * Math.sqrt(a / NOTCH_RANGE)
 }
 
 export type Decode = 'none' | 'partial' | 'clear'

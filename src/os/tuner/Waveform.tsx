@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useElementSize } from '../lib/useElementSize'
 import { coherenceStore } from '../store/coherence'
 import { tunerStore } from '../store/tuner'
-import { TARGET, lockStrength } from './tunerMath'
+import { TARGET, clarity } from './tunerMath'
 import { carrierSpeed, drawWave } from './waveDraw'
 
 const BAD_STRETCH_NOISE = 0.3
@@ -26,7 +26,7 @@ export default function Waveform({ reduced }: { reduced: boolean }) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
     const initial = tunerStore.get()
-    let strength = initial.locked ? 1 : lockStrength(initial.value)
+    let strength = initial.locked ? 1 : clarity(initial.value) * 0.9
     let offset = initial.locked ? 0 : initial.value - TARGET
     let noiseFloor = 0
     let t = 0
@@ -44,7 +44,7 @@ export default function Waveform({ reduced }: { reduced: boolean }) {
       last = now
       const s = tunerStore.get()
       // Locked: the last bit of steadiness arrives only with the lock, then the trace settles slowly.
-      const target = s.locked ? 1 : lockStrength(s.value) * 0.9
+      const target = s.locked ? 1 : clarity(s.value) * 0.9
       const k = 1 - Math.exp(-dt * (s.locked ? 1.6 : 6))
       strength += (target - strength) * k
       offset += ((s.locked ? 0 : s.value - TARGET) - offset) * (1 - Math.exp(-dt * 8))

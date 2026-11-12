@@ -63,6 +63,8 @@ export interface DecayPlan {
   wash: number
   /** a log line that slowly rewrites itself, or null */
   logRewrite: { index: number; alt: string } | null
+  /** label keys that are misspelled at this step (for labels whose text changes at runtime, see decayedLabel) */
+  misspelt: D7LabelKey[]
 }
 
 const STEP = 0.05
@@ -195,10 +197,8 @@ export function decayPlan(coherence: number, seed: string, badStretch = false): 
     (fragmented ? 5 : fraying ? (bucket < 0.65 ? 3 : 2) : 0) + (badStretch ? badStretchMisspellings(seed) : 0),
   )
   const labels = { ...D7_LABELS } as Record<D7LabelKey, string>
-  for (let i = 0; i < misspellCount; i++) {
-    const key = labelOrder[i]
-    labels[key] = misspell(D7_LABELS[key], seeded(`${seed}:label:${key}`))
-  }
+  const misspelt = labelOrder.slice(0, misspellCount)
+  for (const key of misspelt) labels[key] = misspell(D7_LABELS[key], seeded(`${seed}:label:${key}`))
 
   /* ---- chart ---- */
   const chart: ChartFx = {
@@ -224,5 +224,11 @@ export function decayPlan(coherence: number, seed: string, badStretch = false): 
     ghost: fragmented ? round(lerp(5, 9, deep), 10) : 0,
     wash: !fraying ? 0 : fragmented ? round(lerp(0.35, 0.55, deep)) : 0.15,
     logRewrite: fragmented ? { index: logIndex, alt: logAlt } : null,
+    misspelt,
   }
+}
+
+/** A label whose healthy text changes at runtime (e.g. the status line), misspelled the same way the plan would. */
+export function decayedLabel(plan: DecayPlan, key: D7LabelKey, text: string, seed: string): string {
+  return plan.misspelt.includes(key) ? misspell(text, seeded(`${seed}:label:${key}`)) : text
 }

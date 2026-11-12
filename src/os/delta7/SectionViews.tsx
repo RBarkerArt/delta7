@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import Panel from './Panel'
 import RewritingLine from './RewritingLine'
-import { D7_ARCHIVE, D7_FILES, D7_LOGS, D7_MEMORIES, D7_MESSAGES_LIST, D7_MESSAGE } from '../mock/delta7Content'
+import { D7_ARCHIVE, D7_FILES, D7_MEMORIES, D7_MESSAGES_LIST, D7_MESSAGE } from '../mock/delta7Content'
 import type { DecayPlan } from './decay'
+import { useD7Signal } from './hooks'
 
 // Simple placeholder views for the non-overview sections. All content TODO(copy).
 
@@ -95,10 +96,11 @@ export function ArchiveView(p: ViewProps) {
 
 export function LogsView(p: ViewProps) {
   const rw = p.plan.logRewrite
+  const { logs } = useD7Signal()
   return (
     <Frame {...p} title={p.plan.labels['nav.logs']} testId="d7-view-logs">
       <ol className="font-os-mono text-[11.5px] leading-[1.75]">
-        {D7_LOGS.map((line, i) => (
+        {logs.map((line, i) => (
           <li key={i} className="flex gap-3 whitespace-pre">
             <span className="text-[color:var(--d7-soft)]">{line.slice(0, 8)}</span>
             <RewritingLine text={line.slice(10)} alt={rw && rw.index === i ? rw.alt : null} />

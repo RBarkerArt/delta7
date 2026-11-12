@@ -2,11 +2,11 @@ import { useEffect } from 'react'
 import { tunerStore } from '../store/tuner'
 import { settingsStore } from '../store/settings'
 import { coherenceStore } from '../store/coherence'
-import { TARGET, lockStrength } from './tunerMath'
+import { TARGET, clarity } from './tunerMath'
 
 /**
  * Tiny Web Audio voice for the tuner: band-passed static that thins out, and a soft low tone that
- * steadies, as the dial approaches 1.42. Created lazily on the first Play tap (autoplay rules), silent
+ * steadies, as the dial approaches the target (both follow clarity()). Created lazily on the first Play tap (autoplay rules), silent
  * until then, always quiet, and closed when the last tuner unmounts. No audio files.
  */
 
@@ -90,7 +90,7 @@ function sync() {
   if (!v || v.ctx.state === 'closed') return
   const { value, transport, locked } = tunerStore.get()
   const audible = transport === 'playing' && settingsStore.get().sound && document.visibilityState === 'visible'
-  const s = locked ? 1 : lockStrength(value)
+  const s = locked ? 1 : clarity(value)
   const now = v.ctx.currentTime
   v.master.gain.setTargetAtTime(audible ? MASTER : 0, now, RAMP)
   const bad = !locked && coherenceStore.get().badStretch

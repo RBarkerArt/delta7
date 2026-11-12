@@ -46,24 +46,44 @@ export const D7_MESSAGE = {
   body: 'lorem ipsum dolor sit amet, consectetur adipiscing elit. sed do eiusmod tempor incididunt ut labore.',
 }
 
-// TODO(copy)
+/** Placeholder in log lines for the hold value: `?` until the first lock ever, then the target. */
+export const HOLD_SLOT = '{hold}'
+
+// TODO(copy). Lines are `hh:mm:ss  text`; `{hold}` is filled in by `d7Logs()`.
 export const D7_LOGS: string[] = [
   '02:11:04  rk: input open',
-  '02:11:05  rk: hold=1.42',
+  '02:11:05  rk: hold={hold}',
   '02:11:09  rk: decode: partial',
   '02:12:30  rk: buffer 3/4',
   '02:13:02  rk: decode: partial',
   '02:14:47  rk: input idle',
-  '02:15:10  rk: hold=1.42',
+  '02:15:10  rk: hold={hold}',
 ]
+
+/** The program's own note-to-self before the signal has ever been found. Owner-supplied text, verbatim. */
+export const D7_NUDGE = '02:15:12  rk: something near the low end, keep sweeping'
 
 /** Alternate texts a log line drifts into when coherence is fragmented. TODO(copy) */
 export const D7_LOG_REWRITES: string[] = [
-  'rk: hold=1.4?',
+  'rk: hold=??',
   'rk: decode: parti',
   'rk: input open open',
   'rk: hold= ',
 ]
+
+/** The log as shown: `{hold}` filled in, and the nudge as the newest line until the first lock. */
+export function d7Logs(hold: string, everLocked: boolean): string[] {
+  const lines = D7_LOGS.map((l) => l.replace(HOLD_SLOT, hold))
+  return everLocked ? lines : [...lines, D7_NUDGE]
+}
+
+/** The toolbar's status line, by tuner state. TODO(copy) */
+export const D7_STATUS = {
+  searching: 'status: searching',
+  holding: 'status: holding',
+  drifting: 'status: drifting',
+} as const
+export type D7Status = keyof typeof D7_STATUS
 
 // TODO(copy)
 export const D7_MESSAGES_LIST = [

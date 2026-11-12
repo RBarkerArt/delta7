@@ -2,9 +2,11 @@ import { useState } from 'react'
 import Panel from './Panel'
 import SignalChart from './SignalChart'
 import RewritingLine from './RewritingLine'
-import { D7_FILES, D7_LOGS, D7_MESSAGE } from '../mock/delta7Content'
+import { D7_FILES, D7_MESSAGE, D7_STATUS } from '../mock/delta7Content'
 import type { D7View } from '../mock/delta7Content'
+import { decayedLabel } from './decay'
 import type { DecayPlan } from './decay'
+import { useD7Signal } from './hooks'
 
 interface Props {
   plan: DecayPlan
@@ -22,7 +24,8 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
   const [markRead, setMarkRead] = useState(false)
   const [refreshed, setRefreshed] = useState(false)
   const words = D7_MESSAGE.body.split(' ')
-  const tail = D7_LOGS[D7_LOGS.length - 1]
+  const signal = useD7Signal()
+  const tail = signal.logs[signal.logs.length - 1]
   const blur = plan.blurPx
 
   return (
@@ -30,8 +33,13 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
       {/* toolbar — the default-looking controls */}
       <Panel fx={plan.panels.toolbar} blurPx={blur} z={3} testId="d7-panel-toolbar" className="flex flex-wrap items-center gap-x-4 gap-y-2 px-[10px] py-[7px]">
         <span className="flex items-center gap-1.5 text-[12px]">
-          <span className="inline-block h-[7px] w-[7px] rounded-full bg-[#7f8a62]" aria-hidden="true" />
-          {plan.labels.status}
+          <span
+            className={`inline-block h-[7px] w-[7px] rounded-full ${signal.status === 'holding' ? 'bg-[#7f8a62]' : 'bg-[#b49a74]'}`}
+            aria-hidden="true"
+          />
+          <span data-testid="d7-status" data-status={signal.status}>
+            {decayedLabel(plan, 'status', D7_STATUS[signal.status], seed)}
+          </span>
         </span>
         <span className="min-w-[132px] flex-1 truncate font-os-mono text-[11px] text-[color:var(--d7-soft)]">
           <RewritingLine text={tail.slice(10)} alt={plan.logRewrite?.alt ?? null} />
@@ -65,7 +73,9 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
         <Panel fx={plan.panels.signal} blurPx={blur} z={1} testId="d7-panel-signal" className="flex flex-col p-3">
           <div className="mb-1 flex items-baseline justify-between">
             <h3 className={head}>{plan.labels.signal}</h3>
-            <span className="font-os-mono text-[11px] text-[color:var(--d7-soft)]">1.42</span>
+            <span className="font-os-mono text-[11px] text-[color:var(--d7-soft)]" data-testid="d7-signal-value">
+              {signal.live}
+            </span>
           </div>
           <div className={wide ? 'h-[128px]' : 'h-[96px]'}>
             <SignalChart fx={plan.chart} reduced={reduced} seed={seed} />

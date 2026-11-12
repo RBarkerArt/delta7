@@ -32,7 +32,7 @@ export interface WaveFrame {
   phase: number
   /** Smoothed lock strength 0..1. */
   strength: number
-  /** Signed distance from 1.42 (MHz). */
+  /** Signed distance from the target (MHz). */
   offset: number
   /** Jitter frame index: changes ~20×/s normally, slowly with reduced motion. */
   frame: number
@@ -46,7 +46,7 @@ export function carrierSpeed(strength: number): number {
 }
 
 export function drawWave(ctx: CanvasRenderingContext2D, f: WaveFrame) {
-  const { width: w, height: h, t, phase, strength: s, offset, frame, noiseFloor } = f
+  const { width: w, height: h, t, phase, strength: s, frame, noiseFloor } = f
   ctx.clearRect(0, 0, w, h)
   const mid = h / 2
   const pad = 14
@@ -59,10 +59,13 @@ export function drawWave(ctx: CanvasRenderingContext2D, f: WaveFrame) {
   ctx.lineTo(w - pad, mid + 0.5)
   ctx.stroke()
 
-  const noiseAmt = Math.max(noiseFloor, (1 - s) ** 0.8)
+  // Two layers of static, both from clarity: sparse crackle that thins out first (the wide, faint zone a patient
+  // sweep notices), then the hiss, which only really settles close in. The lock clears what is left.
+  const noiseAmt = Math.max(noiseFloor, (1 - s) ** 1.15)
+  const crackle = Math.max(noiseFloor * 0.6, Math.max(0, 1 - s / 0.3) ** 2)
   const amp = Math.min(h * 0.26, 76) * (1 + 0.22 * s)
   // Off-lock the carrier is detuned (more, faster cycles); at the lock it slows to ~2 calm cycles.
-  const cycles = 2 + Math.min(6, Math.abs(offset) * 22)
+  const cycles = 2 + 6 * Math.max(0, 1 - s / 0.9) ** 1.5
   const n = Math.max(32, Math.floor((w - pad * 2) / 2))
   // Colour is held back until the very end: near → a hint of warmth, the lock → full red-amber.
   const [r, g, b] = mix(WEAK, WARM, Math.pow(s, 5))
@@ -77,7 +80,9 @@ export function drawWave(ctx: CanvasRenderingContext2D, f: WaveFrame) {
         0.5 * Math.sin(TAU * 17 * x + t * 7.3) * Math.sin(TAU * 3.1 * x - t * 2.1) +
         0.3 * Math.sin(TAU * 41 * x - t * 13) +
         0.38 * softJitter(i / 3, frame)
-      const y = mid - amp * env * ((1 - noiseAmt * 0.45) * clean + noiseAmt * hiss)
+      const k = jitter(i * 7.1 + 3, frame)
+      const pop = Math.abs(k) > 0.9 ? Math.sign(k) * ((Math.abs(k) - 0.9) / 0.1) * 0.95 : 0
+      const y = mid - amp * env * ((1 - noiseAmt * 0.45) * clean + noiseAmt * hiss + crackle * pop)
       const px = pad + x * (w - pad * 2)
       if (i === 0) ctx.moveTo(px, y)
       else ctx.lineTo(px, y)

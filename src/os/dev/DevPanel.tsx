@@ -9,6 +9,7 @@ import type { WallpaperName } from '../store/settings'
 import { setForceMobile, useForceMobile } from '../store/device'
 import { setDay, setDevOpen, useDay } from '../store/dev'
 import { relock } from '../boot/lockState'
+import { forgetFirstLock, useEverLocked } from '../store/tuner'
 
 const field = 'rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white outline-none focus:ring-1 focus:ring-white/40'
 const btn = 'rounded bg-white/10 px-2 py-0.5 text-[11px] hover:bg-white/20 focus-visible:ring-1 focus-visible:ring-white/50 outline-none'
@@ -27,6 +28,7 @@ export default function DevPanel() {
   const coherence = useCoherence()
   const badStretch = useBadStretch()
   const locked = useTunerLocked()
+  const everLocked = useEverLocked()
   const hasNew = useHasNew()
   const override = useClockOverride()
   const wallpaper = useSettings((s) => s.wallpaper)
@@ -98,6 +100,14 @@ export default function DevPanel() {
             <span data-testid="dev-tuner-locked" className={locked ? 'text-emerald-300' : 'text-white/50'}>
               {locked ? 'yes' : 'no'}
             </span>
+          </Row>
+          <Row label="first lock">
+            <span data-testid="dev-ever-locked" className={everLocked ? 'text-emerald-300' : 'text-white/50'}>
+              {everLocked ? 'yes' : 'no'}
+            </span>
+            <button type="button" className={btn} onClick={forgetFirstLock} data-testid="dev-forget-lock">
+              forget
+            </button>
           </Row>
           <Row label={`signal${hasNew ? ' · new' : ''}`}>
             <button type="button" className={btn} onClick={triggerPulse} data-testid="dev-pulse">

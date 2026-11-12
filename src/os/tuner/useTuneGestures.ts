@@ -5,8 +5,8 @@ import { FREQ_MAX, FREQ_MIN, LOCKED_DETENT, MAGNET_RANGE, TARGET, clampFreq, not
 /**
  * Pointer + wheel tuning on the ruled strip. The strip moves under a fixed needle, so a drag moves it with
  * the hand (drag left → higher). Forgiveness, in layers:
- *  - a sticky notch around 1.42 (the frequency moves slower than the hand near it),
- *  - on release / flick end / wheel idle, anything within ±0.02 glides into 1.42,
+ *  - a sticky notch around the target (the frequency moves slower than the hand near it),
+ *  - on release / flick end / wheel idle, anything within MAGNET_RANGE glides into the target,
  *  - a tap on the strip glides to that spot (with the same magnet),
  *  - once locked, a drag has to travel past a small detent before the lock lets go.
  */
@@ -57,7 +57,7 @@ export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
         raw += v * dt
         v *= Math.exp(-dt / 280)
         const inBand = applyRaw(raw)
-        // Slow enough near 1.42: let the magnet take it from here.
+        // Slow enough near the target: let the magnet take it from here.
         const slow = Math.abs(v * pxPerUnit) < 0.08
         if (!inBand || slow || (Math.abs(raw - TARGET) <= MAGNET_RANGE && Math.abs(v * pxPerUnit) < 0.35)) {
           momentumRaf = 0

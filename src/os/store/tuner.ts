@@ -1,7 +1,8 @@
 import { createStore } from './createStore'
 import { coherenceStore, setTunerLocked } from './coherence'
 import { haptic } from './settings'
-import { HOLD_MS, TARGET, clampFreq, holdMsFor, isInLockWindow, roundFreq } from '../tuner/tunerMath'
+import { readJSON, removeKey, writeJSON } from '../lib/storage'
+import { HOLD_MS, START_VALUE, TARGET, clampFreq, holdComplete, holdMsFor, isInLockWindow, roundFreq } from '../tuner/tunerMath'
 
 /**
  * Tuner state, shared by every mounted tuner (the tuner app and Delta7's tuner view).
@@ -21,17 +22,36 @@ interface TunerState {
   transport: Transport
   /** Bumped on every lock, so the readout / lock icon can play their small bounce. */
   lockNonce: number
+  /** The player has tuned at least once this session. */
+  touched: boolean
+  /** Tuning input in the last few seconds (the Delta7 icon beats while the dial is being worked). */
+  adjusting: boolean
+  /** The signal has been found at least once, ever (persisted). Until then the UI never shows the target. */
+  everLocked: boolean
 }
 
-// TODO(engine): the starting frequency could come from the day script later.
+/* ---------- remembered first find ---------- */
+
+// Stored as `d7os:signal`. TODO(engine): later this comes from the player's saved progress, not local storage.
+const SIGNAL_KEY = 'signal'
+interface SignalMemory {
+  everLocked: boolean
+}
+function loadEverLocked(): boolean {
+  return readJSON<Partial<SignalMemory>>(SIGNAL_KEY, {}).everLocked === true
+}
+
 export const tunerStore = createStore<TunerState>({
-  value: 1.1,
+  value: START_VALUE,
   locked: false,
   holding: false,
   holdSince: 0,
   holdMs: HOLD_MS,
   transport: 'stopped',
   lockNonce: 0,
+  touched: false,
+  adjusting: false,
+  everLocked: loadEverLocked(),
 })
 
 let holdTimer: ReturnType<typeof setTimeout> | null = null
@@ -45,7 +65,8 @@ function clearHold() {
 
 function lock() {
   clearHold()
-  tunerStore.set((s) => ({ value: TARGET, locked: true, holding: false, holdSince: 0, lockNonce: s.lockNonce + 1 }))
+  if (!tunerStore.get().everLocked) writeJSON(SIGNAL_KEY, { everLocked: true } satisfies SignalMemory)
+  tunerStore.set((s) => ({ value: TARGET, locked: true, holding: false, holdSince: 0, lockNonce: s.lockNonce + 1, everLocked: true }))
   setTunerLocked(true)
   haptic(8)
 }
@@ -72,7 +93,8 @@ function evaluate() {
     holdTimer = setTimeout(() => {
       holdTimer = null
       const now = tunerStore.get()
-      if (!now.locked && armed && isInLockWindow(now.value)) lock()
+      // +5ms: timers and Date.now() can disagree by a tick.
+      if (!now.locked && armed && isInLockWindow(now.value) && holdComplete(now.holdSince, Date.now() + 5, now.holdMs)) lock()
     }, holdMs)
   } else if (s.holding) {
     clearHold()
@@ -83,6 +105,21 @@ function evaluate() {
 function apply(v: number) {
   tunerStore.set({ value: clampFreq(roundFreq(v)) })
   evaluate()
+}
+
+/* ---------- "being tuned right now" ---------- */
+
+const ADJUSTING_MS = 5000
+let adjustTimer: ReturnType<typeof setTimeout> | null = null
+
+function markInput() {
+  const s = tunerStore.get()
+  if (!s.touched || !s.adjusting) tunerStore.set({ touched: true, adjusting: true })
+  if (adjustTimer) clearTimeout(adjustTimer)
+  adjustTimer = setTimeout(() => {
+    adjustTimer = null
+    tunerStore.set({ adjusting: false })
+  }, ADJUSTING_MS)
 }
 
 /* ---------- glide (magnet / tap-to-tune), one rAF tween at a time ---------- */
@@ -98,6 +135,7 @@ export function cancelGlide() {
 export function glideTo(target: number, ms = 420) {
   cancelGlide()
   armed = true
+  markInput()
   const from = tunerStore.get().value
   const to = clampFreq(target)
   if (Math.abs(to - from) < 1e-4) {
@@ -124,6 +162,7 @@ export function getTuner(): TunerState {
 export function setTunerValue(v: number) {
   cancelGlide()
   armed = true
+  markInput()
   apply(v)
 }
 
@@ -150,6 +189,25 @@ export function stopTuner() {
   tunerStore.set({ transport: 'stopped' })
 }
 
+/** Has the signal ever been found? (Non-React read.) */
+export function getEverLocked(): boolean {
+  return tunerStore.get().everLocked
+}
+
+/**
+ * Dev only: forget the first find and reset the dial, so the target is hidden again everywhere.
+ * Releases any lock and puts the dial back where a new player starts.
+ */
+export function forgetFirstLock() {
+  cancelGlide()
+  clearHold()
+  removeKey(SIGNAL_KEY)
+  const wasLocked = tunerStore.get().locked
+  tunerStore.set({ everLocked: false, touched: false, value: START_VALUE, locked: false, holding: false, holdSince: 0 })
+  if (wasLocked) setTunerLocked(false)
+  armed = true
+}
+
 export function useTunerValue(): number {
   return tunerStore.use((s) => s.value)
 }
@@ -170,4 +228,16 @@ export function useTransport(): Transport {
 }
 export function useLockNonce(): number {
   return tunerStore.use((s) => s.lockNonce)
+}
+/** True once the player has tuned at least once this session. */
+export function useTunerTouched(): boolean {
+  return tunerStore.use((s) => s.touched)
+}
+/** True while the dial has had input in the last few seconds. */
+export function useTunerAdjusting(): boolean {
+  return tunerStore.use((s) => s.adjusting)
+}
+/** True once the signal has ever been locked (persisted across reloads). */
+export function useEverLocked(): boolean {
+  return tunerStore.use((s) => s.everLocked)
 }

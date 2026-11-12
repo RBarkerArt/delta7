@@ -8,6 +8,7 @@ import {
   useTunerHoldMs,
   useTunerHoldSince,
   useTunerHolding,
+  useEverLocked,
   useTunerLock,
   useTunerValue,
 } from '../store/tuner'
@@ -18,7 +19,8 @@ import Readout from './Readout'
 import TickStrip from './TickStrip'
 import Transport from './Transport'
 import Waveform from './Waveform'
-import { TARGET, decodeState, lockStrength } from './tunerMath'
+import ClarityStatus from './ClarityStatus'
+import { SIGNAL_TARGET, clarity, clarityBucket, clarityWords, decodeState } from './tunerMath'
 import { useTunerAudio } from './tunerAudio'
 
 /**
@@ -36,15 +38,19 @@ export default function TunerApp({ isMobile }: AppProps) {
   const badStretch = useBadStretch()
   const lockNonce = useLockNonce()
   const transport = useTransport()
+  const everLocked = useEverLocked()
   const reduced = useReducedMotionPref()
   useTunerAudio()
 
-  const shown = locked ? TARGET : value
-  const strength = locked ? 1 : lockStrength(value)
+  const shown = locked ? SIGNAL_TARGET : value
+  const strength = locked ? 1 : clarity(value)
   const decode = decodeState(strength, locked)
+  const bucket = clarityBucket(strength, locked)
   // The words lag the wave a little: they only really clear in the last stretch, and fully at the lock.
-  const clarity = locked ? 1 : Math.min(0.95, strength * strength)
+  const messageClarity = locked ? 1 : Math.min(0.95, strength * strength)
   const readoutText = shown.toFixed(2)
+  // Until the first lock ever, the program doesn't know what it's listening for.
+  const holdText = everLocked ? SIGNAL_TARGET.toFixed(2) : '?'
 
   // Container-driven sizing (width 0 on the first frame → use the compact layout).
   const w = width || 360
@@ -69,7 +75,7 @@ export default function TunerApp({ isMobile }: AppProps) {
       <div
         aria-hidden="true"
         className="tuner-wash pointer-events-none absolute inset-0 transition-opacity duration-[1200ms] ease-out"
-        style={{ opacity: locked ? 1 : clarity * 0.3 }}
+        style={{ opacity: locked ? 1 : messageClarity * 0.3 }}
       />
       <div
         className="relative mx-auto flex h-full min-h-[340px] max-w-[880px] flex-col justify-center"
@@ -96,10 +102,11 @@ export default function TunerApp({ isMobile }: AppProps) {
           value={shown}
           locked={locked}
           pxPerUnit={pxPerUnit}
-          ariaText={`${readoutText} MHz${locked ? ', locked' : holding ? ', holding' : ''}`}
+          ariaText={`${readoutText} megahertz, ${clarityWords(bucket)}${!locked && holding ? ', holding' : ''}`}
         />
+        <ClarityStatus bucket={bucket} />
 
-        <MessageLine strength={clarity} size={compact ? 12.5 : 13.5} />
+        <MessageLine strength={messageClarity} size={compact ? 12.5 : 13.5} />
 
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <Transport state={transport} size={btn} />
@@ -107,7 +114,7 @@ export default function TunerApp({ isMobile }: AppProps) {
             data-testid="tuner-debug"
             className="os-selectable font-os-mono text-[10.5px] leading-tight text-os-ink-soft/90"
           >
-            rk: input open hold={shown.toFixed(2)} decode: {decode} lock={locked ? 1 : 0}
+            rk: input open hold={holdText} decode: {decode} lock={locked ? 1 : 0}
           </p>
         </div>
       </div>

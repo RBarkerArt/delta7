@@ -26,7 +26,7 @@ export default function Readout({ text, locked, lockNonce, reduced, size }: Prop
         <span className="text-os-ink transition-opacity duration-700" style={{ opacity: locked ? 0 : 1 }}>
           {text}
         </span>
-        {/* Warm copy via ::after so the element's text stays exactly "1.42 MHz". */}
+        {/* Warm copy via ::after so the element's text stays exactly "<value> MHz". */}
         <span
           aria-hidden="true"
           data-text={text}
