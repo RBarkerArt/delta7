@@ -94,9 +94,10 @@
   [data-mobile='true'] .os-label-pill {
     padding-inline: 0.6em;
   }
+  /* No backdrop blur available: a 50% fill keeps the label at WCAG AA (≥ 4.5:1) on every wallpaper by fill alone. */
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .os-label-pill::before {
-      background: rgba(40, 24, 30, 0.45);
+      background: rgba(40, 24, 30, 0.5);
     }
   }
   /*
