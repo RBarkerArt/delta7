@@ -106,13 +106,13 @@ export default function TunerApp({ isMobile }: AppProps) {
         />
         <ClarityStatus bucket={bucket} />
 
-        <MessageLine strength={messageClarity} size={compact ? 12.5 : 13.5} />
+        <MessageLine strength={messageClarity} size={compact ? 13 : 14} />
 
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <Transport state={transport} size={btn} />
           <p
             data-testid="tuner-debug"
-            className="os-selectable font-os-mono text-[10.5px] leading-tight text-os-ink-soft/90"
+            className="os-selectable font-os-mono text-[11.5px] leading-tight text-[#6a5e60]"
           >
             rk: input open hold={holdText} decode: {decode} lock={locked ? 1 : 0}
           </p>

@@ -83,6 +83,7 @@ export default function Delta7App({ params, isMobile }: AppProps) {
       data-testid="d7-root"
       data-level={level}
       data-bucket={plan.bucket.toFixed(2)}
+      data-decay-bucket={plan.bucket.toFixed(3)}
       data-compact={compact ? 'true' : 'false'}
       data-bad-stretch={badStretch ? 'true' : 'false'}
       className={`d7 relative flex h-full w-full flex-col overflow-hidden font-os-sans ${reduced ? 'd7-reduced' : ''}`}

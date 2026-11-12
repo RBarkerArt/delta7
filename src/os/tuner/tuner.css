@@ -32,6 +32,6 @@
 
 .tuner-tick-label {
   font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Segoe UI Mono', 'Roboto Mono', Menlo, Consolas, 'Liberation Mono', monospace;
-  font-size: 10.5px;
-  fill: rgba(58, 48, 52, 0.55);
+  font-size: 11px;
+  fill: #6a5e60;
 }

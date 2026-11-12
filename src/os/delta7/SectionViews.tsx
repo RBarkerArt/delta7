@@ -16,15 +16,15 @@ function Frame({ plan, wide, title, testId, children }: ViewProps & { title: str
   return (
     <div className={`mx-auto max-w-[1080px] ${wide ? 'p-4' : 'p-3'}`}>
       <Panel fx={plan.panels.list} blurPx={plan.blurPx} testId={testId} className="p-3">
-        <h3 className="mb-2 text-[12px] font-semibold lowercase text-[color:var(--d7-soft)]">{title}</h3>
+        <h3 className="mb-2 text-[13px] font-semibold lowercase text-[color:var(--d7-soft)]">{title}</h3>
         {children}
       </Panel>
     </div>
   )
 }
 
-const row = 'd7-row flex w-full items-baseline gap-3 rounded-[3px] px-1.5 py-[5px] text-left text-[12.5px]'
-const meta = 'shrink-0 text-[11px] text-[color:var(--d7-soft)]'
+const row = 'd7-row flex w-full items-baseline gap-3 rounded-[3px] px-1.5 py-[5px] text-left text-[14px]'
+const meta = 'shrink-0 text-[12px] text-[color:var(--d7-soft)]'
 
 export function MemoriesView(p: ViewProps) {
   return (
@@ -33,7 +33,7 @@ export function MemoriesView(p: ViewProps) {
         {D7_MEMORIES.map((m, i) => (
           <button key={m} type="button" className="d7-row rounded-[3px] p-1 text-left" aria-label={m}>
             <div className={`d7-thumb-${i % 6} aspect-[4/3] rounded-[2px]`} />
-            <span className="mt-1 block truncate font-os-mono text-[11px] text-[color:var(--d7-soft)]">{m}</span>
+            <span className="mt-1 block truncate font-os-mono text-[12px] text-[color:var(--d7-soft)]">{m}</span>
           </button>
         ))}
       </div>
@@ -54,7 +54,7 @@ export function MessagesView(p: ViewProps) {
           </li>
         ))}
       </ul>
-      <p className="mt-3 border-t border-[color:var(--d7-rule)] pt-3 text-[13px] leading-[1.5] text-[color:var(--d7-soft)]">{D7_MESSAGE.body}</p>
+      <p className="mt-3 border-t border-[color:var(--d7-rule)] pt-3 text-[14px] leading-[1.5] text-[color:var(--d7-soft)]">{D7_MESSAGE.body}</p>
     </Frame>
   )
 }
@@ -66,9 +66,9 @@ export function FilesView(p: ViewProps) {
         {D7_FILES.map((f) => (
           <li key={f.name}>
             <button type="button" className={row}>
-              <span className="min-w-0 flex-1 truncate font-os-mono text-[12px]">{f.name}</span>
+              <span className="min-w-0 flex-1 truncate font-os-mono text-[13px]">{f.name}</span>
               <span className={meta}>{f.size}</span>
-              <span className={`${meta} w-[62px] text-right`}>{f.when}</span>
+              <span className={`${meta} w-[66px] text-right`}>{f.when}</span>
             </button>
           </li>
         ))}
@@ -84,7 +84,7 @@ export function ArchiveView(p: ViewProps) {
         {D7_ARCHIVE.map((a) => (
           <li key={a.name}>
             <button type="button" className={row}>
-              <span className="min-w-0 flex-1 truncate font-os-mono text-[12px]">{a.name}</span>
+              <span className="min-w-0 flex-1 truncate font-os-mono text-[13px]">{a.name}</span>
               <span className={meta}>{a.size}</span>
             </button>
           </li>
@@ -99,9 +99,9 @@ export function LogsView(p: ViewProps) {
   const { logs } = useD7Signal()
   return (
     <Frame {...p} title={p.plan.labels['nav.logs']} testId="d7-view-logs">
-      <ol className="font-os-mono text-[11.5px] leading-[1.75]">
+      <ol className="font-os-mono text-[12.5px] leading-[1.75]">
         {logs.map((line, i) => (
-          <li key={i} className="flex gap-3 whitespace-pre">
+          <li key={i} className={`flex gap-3 ${p.wide ? 'whitespace-pre' : 'whitespace-pre-wrap'}`}>
             <span className="text-[color:var(--d7-soft)]">{line.slice(0, 8)}</span>
             <RewritingLine text={line.slice(10)} alt={rw && rw.index === i ? rw.alt : null} />
           </li>

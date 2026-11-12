@@ -16,8 +16,8 @@ function isDecayable(v: D7View): v is DecayableNav {
 }
 
 /**
- * Left side-panel nav. `tuner` is never touched by decay (no fade, drop, misspelling, blur or movement).
- * Dropped items leave a faint gap where they were — still there, still clickable, nearly gone.
+ * Left side-panel nav. `tuner` is never touched by decay (no fade, ghost, misspelling, blur or movement).
+ * Faded / ghosted items stay legible and clickable; hover or focus brings them back.
  */
 export default function Nav({ view, plan, onSelect, day }: Props) {
   return (
@@ -29,12 +29,12 @@ export default function Nav({ view, plan, onSelect, day }: Props) {
           const state = decays ? plan.nav[item] : 'normal'
           const label = item === 'tuner' ? 'tuner' : plan.labels[`nav.${item}` as D7LabelKey]
           const style: CSSProperties | undefined = decays
-            ? {
-                opacity: state === 'dropped' ? (active ? 0.5 : 0.07) : state === 'faded' ? 0.38 : 1,
+            ? ({
+                '--d7-nav-o': active ? Math.max(0.8, plan.navOpacity[item]) : plan.navOpacity[item],
                 transform: plan.navShift[item] ? `translateX(${plan.navShift[item]}px)` : undefined,
-              }
+              } as CSSProperties)
             : undefined
-          const blur = decays && plan.blurPx > 0 ? `blur(${Math.min(0.35, plan.blurPx * 0.7)}px)` : undefined
+          const blur = decays && plan.blurPx > 0 ? `blur(${Math.min(0.3, plan.blurPx * 0.7)}px)` : undefined
           return (
             <li key={item}>
               <button
@@ -44,7 +44,7 @@ export default function Nav({ view, plan, onSelect, day }: Props) {
                 aria-current={active ? 'page' : undefined}
                 aria-label={item}
                 onClick={() => onSelect(item)}
-                className={`d7-nav-btn ${decays ? 'd7-fx' : ''} flex w-full items-center gap-2 rounded-[4px] py-[5px] pl-2 pr-2 text-left text-[13px] ${
+                className={`d7-nav-btn ${decays ? 'd7-fx' : ''} ${state === 'dropped' ? 'd7-ghost' : ''} flex w-full items-center gap-2 rounded-[4px] py-[5px] pl-2 pr-2 text-left text-[14px] ${
                   active ? 'bg-[#f9f5ef] text-[color:var(--d7-ink)] shadow-[inset_3px_0_0_var(--d7-accent)]' : 'text-[color:var(--d7-soft)] hover:bg-black/[0.035]'
                 }`}
                 style={style}
@@ -55,7 +55,7 @@ export default function Nav({ view, plan, onSelect, day }: Props) {
           )
         })}
       </ul>
-      <div className="mt-auto px-4 pb-3 font-os-mono text-[10px] text-[color:var(--d7-soft)] opacity-70">day {day}</div>
+      <div className="mt-auto px-4 pb-3 font-os-mono text-[11px] text-[color:var(--d7-soft)]">day {day}</div>
     </nav>
   )
 }

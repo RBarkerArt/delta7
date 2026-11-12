@@ -16,7 +16,7 @@ interface Props {
   onNavigate: (v: D7View) => void
 }
 
-const head = 'text-[12px] font-semibold lowercase tracking-[0.01em] text-[color:var(--d7-soft)]'
+const head = 'text-[13px] font-semibold lowercase tracking-[0.01em] text-[color:var(--d7-soft)]'
 
 export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: Props) {
   const [autoRefresh, setAutoRefresh] = useState(true)
@@ -31,8 +31,15 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
   return (
     <div className={`mx-auto flex max-w-[1080px] flex-col ${wide ? 'gap-3 p-4' : 'gap-3 p-3'}`}>
       {/* toolbar — the default-looking controls */}
-      <Panel fx={plan.panels.toolbar} blurPx={blur} z={3} testId="d7-panel-toolbar" className="flex flex-wrap items-center gap-x-4 gap-y-2 px-[10px] py-[7px]">
-        <span className="flex items-center gap-1.5 text-[12px]">
+      {/* The toolbar holds the controls: it only ever gets half the soft-type blur. */}
+      <Panel
+        fx={plan.panels.toolbar}
+        blurPx={blur / 2}
+        z={3}
+        testId="d7-panel-toolbar"
+        className={`flex flex-wrap items-center gap-x-4 px-[10px] ${wide ? 'gap-y-2 py-[7px]' : 'gap-y-0 py-1'}`}
+      >
+        <span className="flex items-center gap-1.5 text-[13px]">
           <span
             className={`inline-block h-[7px] w-[7px] rounded-full ${signal.status === 'holding' ? 'bg-[#7f8a62]' : 'bg-[#b49a74]'}`}
             aria-hidden="true"
@@ -41,11 +48,14 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
             {decayedLabel(plan, 'status', D7_STATUS[signal.status], seed)}
           </span>
         </span>
-        <span className="min-w-[132px] flex-1 truncate font-os-mono text-[11px] text-[color:var(--d7-soft)]">
+        <span
+          className={`min-w-[132px] flex-1 font-os-mono text-[12px] text-[color:var(--d7-soft)] ${wide ? 'truncate' : 'basis-full py-1'}`}
+          data-testid="d7-log-tail"
+        >
           <RewritingLine text={tail.slice(10)} alt={plan.logRewrite?.alt ?? null} />
         </span>
-        <span className="flex flex-wrap items-center gap-2.5">
-          <label className="flex items-center gap-1 text-[12px]">
+        <span className={`flex flex-wrap items-center ${wide ? 'gap-2.5' : 'gap-2'}`}>
+          <label className="d7-check text-[13px]">
             <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} data-testid="d7-autorefresh" />
             {plan.labels.refresh}
           </label>
@@ -56,14 +66,14 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
           </select>
           <button
             type="button"
-            className="d7-btn"
+            className="d7-hit"
             data-testid="d7-refresh"
             onClick={() => {
               setRefreshed(true)
               setTimeout(() => setRefreshed(false), 1200)
             }}
           >
-            {refreshed ? 'ok' : 'refresh'}
+            <span className="d7-btn">{refreshed ? 'ok' : 'refresh'}</span>
           </button>
         </span>
       </Panel>
@@ -73,7 +83,7 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
         <Panel fx={plan.panels.signal} blurPx={blur} z={1} testId="d7-panel-signal" className="flex flex-col p-3">
           <div className="mb-1 flex items-baseline justify-between">
             <h3 className={head}>{plan.labels.signal}</h3>
-            <span className="font-os-mono text-[11px] text-[color:var(--d7-soft)]" data-testid="d7-signal-value">
+            <span className="font-os-mono text-[12px] text-[color:var(--d7-soft)]" data-testid="d7-signal-value">
               {signal.live}
             </span>
           </div>
@@ -84,22 +94,22 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
 
         {/* latest message — its heading is the one in a mismatched monospace */}
         <Panel fx={plan.panels.message} blurPx={blur} z={2} testId="d7-panel-message" className="flex flex-col p-[14px]">
-          <h3 className="d7-courier text-[13px] font-bold text-[color:var(--d7-ink)]">{plan.labels.latest}</h3>
-          <p className="mt-0.5 font-os-mono text-[10.5px] text-[color:var(--d7-soft)]">received {D7_MESSAGE.received}</p>
+          <h3 className="d7-courier text-[14px] font-bold text-[color:var(--d7-ink)]">{plan.labels.latest}</h3>
+          <p className="mt-0.5 font-os-mono text-[11.5px] text-[color:var(--d7-soft)]">received {D7_MESSAGE.received}</p>
           {/* TODO(copy) */}
-          <p className="mt-2 text-[13px] leading-[1.5]">
+          <p className="mt-2 text-[14px] leading-[1.5]">
             {words.map((w, i) => (
               <span key={i} className="d7-fx" style={{ opacity: plan.fadedWords.includes(i) ? 0.16 : 1 }}>
                 {w}{' '}
               </span>
             ))}
           </p>
-          <div className="mt-auto flex items-center gap-2 pt-3">
-            <button type="button" className="d7-btn" onClick={() => onNavigate('messages')} data-testid="d7-reply">
-              reply
+          <div className={`mt-auto flex items-center gap-2 ${wide ? 'pt-3' : 'pt-1'}`}>
+            <button type="button" className="d7-hit" onClick={() => onNavigate('messages')} data-testid="d7-reply">
+              <span className="d7-btn">reply</span>
             </button>
-            <label className="ml-1 flex items-center gap-1 text-[12px] text-[color:var(--d7-soft)]">
-              <input type="checkbox" checked={markRead} onChange={(e) => setMarkRead(e.target.checked)} />
+            <label className="d7-check ml-1 text-[13px] text-[color:var(--d7-soft)]">
+              <input type="checkbox" checked={markRead} onChange={(e) => setMarkRead(e.target.checked)} data-testid="d7-mark-read" />
               mark read
             </label>
           </div>
@@ -115,12 +125,12 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
               <li key={f.name}>
                 <button
                   type="button"
-                  className="d7-row flex w-full items-baseline gap-2 rounded-[3px] px-1 py-[3px] text-left text-[12.5px]"
+                  className="d7-row flex w-full items-baseline gap-2 rounded-[3px] px-1 py-[3px] text-left text-[13px]"
                   onClick={() => onNavigate('files')}
                 >
-                  <span className="min-w-0 flex-1 truncate font-os-mono text-[12px]">{f.name}</span>
-                  <span className="shrink-0 text-[11px] text-[color:var(--d7-soft)]">{f.size}</span>
-                  <span className="w-[62px] shrink-0 text-right text-[11px] text-[color:var(--d7-soft)]">{f.when}</span>
+                  <span className="min-w-0 flex-1 truncate font-os-mono text-[13px]">{f.name}</span>
+                  <span className="shrink-0 text-[12px] text-[color:var(--d7-soft)]">{f.size}</span>
+                  <span className="w-[66px] shrink-0 text-right text-[12px] text-[color:var(--d7-soft)]">{f.when}</span>
                 </button>
               </li>
             ))}
@@ -139,7 +149,7 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
               />
             ) : null}
             <div className="d7-feed-wash d7-fx absolute inset-0" style={{ opacity: plan.wash }} aria-hidden="true" />
-            <span className="absolute bottom-1.5 left-2 rounded-[2px] bg-[rgba(251,248,243,0.85)] px-1.5 py-[1px] font-os-mono text-[11px] text-[color:var(--d7-ink)]">
+            <span className="absolute bottom-1.5 left-2 rounded-[2px] bg-[rgba(251,248,243,0.88)] px-1.5 py-[1px] font-os-mono text-[12px] text-[color:var(--d7-ink)]">
               {plan.labels.feed}
             </span>
           </div>

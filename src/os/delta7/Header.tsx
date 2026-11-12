@@ -17,23 +17,25 @@ export default function Header({ compact, drawerOpen, onMenu, plan, day }: Props
       {compact ? (
         <button
           type="button"
-          className="d7-btn flex h-[24px] items-center px-[6px]"
+          className="d7-hit -ml-2.5 -mr-1"
           onClick={onMenu}
           aria-label="open sections"
           aria-expanded={drawerOpen}
           data-testid="d7-drawer-button"
         >
-          <PanelLeft size={15} strokeWidth={1.5} />
+          <span className="d7-btn flex h-[26px] items-center px-[7px]">
+            <PanelLeft size={15} strokeWidth={1.5} />
+          </span>
         </button>
       ) : null}
       <h2 className="text-[14px] font-semibold tracking-[-0.005em]">Delta7 v0.14-rk</h2>
       <span
-        className="d7-fx inline-block rounded-[2px] border border-[rgba(120,96,60,0.3)] bg-[#efe0bf] px-1 font-os-mono text-[9.5px] leading-[15px] text-[#6d5a3f] shadow-[0_1px_1px_rgba(40,24,30,0.08)]"
+        className="d7-fx inline-block rounded-[2px] border border-[rgba(120,96,60,0.3)] bg-[#efe0bf] px-1 font-os-mono text-[11px] leading-[16px] text-[#6d5a3f] shadow-[0_1px_1px_rgba(40,24,30,0.08)]"
         style={{ transform: `rotate(${-2 - peel * 5}deg) translateY(${peel * 2}px)` }}
       >
         rk:scan v0.3
       </span>
-      {compact ? <span className="ml-auto font-os-mono text-[10px] text-[color:var(--d7-soft)] opacity-70">day {day}</span> : null}
+      {compact ? <span className="ml-auto font-os-mono text-[11px] text-[color:var(--d7-soft)]">day {day}</span> : null}
     </header>
   )
 }

@@ -34,7 +34,7 @@ export default function Readout({ text, locked, lockNonce, reduced, size }: Prop
           style={{ opacity: locked ? 1 : 0 }}
         />
       </span>{' '}
-      <span className="font-os-mono text-os-ink-soft" style={{ fontSize: Math.max(12, size * 0.26) }}>
+      <span className="font-os-mono text-[#6a5e60]" style={{ fontSize: Math.max(12, size * 0.26) }}>
         MHz
       </span>
     </motion.div>

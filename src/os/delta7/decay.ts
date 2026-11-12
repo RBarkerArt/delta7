@@ -1,14 +1,19 @@
-import { clamp01, levelFor } from '../store/coherenceMath'
-import { seeded } from '../lib/seeded'
-import { D7_LABELS, D7_LOGS, D7_LOG_REWRITES, D7_MESSAGE } from '../mock/delta7Content'
-import type { D7LabelKey } from '../mock/delta7Content'
+import { clamp01, levelFor } from '../store/coherenceMath.ts'
+import { seeded } from '../lib/seeded.ts'
+import { D7_LABELS, D7_LOGS, D7_LOG_REWRITES, D7_MESSAGE } from '../mock/delta7Content.ts'
+import type { D7LabelKey } from '../mock/delta7Content.ts'
 import type { DecayLevel } from '../types'
 
 /**
  * Pure mapping coherence → how the Delta7 dashboard looks. No React, no time, no Math.random.
- * Same (bucketed coherence, seed) → same plan, so nothing flickers between renders.
+ * Same (bucket, seed, badStretch) → same plan, so nothing flickers between renders.
  *
- * Choices (which panel tears, which nav item fades…) come from the seed only, and their strength from the
+ * Players live between 1.0 and the absence floors (0.70, or 0.75 in a bad stretch), so that is where the VISIBLE
+ * range is: `mood` runs 0 → 1 over 0.95 → 0.70 in 0.025 steps, and every step down adds a small, visible change.
+ * Below 0.70 (dev slider / scripted moments only) `depth` adds the heavier effects. Effects are driven by coherence
+ * itself, not by the level names (those stay the owner's definitions for `data-level`).
+ *
+ * Choices (which panel tilts or tears, which nav item ghosts…) come from the seed only, and their strength from the
  * bucket, so as coherence falls the SAME things get progressively worse instead of jumping around.
  */
 
@@ -42,15 +47,21 @@ export interface ChartFx {
 
 export interface DecayPlan {
   level: DecayLevel
-  /** coherence floored to 0.05 steps */
+  /** coherence floored to 0.025 steps */
   bucket: number
-  /** 0 at ≥0.9, rising to 1 at 0 */
+  /** 0..1 over 0.95 → 0.70: the gentle, everyday unwellness */
+  mood: number
+  /** 0..1 over 0.70 → 0.10: the heavier effects, out of normal play */
+  depth: number
+  /** 0 when healthy → 1 at the bottom; drives the sticker peel */
   severity: number
   blurPx: number
   grain: number
   vignette: number
   panels: Record<PanelId, PanelFx>
   nav: Record<DecayableNav, NavState>
+  /** nav opacity (decayable items only); hover / focus brings an item back */
+  navOpacity: Record<DecayableNav, number>
   /** nav x-offsets in px (decayable items only) */
   navShift: Record<DecayableNav, number>
   labels: Record<D7LabelKey, string>
@@ -67,15 +78,27 @@ export interface DecayPlan {
   misspelt: D7LabelKey[]
 }
 
-const STEP = 0.05
+const STEP = 0.025
 
-/** Floors to 0.05 steps. Floor (not round) so the bucket's level always equals the store's level. */
+const round = (v: number, p = 100) => Math.round(v * p) / p
+const lerp = (a: number, b: number, t: number) => a + (b - a) * clamp01(t)
+/** 0 below `from`, rising to 1 at `to` (for effects that arrive part-way down). */
+const ramp = (v: number, from: number, to: number) => clamp01((v - from) / (to - from))
+
+/** Floors to 0.025 steps. Floor (not round) so the bucket's level always equals the store's level. */
 export function bucketOf(c: number): number {
-  return Math.floor(clamp01(c) / STEP + 1e-6) * STEP
+  return round(Math.floor(clamp01(c) / STEP + 1e-6) * STEP, 1000)
 }
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * clamp01(t)
-const round = (v: number, p = 100) => Math.round(v * p) / p
+/** 0 at ≥ 0.95 → 1 at 0.70. */
+export function moodOf(bucket: number): number {
+  return round(clamp01((0.95 - bucket) / 0.25), 1000)
+}
+
+/** 0 at ≥ 0.70 → 1 at 0.10. */
+export function depthOf(bucket: number): number {
+  return round(clamp01((0.7 - bucket) / 0.6), 1000)
+}
 
 function shuffled<T>(items: readonly T[], rnd: () => number): T[] {
   const a = [...items]
@@ -117,16 +140,18 @@ export function badStretchMisspellings(seed: string): number {
   return seeded(`${seed}:bad-stretch`)() < 0.5 ? 2 : 3
 }
 
+/** How many labels are misspelled: one by ~0.875, a couple by 0.80, three at 0.70, more only below. */
+export function misspellCountFor(mood: number, depth: number): number {
+  const everyday = mood >= 0.95 ? 3 : mood >= 0.55 ? 2 : mood >= 0.3 ? 1 : 0
+  return everyday + Math.round(depth * 6)
+}
+
 export function decayPlan(coherence: number, seed: string, badStretch = false): DecayPlan {
-  const bucket = round(bucketOf(coherence))
+  const bucket = bucketOf(coherence)
   const level = levelFor(bucket)
-  // severity: 0 at 0.9 and above → 1 at 0.
-  const severity = round(clamp01((0.9 - bucket) / 0.9))
-  const recovering = bucket < 0.9
-  const fraying = bucket < 0.75
-  const fragmented = bucket < 0.55
-  // depth within the fragmented band: 0 at 0.5 → 1 at 0
-  const deep = clamp01((0.55 - bucket) / 0.55)
+  const m = moodOf(bucket)
+  const d = depthOf(bucket)
+  const severity = round(clamp01(m * 0.45 + d * 0.55))
 
   // Seed-only choices (stable across buckets).
   const choose = seeded(`${seed}:choices`)
@@ -139,13 +164,13 @@ export function decayPlan(coherence: number, seed: string, badStretch = false): 
   )
   const logIndex = 1 + Math.floor(choose() * (D7_LOGS.length - 2))
   const logAlt = D7_LOG_REWRITES[Math.floor(choose() * D7_LOG_REWRITES.length)]
+  // The one panel that starts to lean first.
+  const tilted = (['signal', 'message', 'files', 'feed'] as const)[Math.floor(choose() * 4)]
 
   /* ---- panels ---- */
-  const drift = !recovering ? 0 : fragmented ? lerp(5, 8, deep) : fraying ? lerp(3, 5, (0.75 - bucket) / 0.2) : lerp(1, 3, (0.9 - bucket) / 0.15)
-  const rotMax = !fraying ? 0 : fragmented ? lerp(1.5, 1.8, deep) : lerp(0.5, 1.5, (0.75 - bucket) / 0.2)
-  const dip = !fraying ? 0 : fragmented ? lerp(0.16, 0.24, deep) : lerp(0.05, 0.14, (0.75 - bucket) / 0.2)
-  const tears = fragmented ? (bucket >= 0.35 ? 1 : 2) : 0
-
+  const drift = m > 0 ? 3 * m + 6 * d : 0
+  const rotAll = 0.9 * ramp(m, 0.5, 1) + 0.9 * d // everyone leans a little from ~0.825
+  const dip = 0.06 * ramp(m, 0.6, 1) + 0.16 * d
   const panels = {} as Record<PanelId, PanelFx>
   for (const id of PANEL_IDS) {
     const r = seeded(`${seed}:panel:${id}`)
@@ -155,75 +180,99 @@ export function decayPlan(coherence: number, seed: string, badStretch = false): 
     const rotScale = 0.45 + r() * 0.55
     const dipScale = 0.4 + r() * 0.6
     const toolbar = id === 'toolbar'
+    // The tilted panel leans from ~0.875 (0.4° by 0.85, ~1° at 0.70).
+    const lean = id === tilted ? lerp(0.25, 1, ramp(m, 0.2, 1)) * (m >= 0.2 ? 1 : 0) : 0
     panels[id] = {
       x: round(ax * drift * (toolbar ? 0.4 : 1), 10),
       y: round(ay * drift * (toolbar ? 0.3 : 0.7), 10),
-      rot: round(ar * rotMax * rotScale * (toolbar ? 0.3 : 1)),
+      rot: round(ar * (lean + rotAll * rotScale) * (toolbar ? 0.3 : 1)),
       opacity: round(1 - dip * dipScale),
       tear: null,
     }
   }
+  // Torn card edges: one from ~0.775 (a few px), a second and third only below 0.70.
+  const tears = (m >= 0.7 ? 1 : 0) + (d >= 0.15 ? 1 : 0) + (d >= 0.5 ? 1 : 0)
   for (let i = 0; i < tears; i++) {
     const id = tearOrder[i]
     const r = seeded(`${seed}:tear:${id}`)
-    panels[id].tear = tearPolygon(id === 'files' ? 'bottom' : r() < 0.5 ? 'bottom' : 'right', lerp(5, 9, deep), r)
+    const depthPx = i === 0 ? lerp(2.5, 5, ramp(m, 0.7, 1)) + 5 * d : lerp(4, 10, d)
+    panels[id].tear = tearPolygon(id === 'files' ? 'bottom' : r() < 0.5 ? 'bottom' : 'right', depthPx, r)
   }
-  if (fragmented) {
-    // The feed slips clearly out of line — down and to the left, away from anything clickable.
-    panels.feed = { ...panels.feed, x: round(-lerp(10, 18, deep), 10), y: round(lerp(14, 26, deep), 10), rot: round(-lerp(1.6, 2.2, deep)) }
+  if (d > 0) {
+    // Below 0.70 the feed slips clearly out of line — down and to the left, away from anything clickable.
+    panels.feed = {
+      ...panels.feed,
+      x: round(panels.feed.x - lerp(3, 18, d), 10),
+      y: round(panels.feed.y + lerp(5, 26, d), 10),
+      rot: round(panels.feed.rot - lerp(0.6, 2.2, d)),
+    }
   }
 
   /* ---- nav ---- */
   const nav = Object.fromEntries(DECAYABLE_NAV.map((n) => [n, 'normal'])) as Record<DecayableNav, NavState>
+  const navOpacity = Object.fromEntries(DECAYABLE_NAV.map((n) => [n, 1])) as Record<DecayableNav, number>
   const navShift = Object.fromEntries(DECAYABLE_NAV.map((n) => [n, 0])) as Record<DecayableNav, number>
-  if (fragmented) {
-    nav[navOrder[0]] = 'dropped'
-    nav[navOrder[1]] = 'dropped'
-    nav[navOrder[2]] = 'faded'
-  } else if (fraying) {
-    nav[navOrder[0]] = bucket < 0.65 ? 'dropped' : 'faded'
-  }
-  if (recovering) {
+  // [fades from, ghosts from] for the first three items in seeded order: one by 0.80 / 0.75, the others below 0.70.
+  const steps: [boolean, boolean][] = [
+    [m >= 0.55, m >= 0.8],
+    [d >= 0.1, d >= 0.3],
+    [d >= 0.4, d >= 0.7],
+  ]
+  steps.forEach(([faded, ghost], i) => {
+    const n = navOrder[i]
+    if (ghost) {
+      nav[n] = 'dropped'
+      navOpacity[n] = round(lerp(0.5, 0.42, d))
+    } else if (faded) {
+      nav[n] = 'faded'
+      navOpacity[n] = i === 0 ? round(lerp(0.78, 0.62, ramp(m, 0.55, 0.8))) : 0.62
+    }
+  })
+  if (drift > 0) {
     for (const n of DECAYABLE_NAV) {
       const r = seeded(`${seed}:nav:${n}`)
-      navShift[n] = round((r() * 2 - 1) * drift * 0.5, 10)
+      navShift[n] = round((r() * 2 - 1) * drift * 0.5 + (nav[n] === 'dropped' ? 5 : 0), 10)
     }
   }
 
   /* ---- labels ---- */
-  const labelKeys = Object.keys(D7_LABELS).length
-  const misspellCount = Math.min(
-    labelKeys,
-    (fragmented ? 5 : fraying ? (bucket < 0.65 ? 3 : 2) : 0) + (badStretch ? badStretchMisspellings(seed) : 0),
-  )
+  const labelKeys = labelOrder.length
+  const misspellCount = Math.min(labelKeys, misspellCountFor(m, d) + (badStretch ? badStretchMisspellings(seed) : 0))
   const labels = { ...D7_LABELS } as Record<D7LabelKey, string>
   const misspelt = labelOrder.slice(0, misspellCount)
   for (const key of misspelt) labels[key] = misspell(D7_LABELS[key], seeded(`${seed}:label:${key}`))
 
   /* ---- chart ---- */
   const chart: ChartFx = {
-    stutter: fragmented ? lerp(0.5, 0.8, deep) : fraying ? lerp(0.15, 0.4, (0.75 - bucket) / 0.2) : 0,
-    gaps: fragmented ? lerp(0.07, 0.16, deep) : 0,
-    amp: fragmented ? lerp(0.6, 0.35, deep) : fraying ? 0.85 : 1,
-    noise: round(lerp(0.12, 0.5, severity)),
+    stutter: round((m >= 0.5 ? lerp(0.1, 0.35, ramp(m, 0.5, 1)) : 0) + 0.45 * d),
+    gaps: d > 0 ? round(lerp(0.04, 0.18, d)) : 0,
+    amp: round(1 - 0.12 * m - 0.3 * d),
+    noise: round(0.12 + 0.2 * m + 0.2 * d),
   }
+
+  /* ---- blanked words ---- */
+  const blanked = (m >= 0.95 ? 2 : m >= 0.7 ? 1 : 0) + Math.round(d * 6)
 
   return {
     level,
     bucket,
+    mood: m,
+    depth: d,
     severity,
-    blurPx: !recovering ? 0 : fragmented ? round(lerp(0.45, 0.55, deep)) : fraying ? 0.4 : round(lerp(0.15, 0.35, (0.9 - bucket) / 0.15)),
-    grain: !recovering ? 0 : fragmented ? round(lerp(0.12, 0.17, deep)) : fraying ? 0.09 : 0.05,
-    vignette: !fraying ? 0 : fragmented ? round(lerp(0.45, 0.7, deep)) : round(lerp(0.12, 0.3, (0.75 - bucket) / 0.2)),
+    // Soft type: ≤0.35px in normal play (the spec's ≤0.4), a little more only below 0.70.
+    blurPx: m > 0 ? round(0.06 + 0.29 * m + 0.2 * d) : 0,
+    grain: m > 0 ? round(0.035 + 0.07 * m + 0.08 * d) : 0,
+    vignette: round(0.26 * m ** 1.5 + 0.44 * d),
     panels,
     nav,
+    navOpacity,
     navShift,
     labels,
     chart,
-    fadedWords: fragmented ? wordOrder.slice(0, 3 + Math.round(deep * 4)) : fraying && bucket < 0.65 ? wordOrder.slice(0, 1) : [],
-    ghost: fragmented ? round(lerp(5, 9, deep), 10) : 0,
-    wash: !fraying ? 0 : fragmented ? round(lerp(0.35, 0.55, deep)) : 0.15,
-    logRewrite: fragmented ? { index: logIndex, alt: logAlt } : null,
+    fadedWords: wordOrder.slice(0, Math.min(wordOrder.length, blanked)),
+    ghost: m >= 0.6 ? round(lerp(1.5, 3, ramp(m, 0.6, 1)) + 9 * d, 10) : 0,
+    wash: round(0.16 * m + 0.4 * d),
+    logRewrite: d >= 0.25 ? { index: logIndex, alt: logAlt } : null,
     misspelt,
   }
 }
