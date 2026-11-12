@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { useElementSize } from '../lib/useElementSize'
+import { watchOnScreen } from '../lib/watchOnScreen'
+import { useAppVisible } from '../windows/appVisibility'
 import { coherenceStore } from '../store/coherence'
 import { tunerStore, useTransport } from '../store/tuner'
 import { TARGET, clarity } from './tunerMath'
@@ -10,25 +11,33 @@ const BAD_STRETCH_NOISE = 0.3
 /** A stopped tuner's trace: low, flat-ish static, frozen. */
 const IDLE_AMP = 0.3
 
+/** Reduced motion: a few still frames a second, enough to show the trace clearing as the dial moves. */
+const REDUCED_FRAME_MS = 250
+
 /**
- * The live trace. One rAF loop per mounted canvas, paused when the tab is hidden, the canvas is offscreen,
- * or the transport is paused (the trace freezes). Stopped: one dim, low, frozen frame of plain static (idle).
- * Reads the store directly each frame (no React renders).
+ * The live trace. One loop per mounted canvas, paused when the tab is hidden, the canvas is offscreen, its window is
+ * minimized, or the transport is stopped (the trace freezes). Stopped: one dim, low, frozen frame of plain static
+ * (idle). Reads the store directly each frame (no React renders); its size comes from its own ResizeObserver.
  */
 export default function Waveform({ reduced }: { reduced: boolean }) {
-  const { ref: boxRef, width, height } = useElementSize<HTMLDivElement>()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const stopped = useTransport() === 'stopped'
+  const appVisible = useAppVisible()
+  const visibleRef = useRef(appVisible)
+  const updateRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    visibleRef.current = appVisible
+    updateRef.current?.()
+  }, [appVisible])
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas || width < 2 || height < 2) return
+    if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const dpr = Math.min(2, window.devicePixelRatio || 1)
-    canvas.width = Math.round(width * dpr)
-    canvas.height = Math.round(height * dpr)
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    let width = 0
+    let height = 0
 
     const initial = tunerStore.get()
     let strength = initial.locked ? 1 : clarity(initial.value) * 0.9
@@ -38,19 +47,26 @@ export default function Waveform({ reduced }: { reduced: boolean }) {
     let phase = 0
     let last = performance.now()
     let raf = 0
-    let onScreen = true
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let running = false
+    let shown = true
     const timeScale = reduced ? 0.12 : 1
 
-    const render = () =>
+    const render = () => {
+      if (width < 2 || height < 2) return
       drawWave(ctx, { width, height, t, phase, strength, offset, noiseFloor, frame: Math.floor(t * (reduced ? 1.5 : 20)) })
+    }
     const renderIdle = () => {
       // Plain static, nothing of the signal: the next live frame eases back in from here.
       strength = 0
+      if (width < 2 || height < 2) return
       drawWave(ctx, { width, height, t, phase, strength: 0, offset: 0, noiseFloor: 0, frame: Math.floor(t * 20), ampScale: IDLE_AMP })
     }
 
     const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000)
+      raf = 0
+      if (!running) return
+      const dt = Math.min(reduced ? REDUCED_FRAME_MS / 1000 : 0.05, (now - last) / 1000)
       last = now
       const s = tunerStore.get()
       // Locked: the last bit of steadiness arrives only with the lock, then the trace settles slowly.
@@ -64,50 +80,68 @@ export default function Waveform({ reduced }: { reduced: boolean }) {
       t += dt * timeScale
       phase += dt * timeScale * carrierSpeed(strength)
       render()
-      raf = requestAnimationFrame(tick)
+      if (reduced) {
+        timer = setTimeout(() => {
+          timer = null
+          raf = requestAnimationFrame(tick)
+        }, REDUCED_FRAME_MS)
+      } else raf = requestAnimationFrame(tick)
     }
 
-    const shouldRun = () =>
-      document.visibilityState === 'visible' && onScreen && (tunerStore.get().transport === 'playing' || tunerStore.get().transport === 'open')
+    const halt = () => {
+      if (timer) clearTimeout(timer)
+      timer = null
+      cancelAnimationFrame(raf)
+      raf = 0
+    }
+    const live = () => tunerStore.get().transport === 'playing' || tunerStore.get().transport === 'open'
     let idleDrawn = false
     const update = () => {
       const stoppedNow = tunerStore.get().transport === 'stopped'
       if (stoppedNow && !idleDrawn) renderIdle()
       idleDrawn = stoppedNow
-      const run = shouldRun()
-      if (run && !raf) {
+      const run = shown && visibleRef.current && live()
+      if (run === running) return
+      running = run
+      if (run) {
         last = performance.now()
         raf = requestAnimationFrame(tick)
-      } else if (!run && raf) {
-        cancelAnimationFrame(raf)
-        raf = 0
-      }
+      } else halt()
     }
 
-    if (initial.transport === 'stopped') {
-      renderIdle()
-      idleDrawn = true
-    } else render()
-    const io = new IntersectionObserver((entries) => {
-      onScreen = entries.some((e) => e.isIntersecting)
+    // Size from the observer: reallocate the backing store and redraw the current frame at once (same frame).
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect
+      if (!r || (r.width === width && r.height === height)) return
+      width = r.width
+      height = r.height
+      const dpr = Math.min(2, window.devicePixelRatio || 1)
+      canvas.width = Math.round(width * dpr)
+      canvas.height = Math.round(height * dpr)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      if (tunerStore.get().transport === 'stopped') renderIdle()
+      else render()
+    })
+    ro.observe(canvas)
+    const unwatch = watchOnScreen(canvas, (on) => {
+      shown = on
       update()
     })
-    io.observe(canvas)
     const unsub = tunerStore.subscribe(update)
-    document.addEventListener('visibilitychange', update)
+    updateRef.current = update
     update()
     return () => {
-      cancelAnimationFrame(raf)
-      raf = 0
-      io.disconnect()
+      running = false
+      halt()
+      ro.disconnect()
+      unwatch()
       unsub()
-      document.removeEventListener('visibilitychange', update)
+      updateRef.current = null
     }
-  }, [width, height, reduced])
+  }, [reduced])
 
   return (
     <div
-      ref={boxRef}
       data-testid="tuner-wave"
       data-idle={stopped ? 'true' : 'false'}
       className="tuner-wave relative h-full w-full transition-opacity duration-500"

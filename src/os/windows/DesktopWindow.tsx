@@ -185,8 +185,9 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
       className={`absolute left-0 top-0 outline-none ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}
       style={{ x: fx, y: fy, width: fw, height: fh, zIndex: app.z, opacity: hidden ? pose.values.o : 1 }}
     >
+      {/* The frame carries the pose (launch / minimize) and the two static shadow layers; the panel inside clips. */}
       <motion.div
-        className={`relative flex h-full w-full flex-col overflow-hidden bg-os-cream font-os-sans text-os-ink ${focused ? 'os-window' : 'os-window os-window-idle'}`}
+        className={`os-window-frame relative h-full w-full ${focused ? 'is-focused' : ''}`}
         style={{
           x: pose.values.x,
           y: pose.values.y,
@@ -199,19 +200,24 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
           willChange: 'transform',
         }}
       >
-        <TitleBar
-          def={def}
-          focused={focused}
-          maximized={maximized}
-          onPointerDown={gestures.onTitlePointerDown}
-          onToggleMaximize={toggleMaximize}
-          onMinimize={() => minimizeApp(app.id)}
-          onClose={() => closeApp(app.id)}
-        />
-        <div className="os-selectable relative min-h-0 flex-1 overflow-auto overscroll-contain">
-          <AppBody app={app} isMobile={false} />
+        <div
+          className={`relative flex h-full w-full flex-col overflow-hidden bg-os-cream font-os-sans text-os-ink ${focused ? 'os-window' : 'os-window os-window-idle'}`}
+          style={{ borderRadius: 'inherit' }}
+        >
+          <TitleBar
+            def={def}
+            focused={focused}
+            maximized={maximized}
+            onPointerDown={gestures.onTitlePointerDown}
+            onToggleMaximize={toggleMaximize}
+            onMinimize={() => minimizeApp(app.id)}
+            onClose={() => closeApp(app.id)}
+          />
+          <div className="os-selectable relative min-h-0 flex-1 overflow-auto overscroll-contain">
+            <AppBody id={app.id} params={app.params} isMobile={false} visible={!hidden} />
+          </div>
+          <LaunchVeil def={def} pose={pose} glyph={DESKTOP_GLYPH} />
         </div>
-        <LaunchVeil def={def} pose={pose} glyph={DESKTOP_GLYPH} />
       </motion.div>
       {!maximized && !hidden ? <ResizeHandles appId={app.id} onEdgePointerDown={gestures.onEdgePointerDown} /> : null}
     </motion.section>

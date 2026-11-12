@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { PanelLeft } from 'lucide-react'
 import type { DecayPlan } from './decay'
 import type { D7View } from '../mock/delta7Content'
@@ -13,7 +14,7 @@ interface Props {
 }
 
 /** `Delta7 v0.14-rk` with its little `rk:scan v0.3` sticker. The header itself never decays (only the sticker peels). */
-export default function Header({ compact, view, drawerOpen, onMenu, plan, day }: Props) {
+export default memo(function Header({ compact, view, drawerOpen, onMenu, plan, day }: Props) {
   const peel = plan.severity
   return (
     <header className="flex h-11 shrink-0 items-center gap-2.5 border-b border-[color:var(--d7-rule)] bg-[#efe8de] px-3">
@@ -43,4 +44,4 @@ export default function Header({ compact, view, drawerOpen, onMenu, plan, day }:
       {compact ? <span className="ml-auto shrink-0 whitespace-nowrap font-os-mono text-[11px] text-[color:var(--d7-soft)]">day {day}</span> : null}
     </header>
   )
-}
+})

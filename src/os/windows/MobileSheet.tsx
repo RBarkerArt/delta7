@@ -151,7 +151,7 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
           {/* Never squeezed below the app's own minimum height (landscape, on-screen keyboard): the body scrolls instead,
               so every control stays reachable. */}
           <div style={{ height: `max(100%, ${def.minSize.h}px)` }}>
-            <AppBody app={app} isMobile />
+            <AppBody id={app.id} params={app.params} isMobile visible={isPresent} />
           </div>
         </div>
         <div

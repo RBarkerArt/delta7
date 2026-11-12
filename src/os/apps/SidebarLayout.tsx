@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { ChevronLeft } from 'lucide-react'
-import { useElementSize } from '../lib/useElementSize'
+import { useWidthBelow } from '../lib/useWidthBelow'
 
 export interface SidebarItem {
   id: string
@@ -29,8 +29,8 @@ export const NARROW_PX = 520
 
 /** Messages-style layout: darker cream list on the left, content on the right. Collapses by container width. */
 export default function SidebarLayout({ items, selectedId, onSelect, footer, listLabel, isMobile, children }: Props) {
-  const { ref, width } = useElementSize<HTMLDivElement>()
-  const narrow = width > 0 ? width < NARROW_PX : isMobile
+  const { ref, below } = useWidthBelow<HTMLDivElement>(NARROW_PX)
+  const narrow = below ?? isMobile
   const [showList, setShowList] = useState(true)
 
   const list = (
@@ -90,7 +90,7 @@ export default function SidebarLayout({ items, selectedId, onSelect, footer, lis
     <div ref={ref} className="flex h-full min-h-full bg-os-cream">
       <aside
         className="shrink-0 overflow-y-auto border-r border-os-ink/[0.08] bg-[#efe8de]"
-        style={{ width: Math.round(Math.min(260, Math.max(180, width * 0.3))) }}
+        style={{ width: 'clamp(180px, 30%, 260px)' }}
       >
         {list}
       </aside>

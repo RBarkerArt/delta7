@@ -6,6 +6,7 @@ import { thumbBackground } from '../apps/thumbStyle'
 import { D7_ARCHIVE, D7_FILES, D7_MEMORIES, D7_MESSAGES_LIST } from '../mock/delta7Content'
 import type { DecayPlan } from './decay'
 import { useD7Signal } from './hooks'
+import { useReducedMotionPref } from '../lib/useReducedMotionPref'
 
 // Simple placeholder views for the non-overview sections. All content TODO(copy).
 // Only message rows do something (they pick the preview); file, archive and memory rows are plain, inert rows.
@@ -117,13 +118,14 @@ export function ArchiveView(p: ViewProps) {
 export function LogsView(p: ViewProps) {
   const rw = p.plan.logRewrite
   const { logs } = useD7Signal()
+  const reduced = useReducedMotionPref()
   return (
     <Frame {...p} title={p.plan.labels['nav.logs']} testId="d7-view-logs">
       <ol className="font-os-mono text-[12.5px] leading-[1.75]">
         {logs.map((line, i) => (
           <li key={i} className={`flex gap-3 ${p.wide ? 'whitespace-pre' : 'whitespace-pre-wrap'}`}>
             <span className="text-[color:var(--d7-soft)]">{line.slice(0, 8)}</span>
-            <RewritingLine text={line.slice(10)} alt={rw && rw.index === i ? rw.alt : null} />
+            <RewritingLine text={line.slice(10)} alt={rw && rw.index === i ? rw.alt : null} reduced={reduced} />
           </li>
         ))}
       </ol>

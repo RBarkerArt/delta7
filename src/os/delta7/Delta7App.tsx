@@ -7,11 +7,11 @@ import Drawer from './Drawer'
 import OverviewView from './OverviewView'
 import TunerView from './TunerView'
 import { ArchiveView, FilesView, LogsView, MemoriesView, MessagesView } from './SectionViews'
-import { bucketOf, decayPlan } from './decay'
-import { useEscape } from './hooks'
-import { useBadStretch, useCoherence, useDecayLevel } from '../store/coherence'
+import { decayPlan } from './decay'
+import { useDecayBucket, useEscape } from './hooks'
+import { useBadStretch, useDecayLevel } from '../store/coherence'
 import { useDay } from '../store/dev'
-import { useElementSize } from '../lib/useElementSize'
+import { useWidthBelow } from '../lib/useWidthBelow'
 import { useReducedMotionPref } from '../lib/useReducedMotionPref'
 import { isD7View } from '../mock/delta7Content'
 import type { D7View } from '../mock/delta7Content'
@@ -24,8 +24,9 @@ const COMPACT_BELOW = 640
  * `decayPlan()`; the Tuner view is never touched by any of it.
  */
 export default function Delta7App({ params, isMobile }: AppProps) {
-  const { ref, width } = useElementSize<HTMLDivElement>()
-  const compact = isMobile || (width > 0 && width < COMPACT_BELOW)
+  // Only the compact/wide answer matters here: resizing the window re-renders nothing until it flips.
+  const { ref, below } = useWidthBelow<HTMLDivElement>(COMPACT_BELOW)
+  const compact = isMobile || below === true
 
   const [view, setView] = useState<D7View>(() => (isD7View(params?.view) ? params.view : 'overview'))
   // `params` changed while open (e.g. the notification asks for the tuner): switch view. Adjusting state during render.
@@ -40,19 +41,20 @@ export default function Delta7App({ params, isMobile }: AppProps) {
   const closeDrawer = useCallback(() => setDrawerOpen(false), [])
   useEscape(compact && drawerOpen, closeDrawer)
 
-  const coherence = useCoherence()
+  // The plan only changes per decay step, so select the step, not the raw value (which moves 4×/s in a recovery).
+  const bucket = useDecayBucket()
   const level = useDecayLevel()
   const day = useDay()
   const reduced = useReducedMotionPref()
   const seed = `d7:${day}`
-  const bucket = bucketOf(coherence)
   const badStretch = useBadStretch()
   const plan = useMemo(() => decayPlan(bucket, seed, badStretch), [bucket, seed, badStretch])
 
-  const select = (v: D7View) => {
+  const select = useCallback((v: D7View) => {
     setView(v)
     setDrawerOpen(false)
-  }
+  }, [])
+  const openDrawer = useCallback(() => setDrawerOpen(true), [])
 
   // Left-edge swipe opens the drawer (touch only).
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null)
@@ -74,7 +76,7 @@ export default function Delta7App({ params, isMobile }: AppProps) {
   }
 
   const wide = !compact
-  const vp = { plan, wide }
+  const vp = useMemo(() => ({ plan, wide }), [plan, wide])
   const nav = <Nav view={view} plan={plan} onSelect={select} day={day} />
 
   return (
@@ -88,7 +90,7 @@ export default function Delta7App({ params, isMobile }: AppProps) {
       data-bad-stretch={badStretch ? 'true' : 'false'}
       className={`d7 relative flex h-full w-full flex-col overflow-hidden font-os-sans ${reduced ? 'd7-reduced' : ''}`}
     >
-      <Header compact={compact} view={view} drawerOpen={drawerOpen} onMenu={() => setDrawerOpen(true)} plan={plan} day={day} />
+      <Header compact={compact} view={view} drawerOpen={drawerOpen} onMenu={openDrawer} plan={plan} day={day} />
       <div className="relative flex min-h-0 flex-1">
         {wide ? <aside className="w-[164px] shrink-0 border-r border-[color:var(--d7-rule)] bg-[color:var(--d7-side)]">{nav}</aside> : null}
         <div className="relative min-h-0 min-w-0 flex-1">
@@ -111,7 +113,7 @@ export default function Delta7App({ params, isMobile }: AppProps) {
           </main>
           {view !== 'tuner' ? (
             <>
-              <div className="d7-grain d7-fx absolute inset-0 z-10" style={{ opacity: plan.grain }} aria-hidden="true" />
+              <div className="d7-grain absolute inset-0 z-10" style={{ opacity: plan.grain }} aria-hidden="true" />
               <div className="d7-vignette d7-fx absolute inset-0 z-10" style={{ opacity: plan.vignette }} aria-hidden="true" />
             </>
           ) : null}

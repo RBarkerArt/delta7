@@ -1,4 +1,3 @@
-import { motion } from 'motion/react'
 import Wallpaper from '../wallpapers/Wallpaper'
 
 /**
@@ -7,15 +6,10 @@ import Wallpaper from '../wallpapers/Wallpaper'
  */
 export default function LockBackdrop() {
   return (
-    <motion.div
-      aria-hidden="true"
-      className="pointer-events-none fixed inset-0 overflow-hidden"
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0, transition: { duration: 0.2 } }}
-    >
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 overflow-hidden">
       <div className="absolute -inset-10" style={{ filter: 'blur(14px) saturate(1.05)' }}>
-        <Wallpaper />
+        <Wallpaper still />
       </div>
-    </motion.div>
+    </div>
   )
 }

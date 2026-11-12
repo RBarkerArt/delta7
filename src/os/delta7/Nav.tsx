@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { CSSProperties } from 'react'
 import { D7_NAV } from '../mock/delta7Content'
 import type { D7LabelKey, D7View } from '../mock/delta7Content'
@@ -19,7 +20,7 @@ function isDecayable(v: D7View): v is DecayableNav {
  * Left side-panel nav. `tuner` is never touched by decay (no fade, ghost, misspelling, blur or movement).
  * Faded / ghosted items stay legible and clickable; hover or focus brings them back.
  */
-export default function Nav({ view, plan, onSelect, day }: Props) {
+export default memo(function Nav({ view, plan, onSelect, day }: Props) {
   return (
     <nav aria-label="delta7 sections" className="flex h-full flex-col">
       <ul className="flex flex-col gap-[2px] px-2 pt-3">
@@ -58,4 +59,4 @@ export default function Nav({ view, plan, onSelect, day }: Props) {
       <div className="mt-auto px-4 pb-3 font-os-mono text-[11px] text-[color:var(--d7-soft)]">day {day}</div>
     </nav>
   )
-}
+})

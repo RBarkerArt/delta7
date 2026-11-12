@@ -233,7 +233,7 @@ export interface LogFile {
   lines: LogLine[]
 }
 
-// TODO(copy): ordinary housekeeping lines only.
+// TODO(copy): ordinary upkeep lines only.
 export const LOG_FILES: LogFile[] = [
   {
     id: 'system',

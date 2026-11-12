@@ -179,22 +179,47 @@
 }
 
 @layer components {
-  /* Desktop window panel. Long soft shadow; a little lighter when the window isn't focused. */
+  /* Desktop window panel. Long soft shadow; a little lighter when the window isn't focused. The two outer shadows
+     live on static layers of the frame around the panel and cross-fade with opacity: box-shadow itself never animates,
+     and a shadow never has to be re-rastered while the window moves or its content changes. */
   .os-window {
     border: 1px solid rgba(58, 48, 52, 0.13);
-    box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.55) inset,
-      0 2px 6px rgba(40, 24, 30, 0.1),
-      0 22px 54px -14px rgba(40, 24, 30, 0.42),
-      0 52px 110px -34px rgba(40, 24, 30, 0.42);
-    transition: box-shadow 220ms ease-out;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset;
   }
   .os-window-idle {
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+  }
+  .os-window-frame::before,
+  .os-window-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    transition: opacity 220ms ease-out;
+    will-change: opacity;
+  }
+  /* idle */
+  .os-window-frame::before {
     box-shadow:
-      0 1px 0 rgba(255, 255, 255, 0.5) inset,
       0 1px 4px rgba(40, 24, 30, 0.08),
       0 14px 34px -14px rgba(40, 24, 30, 0.3),
       0 30px 70px -34px rgba(40, 24, 30, 0.28);
+  }
+  /* focused */
+  .os-window-frame::after {
+    opacity: 0;
+    box-shadow:
+      0 2px 6px rgba(40, 24, 30, 0.1),
+      0 22px 54px -14px rgba(40, 24, 30, 0.42),
+      0 52px 110px -34px rgba(40, 24, 30, 0.42);
+  }
+  .os-window-frame.is-focused::before {
+    opacity: 0;
+  }
+  .os-window-frame.is-focused::after {
+    opacity: 1;
   }
   /* Phone app sheet. */
   .os-sheet {
@@ -205,9 +230,13 @@
   }
 }
 
-/* While a window is dragged or resized: no text selection anywhere. */
-.os-dragging,
-.os-dragging * {
-  user-select: none !important;
-  -webkit-user-select: none !important;
+/* Lock-screen picture: the soft swirl turns very slowly (one turn every 48s). Compositor-only. */
+@keyframes os-lock-swirl {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.os-lock-swirl {
+  animation: os-lock-swirl 48s linear infinite;
+  will-change: transform;
 }

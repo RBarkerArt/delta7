@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useEverLocked, useTunerLock, useTunerTouched, useTunerValue } from '../store/tuner'
+import { coherenceStore } from '../store/coherence'
+import { tunerStore, useEverLocked, useTunerLock } from '../store/tuner'
+import { bucketOf } from './decay'
 import { SIGNAL_TARGET } from '../tuner/signalConfig'
 import { d7Logs } from '../mock/delta7Content'
 import type { D7Status } from '../mock/delta7Content'
@@ -32,9 +34,20 @@ export function useEscape(active: boolean, onEscape: () => void) {
   }, [active, onEscape])
 }
 
+/** The decay step of the current coherence: changes only when a step boundary is crossed. */
+export function useDecayBucket(): number {
+  return coherenceStore.use((s) => bucketOf(s.coherence))
+}
+
+/**
+ * The tuner's live value as shown (two decimals) once it has been touched this session, the target while locked,
+ * `—` before that. Selects the string itself, so only its reader re-renders, and only when the shown digits change.
+ */
+export function useD7Live(): string {
+  return tunerStore.use((s) => (s.locked ? SIGNAL_TARGET.toFixed(2) : s.touched ? s.value.toFixed(2) : '—'))
+}
+
 export interface D7Signal {
-  /** The tuner's live value (two decimals) once it has been touched this session; `—` before that. */
-  live: string
   /** `?` until the first lock ever, then the target. */
   hold: string
   status: D7Status
@@ -45,16 +58,13 @@ export interface D7Signal {
 
 /**
  * What the dashboard knows about the signal. Before the first lock it never shows the target: only the live dial
- * value (which the player is moving themselves) and `hold=?`.
+ * value (which the player is moving themselves, see `useD7Live`) and `hold=?`. Never re-renders on a dial move.
  */
 export function useD7Signal(): D7Signal {
-  const value = useTunerValue()
   const locked = useTunerLock()
-  const touched = useTunerTouched()
   const everLocked = useEverLocked()
   const hold = everLocked ? SIGNAL_TARGET.toFixed(2) : '?'
-  const live = locked ? SIGNAL_TARGET.toFixed(2) : touched ? value.toFixed(2) : '—'
   const status: D7Status = !everLocked ? 'searching' : locked ? 'holding' : 'drifting'
   const logs = useMemo(() => d7Logs(hold, everLocked), [hold, everLocked])
-  return { live, hold, status, everLocked, logs }
+  return { hold, status, everLocked, logs }
 }

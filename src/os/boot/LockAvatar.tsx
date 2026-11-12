@@ -39,13 +39,11 @@ export default function LockAvatar({ size, reduced, leaving }: Props) {
         className="absolute inset-0 overflow-hidden rounded-full"
         style={{ boxShadow: '0 0 0 1px rgba(243, 237, 228, 0.34), 0 14px 34px -12px rgba(30, 18, 24, 0.6)' }}
       >
-        <motion.div
-          aria-hidden="true"
-          className="absolute -inset-[25%]"
-          style={{ background: SWIRL, filter: 'blur(9px) saturate(1.1)' }}
-          animate={reduced ? undefined : { rotate: 360 }}
-          transition={{ duration: 48, ease: 'linear', repeat: Infinity }}
-        />
+        {/* The swirl is blurred once, on a still child, and its composited parent turns with a CSS animation: the
+            blur is never redone per frame and no script runs to turn it. */}
+        <div aria-hidden="true" className={`absolute -inset-[25%] ${reduced ? '' : 'os-lock-swirl'}`}>
+          <div className="absolute inset-0" style={{ background: SWIRL, filter: 'blur(9px) saturate(1.1)' }} />
+        </div>
         <div aria-hidden="true" className="absolute inset-0" style={{ background: LIGHT }} />
         <div
           aria-hidden="true"

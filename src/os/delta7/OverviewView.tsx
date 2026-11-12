@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import Panel from './Panel'
 import SignalChart from './SignalChart'
 import RewritingLine from './RewritingLine'
@@ -6,7 +6,7 @@ import { D7_FILES, D7_MESSAGE, D7_STATUS } from '../mock/delta7Content'
 import type { D7View } from '../mock/delta7Content'
 import { decayedLabel } from './decay'
 import type { DecayPlan } from './decay'
-import { useD7Signal } from './hooks'
+import { useD7Live, useD7Signal } from './hooks'
 
 interface Props {
   plan: DecayPlan
@@ -18,7 +18,17 @@ interface Props {
 
 const head = 'text-[13px] font-semibold lowercase tracking-[0.01em] text-[color:var(--d7-soft)]'
 
-export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: Props) {
+/** The live dial value: the only part of the overview that follows the dial, so only it re-renders. */
+function LiveValue() {
+  const live = useD7Live()
+  return (
+    <span className="font-os-mono text-[12px] text-[color:var(--d7-soft)]" data-testid="d7-signal-value">
+      {live}
+    </span>
+  )
+}
+
+export default memo(function OverviewView({ plan, wide, reduced, seed, onNavigate }: Props) {
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [range, setRange] = useState('24h')
   const [markRead, setMarkRead] = useState(false)
@@ -53,7 +63,7 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
           className={`min-w-[132px] flex-1 whitespace-normal break-words font-os-mono text-[12px] leading-[1.45] text-[color:var(--d7-soft)] ${wide ? 'py-0.5' : 'basis-full py-1'}`}
           data-testid="d7-log-tail"
         >
-          <RewritingLine text={tail.slice(10)} alt={plan.logRewrite?.alt ?? null} />
+          <RewritingLine text={tail.slice(10)} alt={plan.logRewrite?.alt ?? null} reduced={reduced} />
         </span>
         <span className={`flex flex-wrap items-center ${wide ? 'gap-2.5' : 'gap-2'}`}>
           <label className="d7-check text-[13px]">
@@ -81,15 +91,15 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
 
       <div className={wide ? 'grid grid-cols-[1.3fr_1fr] gap-3' : 'flex flex-col gap-3'}>
         {/* signal chart */}
-        <Panel fx={plan.panels.signal} blurPx={blur} z={1} testId="d7-panel-signal" className="flex flex-col p-3">
-          <div className="mb-1 flex items-baseline justify-between">
+        {/* The panel with the live chart takes its soft-type blur on the text and on the canvas itself, never on the
+            whole sheet: a filter over the sheet would be re-applied to everything on every chart frame. */}
+        <Panel fx={plan.panels.signal} blurPx={0} z={1} testId="d7-panel-signal" className="flex flex-col p-3">
+          <div className="mb-1 flex items-baseline justify-between" style={{ filter: blur > 0 ? `blur(${blur}px)` : undefined }}>
             <h3 className={head}>{plan.labels.signal}</h3>
-            <span className="font-os-mono text-[12px] text-[color:var(--d7-soft)]" data-testid="d7-signal-value">
-              {signal.live}
-            </span>
+            <LiveValue />
           </div>
           <div className={wide ? 'h-[128px]' : 'h-[96px]'}>
-            <SignalChart fx={plan.chart} reduced={reduced} seed={seed} />
+            <SignalChart fx={plan.chart} reduced={reduced} seed={seed} blurPx={blur} />
           </div>
         </Panel>
 
@@ -155,4 +165,4 @@ export default function OverviewView({ plan, wide, reduced, seed, onNavigate }: 
       </div>
     </div>
   )
-}
+})

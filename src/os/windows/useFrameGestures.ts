@@ -40,6 +40,17 @@ export interface FrameGestureOptions {
 
 const DRAG_SLOP = 3
 
+/**
+ * No text selection may start while a frame gesture runs. Blocks `selectstart` for the gesture's duration instead of
+ * toggling a class on the root, which would restyle (and repaint) the whole page at the start and end of every drag.
+ * Returns the undo.
+ */
+function blockSelection(): () => void {
+  const block = (e: Event) => e.preventDefault()
+  document.addEventListener('selectstart', block, true)
+  return () => document.removeEventListener('selectstart', block, true)
+}
+
 export function readFrame(f: FrameValues): Frame {
   return { x: f.x.get(), y: f.y.get(), w: f.w.get(), h: f.h.get() }
 }
@@ -95,6 +106,7 @@ export function useFrameGestures(opts: FrameGestureOptions, reduced: boolean) {
       const sy = e.clientY
       let start = readFrame(frame)
       let started = false
+      let unblock: (() => void) | null = null
       const restore = maximizedRestore()
       trackPointer(
         e.pointerId,
@@ -104,7 +116,7 @@ export function useFrameGestures(opts: FrameGestureOptions, reduced: boolean) {
           if (!started) {
             if (Math.hypot(dx, dy) < DRAG_SLOP) return
             started = true
-            document.documentElement.classList.add('os-dragging')
+            unblock = blockSelection()
             if (restore) {
               // Pull a maximized window off the top: restore its size under the pointer, keeping the grab ratio.
               const ratio = (sx - start.x) / Math.max(1, start.w)
@@ -120,8 +132,8 @@ export function useFrameGestures(opts: FrameGestureOptions, reduced: boolean) {
           frame.y.set(rubberClamp(start.y + dy, b.minY, b.maxY))
         },
         () => {
+          unblock?.()
           if (!started) return
-          document.documentElement.classList.remove('os-dragging')
           const now = readFrame(frame)
           const settled = clampFrame(now, minSize, viewport())
           if (settled.x !== now.x || settled.y !== now.y) {
@@ -142,9 +154,14 @@ export function useFrameGestures(opts: FrameGestureOptions, reduced: boolean) {
       const sy = e.clientY
       const start = readFrame(frame)
       const vp = viewport()
-      const root = document.documentElement
-      root.style.cursor = EDGE_CURSOR[edge]
-      root.classList.add('os-dragging')
+      // The handle keeps the pointer (and so its resize cursor) for the whole gesture; nothing on the root changes.
+      const handle = e.currentTarget as Element
+      try {
+        handle.setPointerCapture(e.pointerId)
+      } catch {
+        // pointer already gone: the gesture ends at once anyway
+      }
+      const unblock = blockSelection()
       trackPointer(
         e.pointerId,
         (ev) => {
@@ -166,8 +183,7 @@ export function useFrameGestures(opts: FrameGestureOptions, reduced: boolean) {
           writeFrame(frame, { x, y, w, h })
         },
         () => {
-          root.style.cursor = ''
-          root.classList.remove('os-dragging')
+          unblock()
           writeFrame(frame, roundFrame(readFrame(frame)))
           commit()
         },

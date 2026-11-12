@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import HeartbeatHalo from './HeartbeatHalo'
 import { useHeartbeat } from './useHeartbeat'
 import { getApp } from '../apps/registry'
+import { preloadApp } from '../apps/preload'
 import { openApp, registerIconEl, useIsOpen } from '../store/windows'
 import { useHasNew, usePulseNonce } from '../store/signal'
 import { useBadStretch } from '../store/coherence'
@@ -10,6 +11,7 @@ import { haptic } from '../store/settings'
 import { closePopover, uiStore } from '../store/ui'
 import { springs, fadeFast } from '../lib/motion'
 import { useReducedMotionPref } from '../lib/useReducedMotionPref'
+import { useLockPhase } from '../boot/lockState'
 import type { AppId } from '../types'
 
 interface Props {
@@ -27,8 +29,11 @@ export default function AppIcon({ appId, isMobile }: Props) {
   const beatRef = useRef<HTMLDivElement>(null)
   const haloRef = useRef<HTMLDivElement>(null)
   const isDelta7 = appId === 'delta7'
+  // Behind the lock screen the home is invisible: no pulse runs there. It starts with a beat as the home comes in.
+  const phase = useLockPhase()
+  const behindLock = phase === 'boot' || phase === 'lock'
 
-  useHeartbeat(beatRef, haloRef, { active: isDelta7 && hasNew, badStretch, reduced, nonce })
+  useHeartbeat(beatRef, haloRef, { active: isDelta7 && hasNew && !behindLock, badStretch, reduced, nonce })
 
   const tile = isMobile ? 66 : 112
   const glyph = Math.round(tile * 0.42)
@@ -40,6 +45,8 @@ export default function AppIcon({ appId, isMobile }: Props) {
       type="button"
       data-testid={`app-icon-${appId}`}
       aria-label={`open ${app.label}`}
+      onPointerEnter={() => preloadApp(appId)}
+      onFocus={() => preloadApp(appId)}
       onClick={() => {
         haptic()
         if (uiStore.get().popover === 'search') closePopover()

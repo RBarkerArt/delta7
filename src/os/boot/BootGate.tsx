@@ -26,7 +26,7 @@ import { useIsMobile } from '../store/device'
 import { useReducedMotionPref } from '../lib/useReducedMotionPref'
 
 // The home eases in as the lock lifts away (~0.5s, soft at both ends so the move is actually seen); reduced motion:
-// a short fade.
+// a short fade, opacity only (no scale).
 const SHOW = {
   scale: { type: 'spring', visualDuration: 0.5, bounce: 0.08 },
   opacity: { duration: 0.5, ease: [0.33, 0, 0.2, 1] },
@@ -78,15 +78,16 @@ export default function BootGate({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <AnimatePresence>{phase !== 'home' ? <LockBackdrop key="backdrop" /> : null}</AnimatePresence>
+      {/* The home is fully opaque over the backdrop by the time the lock is gone, so the backdrop just leaves. */}
+      {phase !== 'home' ? <LockBackdrop /> : null}
       {shellMounted ? (
         <motion.div
           className="fixed inset-0"
           data-testid="shell-gate"
           inert={locked}
           aria-hidden={locked ? true : undefined}
-          initial={skipBoot ? false : { opacity: 0, scale: 0.96 }}
-          animate={locked ? { opacity: 0, scale: 0.97 } : { opacity: 1, scale: 1 }}
+          initial={skipBoot ? false : { opacity: 0, scale: reduced ? 1 : 0.96 }}
+          animate={locked ? { opacity: 0, scale: reduced ? 1 : 0.97 } : { opacity: 1, scale: 1 }}
           transition={locked ? HIDE : reduced ? SHOW_REDUCED : SHOW}
         >
           {children}
