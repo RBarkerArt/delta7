@@ -13,8 +13,9 @@ import { fadeFast, springs } from '../lib/motion'
 const AUTO_HIDE_MS = 12_000
 
 /**
- * Small cream banner under the top bar (top-right on desktop, centred on mobile). Tapping it opens
- * Delta7 on the tuner view. Auto-hides after ~12s; the Delta7 icon keeps pulsing (hasNew is untouched).
+ * Small cream banner under the top bar (top-right on desktop, centred on mobile). Carries one of the texts in
+ * `store/signal.ts` (the "something on the dial" banner, or the one-off first-lock banner); either way tapping it
+ * opens Delta7 on the tuner view. Auto-hides after ~12s; the Delta7 icon keeps pulsing (hasNew is untouched).
  */
 export default function NotificationBanner() {
   const n = useNotification()
@@ -77,7 +78,7 @@ export default function NotificationBanner() {
             <button
               type="button"
               onClick={open}
-              aria-label={`${n.text}. open delta7 tuner`}
+              aria-label={`${n.text.replace(/\.$/, '')}. open delta7 tuner`}
               className="flex min-h-[48px] min-w-0 flex-1 items-center gap-3 rounded-[13px] py-2.5 pl-3.5 pr-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-os-ink/30"
             >
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-os-plum text-os-cream/95">

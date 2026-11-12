@@ -113,7 +113,7 @@ export default function TunerApp({ isMobile }: AppProps) {
 
         <TickStrip
           value={shown}
-          locked={locked}
+          bucket={bucket}
           pxPerUnit={pxPerUnit}
           ariaText={`${readoutText} megahertz, ${clarityWords(bucket)}${!locked && holding ? ', holding' : ''}`}
         />

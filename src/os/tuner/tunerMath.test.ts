@@ -24,6 +24,8 @@ import {
   holdMsFor,
   isInLockWindow,
   lockStrength,
+  needleColor,
+  needleTint,
   notch,
   pullTarget,
   roundFreq,
@@ -162,12 +164,12 @@ test('hold timing: ≈1.5s normally, ≈3s in a bad stretch', () => {
 
 test('notch and unnotch are inverses, leave the target fixed, and are identity outside the pull range', () => {
   assert.equal(notch(T), T)
-  for (const d of [-0.007, -0.004, -0.001, 0.003, 0.0079]) {
+  for (const d of [-0.0095, -0.007, -0.004, -0.001, 0.003, 0.0079, 0.0099]) {
     const v = notch(T + d)
     assert.ok(Math.abs(unnotch(v) - (T + d)) < 1e-9)
     assert.ok(Math.abs(v - T) < Math.abs(d), 'slows towards the target inside the range')
   }
-  for (const d of [PULL_RANGE, PULL_RANGE + 0.0001, 0.01, 0.03, 0.08, 0.3]) {
+  for (const d of [PULL_RANGE, PULL_RANGE + 0.0001, 0.02, 0.03, 0.08, 0.3]) {
     assert.equal(notch(T + d), T + d, `notch tugs at +${d}`)
     assert.equal(notch(T - d), T - d, `notch tugs at -${d}`)
     assert.equal(unnotch(T + d), T + d)
@@ -177,20 +179,35 @@ test('notch and unnotch are inverses, leave the target fixed, and are identity o
   assert.ok(handWindow > LOCK_WINDOW && handWindow <= PULL_RANGE)
 })
 
+test('the pull range IS the clear zone', () => {
+  assert.equal(PULL_RANGE, ZONE_CLEAR)
+  // Everywhere the signal reads "clear" (both sides) a calm hand is drawn in; one grid step further out it is not.
+  for (const sign of [-1, 1]) {
+    for (let d = 0; d <= ZONE_CLEAR + 1e-9; d = roundFreq(d + 0.001)) {
+      const v = roundFreq(T + sign * d)
+      assert.equal(clarityBucket(v, false), 'clear')
+      assert.equal(pullTarget(v, 0), T, `clear but not pulled at ${sign * d}`)
+    }
+    const out = roundFreq(T + sign * (ZONE_CLEAR + 0.001))
+    assert.equal(clarityBucket(out, false), 'clearer')
+    assert.equal(pullTarget(out, 0), out)
+  }
+})
+
 test('pullTarget: no assist outside ±PULL_RANGE, and only for a calm dial inside it', () => {
-  assert.equal(PULL_RANGE, 0.008)
-  for (const d of [PULL_RANGE + 0.001, 0.01, 0.02, 0.05, 0.3]) {
+  for (const d of [PULL_RANGE + 0.001, 0.012, 0.02, 0.05, 0.3]) {
     for (const sign of [-1, 1]) {
       const v = roundFreq(T + sign * d)
       assert.equal(pullTarget(v, 0), v, `pulled from ${sign * d}`)
     }
   }
-  for (const d of [0, 0.001, 0.005, 0.007, PULL_RANGE]) {
+  for (const d of [0, 0.001, 0.005, 0.007, 0.009, PULL_RANGE]) {
     for (const sign of [-1, 1]) assert.equal(pullTarget(roundFreq(T + sign * d), 0), T, `not pulled at ${sign * d} at rest`)
   }
   // A slow, deliberate release inside the range is taken; a fast pass through it is not.
   assert.equal(pullTarget(T + 0.006, PULL_MAX_SPEED * 0.5), T)
   assert.equal(pullTarget(T - 0.003, -PULL_MAX_SPEED * 0.9), T)
+  assert.equal(pullTarget(roundFreq(T + PULL_RANGE), PULL_MAX_SPEED * 0.5), T, 'a slow drag at the clear edge is drawn in')
   for (const speed of [PULL_MAX_SPEED * 1.5, 0.5, 2, -3]) {
     assert.equal(pullTarget(T + 0.002, speed), T + 0.002, `captured at ${speed} MHz/s`)
   }
@@ -267,7 +284,9 @@ test('wheelNotches: a clicky wheel is whole notches, trackpad pixel scrolling is
   assert.equal(wheelNotches({ deltaMode: 0, deltaX: 0, deltaY: 0 }), 0)
 })
 
-test('transport: silent until Play; tuning re-opens a stopped tuner without sound; stop closes input', () => {
+// The one-off "first dial touch starts the sound" is a `play` the store sends itself (store/tuner.ts), so here only
+// `play` ever makes sound; plain tuning never does.
+test('transport: silent until played; tuning re-opens a stopped tuner without sound; stop closes input', () => {
   const all: Transport[] = ['open', 'playing', 'paused', 'stopped']
   // The start is `open`: input open, silent.
   assert.equal(transportInputOpen('open'), true)
@@ -287,4 +306,31 @@ test('transport: silent until Play; tuning re-opens a stopped tuner without soun
   assert.equal(nextTransport('paused', 'tune'), 'paused')
   assert.equal(nextTransport('playing', 'tune'), 'playing')
   assert.equal(transportInputOpen('paused'), true)
+})
+
+test('needle tint: plain outside the faint zone, warming by zone, never showing direction', () => {
+  // Outside the faint zone (and stopped → 'none'): exactly the plain needle.
+  assert.equal(needleTint('none'), 0)
+  assert.equal(needleColor('none'), 'rgba(182, 90, 52, 0)')
+  // Steps up through the zones; the lock keeps the clear tint.
+  assert.ok(needleTint('faint') > 0)
+  assert.ok(needleTint('clearer') > needleTint('faint'))
+  assert.ok(needleTint('clear') > needleTint('clearer'))
+  assert.equal(needleTint('clear'), 1)
+  assert.equal(needleTint('locked'), needleTint('clear'))
+  // Same tint at the same distance on both sides of the target, everywhere on the dial; none outside the faint zone.
+  for (let d = 0; d <= 0.5; d = roundFreq(d + 0.001)) {
+    const lo = needleTint(clarityBucket(roundFreq(T - d), false))
+    const hi = needleTint(clarityBucket(roundFreq(T + d), false))
+    assert.equal(lo, hi, `tint differs at ±${d}`)
+    if (d > ZONE_FAINT + 1e-9) assert.equal(hi, 0, `hint outside the faint zone at ${d}`)
+    else assert.ok(hi > 0, `no tint inside the faint zone at ${d}`)
+  }
+  // Never warmer further away.
+  let prev = 1
+  for (let d = 0; d <= 0.3; d = roundFreq(d + 0.001)) {
+    const t = needleTint(clarityBucket(roundFreq(T + d), false))
+    assert.ok(t <= prev)
+    prev = t
+  }
 })

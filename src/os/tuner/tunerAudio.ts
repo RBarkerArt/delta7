@@ -1,13 +1,15 @@
 import { useEffect } from 'react'
-import { tunerStore } from '../store/tuner'
+import { dialTouchMayStartSound, resetTransportOnClose, startFromDialTouch, tunerStore } from '../store/tuner'
 import { settingsStore } from '../store/settings'
 import { coherenceStore } from '../store/coherence'
 import { TARGET, clarity, transportAudible } from './tunerMath'
 
 /**
  * Tiny Web Audio voice for the tuner: band-passed static that thins out, and a soft low tone that
- * steadies, as the dial approaches the target (both follow clarity()). Created lazily on the first Play tap (autoplay rules), silent
- * until then, always quiet, and closed when the last tuner unmounts. No audio files.
+ * steadies, as the dial approaches the target (both follow clarity()). No AudioContext exists before a user gesture:
+ * it is created inside the gesture that starts the sound, either a Play tap or the first touch of the dial while the
+ * transport is still `open` (and only with the Sound setting on). Always quiet, closed when the last tuner unmounts.
+ * No audio files.
  */
 
 interface Voice {
@@ -78,11 +80,37 @@ function build(): Voice | null {
   return { ctx, master, noiseGain, noiseFilter, toneGain, tone, wobble, wobbleDepth }
 }
 
-/** Call from the Play click handler only: muted until the player taps Play (autoplay rules; the OS is near silent). */
+/** Call from inside a user gesture only (the Play click, or startSoundOnDialTouch): browsers' autoplay rules. */
 export function ensureTunerAudio() {
   if (!voice) voice = build()
   if (voice && voice.ctx.state === 'suspended') void voice.ctx.resume().catch(() => {})
   sync()
+}
+
+interface UserActivationLike {
+  isActive: boolean
+}
+
+/**
+ * Call from the dial's gesture handlers (pointer, wheel, keys). The first touch of the dial while the transport is
+ * still `open` starts the sound exactly as Play would, if the Sound setting is on. `activating`: the event is one
+ * browsers count as a user activation (a key, a mouse button press, a touch/pen lift). A wheel is not: there the
+ * sound starts only if the page has a live activation anyway; otherwise nothing happens (no context, no error) and
+ * the next qualifying gesture on the dial starts it. Pause / Stop disarm this: then only Play brings sound back.
+ */
+export function startSoundOnDialTouch(activating: boolean) {
+  if (!dialTouchMayStartSound()) {
+    // Already playing but the context could not start before (no activation then): this gesture can resume it.
+    const v = voice
+    if (activating && v && v.ctx.state === 'suspended' && transportAudible(tunerStore.get().transport, settingsStore.get().sound)) {
+      void v.ctx.resume().catch(() => {})
+    }
+    return
+  }
+  if (!settingsStore.get().sound) return
+  const ua = (navigator as Navigator & { userActivation?: UserActivationLike }).userActivation
+  if (!activating && !ua?.isActive) return
+  if (startFromDialTouch()) ensureTunerAudio()
 }
 
 function sync() {
@@ -126,9 +154,12 @@ export function useTunerAudio() {
       unsubs.forEach((u) => u())
       document.removeEventListener('visibilitychange', sync)
       mounts--
-      // Nothing is listening any more: close the voice. The transport keeps its state (the lock itself keeps holding);
-      // the voice comes back on the next Play tap.
-      if (mounts === 0) close()
+      // Nothing is listening any more: close the voice and put the transport back to its initial `open` state (the
+      // lock itself keeps holding). The voice comes back on Play, or on the first dial touch next time.
+      if (mounts === 0) {
+        close()
+        resetTransportOnClose()
+      }
     }
   }, [])
 }

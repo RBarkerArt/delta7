@@ -4,7 +4,7 @@ import SignalChart from './SignalChart'
 import RewritingLine from './RewritingLine'
 import { D7_FILES, D7_MESSAGE, D7_STATUS } from '../mock/delta7Content'
 import type { D7View } from '../mock/delta7Content'
-import { decayedLabel } from './decay'
+import { decayedLabel, recentFilesCount } from './decay'
 import type { DecayPlan } from './decay'
 import { useD7Live, useD7Signal } from './hooks'
 
@@ -126,10 +126,14 @@ export default memo(function OverviewView({ plan, wide, reduced, seed, onNavigat
           </div>
         </Panel>
 
-        {/* recent files — the panel that's a few px off, even when healthy. The count is off by one: the quiet wrong detail. */}
+        {/* recent files — the panel that's a few px off, even when healthy. Once decay has started the count is off by
+            one: the quiet wrong detail. */}
         <Panel fx={plan.panels.files} blurPx={blur} z={2} testId="d7-panel-files" outerClassName="ml-[3px] mt-[4px]" className="py-3 pl-[14px] pr-3">
           <h3 className={head}>
-            {plan.labels.recent} <span className="font-normal">({D7_FILES.length - 1})</span>
+            {plan.labels.recent}{' '}
+            <span className="font-normal" data-testid="d7-recent-count">
+              ({recentFilesCount(D7_FILES.length, plan.bucket)})
+            </span>
           </h3>
           <ul className="mt-1.5">
             {D7_FILES.map((f) => (

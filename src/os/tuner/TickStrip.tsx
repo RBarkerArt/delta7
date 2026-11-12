@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { nudgeTuner, setTunerValue } from '../store/tuner'
-import { FREQ_MAX, FREQ_MIN, stepOnGrid } from './tunerMath'
+import { FREQ_MAX, FREQ_MIN, NEEDLE_TINT_MS, needleColor, stepOnGrid } from './tunerMath'
+import type { ClarityBucket } from './tunerMath'
+import { startSoundOnDialTouch } from './tunerAudio'
 import { useTuneGestures } from './useTuneGestures'
 
 const PAD = 24 // svg overhang past each end so end labels aren't clipped
@@ -47,13 +49,15 @@ function Ticks({ pxPerUnit }: { pxPerUnit: number }) {
 
 interface Props {
   value: number
-  locked: boolean
+  /** Clarity zone (or `locked`): only the needle's tint follows it. */
+  bucket: ClarityBucket
   pxPerUnit: number
   ariaText: string
 }
 
 /** Ruled band that slides under a fixed needle. role="slider"; drag, flick, wheel, tap and keys all tune. */
-export default function TickStrip({ value, locked, pxPerUnit, ariaText }: Props) {
+export default function TickStrip({ value, bucket, pxPerUnit, ariaText }: Props) {
+  const warm = { backgroundColor: needleColor(bucket), transition: `background-color ${NEEDLE_TINT_MS}ms ease-out` }
   const [el, setEl] = useState<HTMLDivElement | null>(null)
   useTuneGestures(el, pxPerUnit)
 
@@ -87,6 +91,8 @@ export default function TickStrip({ value, locked, pxPerUnit, ariaText }: Props)
     if (handled) {
       e.preventDefault()
       e.stopPropagation()
+      // A key on the dial is a user gesture: the first touch of the dial may start the sound.
+      startSoundOnDialTouch(true)
     }
   }
 
@@ -115,17 +121,16 @@ export default function TickStrip({ value, locked, pxPerUnit, ariaText }: Props)
           <Ticks pxPerUnit={pxPerUnit} />
         </div>
       </div>
-      {/* Fixed needle; the warm copy fades in with the lock. */}
+      {/* Fixed needle. Its warm copy is transparent outside the faint zone (the plain needle: no hint there) and
+          warms through faint → clearer → clear by distance only, never direction; the lock keeps the clear tint. */}
       <div className="pointer-events-none absolute bottom-[29px] top-[6px] left-1/2 -ml-[0.75px] w-[1.5px] rounded-full bg-os-ink/70" />
       <div
-        className="pointer-events-none absolute bottom-[29px] top-[6px] left-1/2 -ml-[1px] w-[2px] rounded-full bg-[#B65A34] transition-opacity duration-700"
-        style={{ opacity: locked ? 1 : 0 }}
+        data-testid="tuner-needle"
+        className="pointer-events-none absolute bottom-[29px] top-[6px] left-1/2 -ml-[1px] w-[2px] rounded-full"
+        style={warm}
       />
       <div className="pointer-events-none absolute left-1/2 top-[3px] -ml-[3.5px] h-[7px] w-[7px] rounded-full bg-os-ink/75" />
-      <div
-        className="pointer-events-none absolute left-1/2 top-[3px] -ml-[3.5px] h-[7px] w-[7px] rounded-full bg-[#B65A34] transition-opacity duration-700"
-        style={{ opacity: locked ? 1 : 0 }}
-      />
+      <div className="pointer-events-none absolute left-1/2 top-[3px] -ml-[3.5px] h-[7px] w-[7px] rounded-full" style={warm} />
     </div>
   )
 }

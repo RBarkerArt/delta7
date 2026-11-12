@@ -11,6 +11,10 @@ import {
   FREQ_MIN,
   HOLD_MS,
   LOCK_WINDOW,
+  NEEDLE_TINT_CLEAR,
+  NEEDLE_TINT_CLEARER,
+  NEEDLE_TINT_FAINT,
+  NEEDLE_WARM,
   NOTCH_POWER,
   PULL_MAX_SPEED,
   PULL_RANGE,
@@ -33,6 +37,8 @@ export {
   LOCKED_DETENT,
   LOCK_WINDOW,
   MAGNET_RANGE,
+  NEEDLE_TINT_MS,
+  NEEDLE_WARM,
   NOTCH_RANGE,
   PULL_MAX_SPEED,
   PULL_RANGE,
@@ -108,13 +114,17 @@ export function wheelNotches(e: WheelLike): number {
 }
 
 /**
- * Transport: `open` (the start: trace live, input open, silent, no button pressed), `playing` (Play tapped: sound if
- * the Sound setting is on), `paused` (trace frozen, input open) or `stopped` (input closed, silent, trace idle).
+ * Transport: `open` (the start: trace live, input open, silent, no button pressed), `playing` (Play tapped, or the
+ * first touch of the dial while still `open`: sound if the Sound setting is on), `paused` (trace frozen, input open)
+ * or `stopped` (input closed, silent, trace idle).
  */
 export type Transport = 'open' | 'stopped' | 'playing' | 'paused'
 export type TransportEvent = 'play' | 'pause' | 'stop' | 'tune'
 
-/** Pure transport transitions. Tuning only re-opens a stopped tuner (to `open`: sound needs Play again). */
+/**
+ * Pure transport transitions. Tuning only re-opens a stopped tuner (to `open`, silent). The one-off "first touch of
+ * the dial starts the sound" is a `play` the store sends itself (see `store/tuner.ts`), never a `tune`.
+ */
 export function nextTransport(state: Transport, event: TransportEvent): Transport {
   switch (event) {
     case 'play':
@@ -133,7 +143,7 @@ export function transportInputOpen(state: Transport): boolean {
   return state !== 'stopped'
 }
 
-/** Sound only after Play, and only with the Sound setting on. */
+/** Sound only while playing (Play, or the first dial touch), and only with the Sound setting on. */
 export function transportAudible(state: Transport, soundOn: boolean): boolean {
   return state === 'playing' && soundOn
 }
@@ -189,6 +199,30 @@ const CLARITY_WORDS: Record<ClarityBucket, string> = {
 /** `signal faint` / `signal clearer` / … for the live region and the slider's aria-valuetext. */
 export function clarityWords(bucket: ClarityBucket): string {
   return CLARITY_WORDS[bucket]
+}
+
+const NEEDLE_TINT: Record<ClarityBucket, number> = {
+  none: 0,
+  faint: NEEDLE_TINT_FAINT,
+  clearer: NEEDLE_TINT_CLEARER,
+  clear: NEEDLE_TINT_CLEAR,
+  locked: NEEDLE_TINT_CLEAR,
+}
+
+/**
+ * How warm the needle is for a clarity bucket, 0..1: 0 (the plain needle) outside the faint zone, then stepping up
+ * through faint → clearer → clear; the lock keeps the clear tint. The bucket is by distance, so both sides of the
+ * target get the same tint: it never shows direction.
+ */
+export function needleTint(bucket: ClarityBucket): number {
+  return NEEDLE_TINT[bucket]
+}
+
+/** The needle's warm layer as a CSS colour: NEEDLE_WARM at the bucket's tint (fully transparent outside the zones). */
+export function needleColor(bucket: ClarityBucket): string {
+  const hex = NEEDLE_WARM.replace('#', '')
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  return `rgba(${r}, ${g}, ${b}, ${needleTint(bucket)})`
 }
 
 export function isInLockWindow(value: number): boolean {

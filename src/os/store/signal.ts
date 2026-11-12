@@ -34,18 +34,29 @@ export function useNotification(): OSNotification | null {
   return signalStore.use((s) => s.notification)
 }
 /**
- * The banner text. Never carries a digit or a partial frequency, before or after the first lock: the dial is the
- * only place the player reads numbers. Keep the `Signal detected` prefix (scripts look for it). TODO(copy)
+ * The banner texts, all in one place. None ever carries a digit or a partial frequency, before or after the first
+ * lock: the dial is the only place the player reads numbers.
+ * - `NOTIFICATION_TEXT`: the "something on the dial" banner. Keep the `Signal detected` prefix (scripts look for it). TODO(copy)
+ * - `HELD_NOTIFICATION_TEXT`: shown once, the first time ever the signal locks (owner's copy).
  */
 export const NOTIFICATION_TEXT = 'Signal detected · something on the dial'
+export const HELD_NOTIFICATION_TEXT = 'delta7: signal held.'
 
-/** In-OS banner only — never the browser Notification API. */
+/** In-OS banner only — never the browser Notification API. Wakes the Delta7 icon's heartbeat. */
 export function showNotification() {
   signalStore.set((s) => ({
     notification: { id: nextId++, text: NOTIFICATION_TEXT },
     hasNew: true,
     pulseNonce: s.pulseNonce + 1,
   }))
+}
+
+/**
+ * The quiet first-lock banner (same in-OS banner, other text). Only the banner: it leaves the Delta7 icon's heartbeat
+ * as it is (the lock itself already steadies it).
+ */
+export function showHeldNotification() {
+  signalStore.set({ notification: { id: nextId++, text: HELD_NOTIFICATION_TEXT } })
 }
 export function dismissNotification() {
   signalStore.set({ notification: null })

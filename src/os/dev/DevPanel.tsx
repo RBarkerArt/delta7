@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { levelFor } from '../store/coherenceMath'
 import { setBadStretch, setCoherence, useBadStretch, useCoherence, useTunerLocked } from '../store/coherence'
-import { showNotification, triggerPulse, useHasNew } from '../store/signal'
+import { showHeldNotification, showNotification, triggerPulse, useHasNew } from '../store/signal'
 import { setClockOverride, useClockOverride } from '../store/clock'
 import { WALLPAPER_NAMES, setWallpaper, useSettings } from '../store/settings'
 import type { WallpaperName } from '../store/settings'
@@ -113,8 +113,11 @@ export default function DevPanel() {
             <button type="button" className={btn} onClick={triggerPulse} data-testid="dev-pulse">
               pulse
             </button>
-            <button type="button" className={btn} onClick={showNotification} data-testid="dev-notify">
+            <button type="button" className={btn} onClick={() => showNotification()} data-testid="dev-notify">
               notify
+            </button>
+            <button type="button" className={btn} onClick={() => showHeldNotification()} data-testid="dev-notify-held">
+              held
             </button>
           </Row>
           <Row label="clock">

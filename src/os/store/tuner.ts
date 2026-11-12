@@ -1,6 +1,7 @@
 import { createStore } from './createStore'
 import { coherenceStore, setTunerLocked } from './coherence'
 import { haptic } from './settings'
+import { showHeldNotification } from './signal'
 import { readJSON, removeKey, writeJSON } from '../lib/storage'
 import {
   HOLD_MS,
@@ -22,8 +23,12 @@ import type { Transport } from '../tuner/tunerMath'
  *
  * Transport: `open` (the tuner starts this way: trace live, input open, silent, no transport button pressed),
  * `playing` (Play tapped: the same, with sound if the Sound setting is on), `paused` (trace frozen, input still open)
- * or `stopped` (lock released, input closed, silent, trace idle). Tuning input re-opens a stopped tuner to `open`
- * (sound needs Play again); Play from anywhere → `playing`.
+ * or `stopped` (lock released, input closed, silent, trace idle). Tuning input re-opens a stopped tuner to `open`;
+ * Play from anywhere → `playing`.
+ *
+ * The first touch of the dial while still `open` also starts the sound, once (`startFromDialTouch`, called by the
+ * tuner's audio from inside the gesture). Pressing Play, Pause or Stop spends that one-off: after Pause or Stop only
+ * Play brings the sound back. Closing the last tuner resets the transport to `open` and re-arms it.
  */
 export type { Transport }
 
@@ -45,6 +50,8 @@ interface TunerState {
   adjusting: boolean
   /** The signal has been found at least once, ever (persisted). Until then the UI never shows the target. */
   everLocked: boolean
+  /** The first touch of the dial may still start the sound (no transport button pressed since the tuner opened). */
+  touchStartsSound: boolean
 }
 
 /* ---------- remembered first find ---------- */
@@ -69,6 +76,7 @@ export const tunerStore = createStore<TunerState>({
   touched: false,
   adjusting: false,
   everLocked: loadEverLocked(),
+  touchStartsSound: true,
 })
 
 let holdTimer: ReturnType<typeof setTimeout> | null = null
@@ -90,12 +98,35 @@ function clearHold() {
   holdTimer = null
 }
 
+/* ---------- the one-off first-lock banner ---------- */
+
+/**
+ * The first-ever lock shows the quiet in-OS banner once the lock has settled: after the readout's bounce and while
+ * the message line finishes clearing, so the two don't land at the same moment.
+ */
+const HELD_BANNER_DELAY_MS = 1600
+let heldTimer: ReturnType<typeof setTimeout> | null = null
+
+function cancelHeldBanner() {
+  if (heldTimer) clearTimeout(heldTimer)
+  heldTimer = null
+}
+
 function lock() {
   clearHold()
-  if (!tunerStore.get().everLocked) writeJSON(SIGNAL_KEY, { everLocked: true } satisfies SignalMemory)
+  const first = !tunerStore.get().everLocked
+  if (first) writeJSON(SIGNAL_KEY, { everLocked: true } satisfies SignalMemory)
   tunerStore.set((s) => ({ value: TARGET, locked: true, holding: false, holdSince: 0, lockNonce: s.lockNonce + 1, everLocked: true }))
   setTunerLocked(true)
   haptic(8)
+  // Only the first time ever (everLocked false → true): never on later locks, never after a reload.
+  if (first) {
+    cancelHeldBanner()
+    heldTimer = setTimeout(() => {
+      heldTimer = null
+      showHeldNotification()
+    }, HELD_BANNER_DELAY_MS)
+  }
 }
 
 function unlock() {
@@ -198,18 +229,45 @@ export function nudgeTuner(delta: number) {
 }
 
 export function playTuner() {
-  tunerStore.set((s) => ({ transport: nextTransport(s.transport, 'play') }))
+  tunerStore.set((s) => ({ transport: nextTransport(s.transport, 'play'), touchStartsSound: false }))
   evaluate()
 }
 
-export function pauseTuner() {
-  tunerStore.set((s) => ({ transport: nextTransport(s.transport, 'pause') }))
+/**
+ * The first touch of the dial while the transport is still in its initial `open` state: the same as tapping Play,
+ * once. Returns false (and changes nothing) after Play / Pause / Stop has been pressed, or once it has happened.
+ * The caller (the tuner's audio) has already checked the Sound setting and that the gesture can start audio.
+ */
+export function startFromDialTouch(): boolean {
+  const s = tunerStore.get()
+  if (s.transport !== 'open' || !s.touchStartsSound) return false
+  playTuner()
+  return true
 }
 
-/** Releases the lock, closes input and silences. Tuning again re-opens input (silent); Play re-opens and plays. */
+/** Could the next dial touch start the sound? (Non-React read, for the gesture handlers.) */
+export function dialTouchMayStartSound(): boolean {
+  const s = tunerStore.get()
+  return s.transport === 'open' && s.touchStartsSound
+}
+
+/**
+ * The last tuner closed: back to the initial `open` transport, with the first dial touch re-armed. The lock itself
+ * keeps holding (it lives on its own); a stopped tuner had already released it.
+ */
+export function resetTransportOnClose() {
+  const s = tunerStore.get()
+  if (s.transport !== 'open' || !s.touchStartsSound) tunerStore.set({ transport: 'open', touchStartsSound: true })
+}
+
+export function pauseTuner() {
+  tunerStore.set((s) => ({ transport: nextTransport(s.transport, 'pause'), touchStartsSound: false }))
+}
+
+/** Releases the lock, closes input and silences. Tuning again re-opens input (silent); only Play plays again. */
 export function stopTuner() {
   cancelGlide()
-  tunerStore.set((s) => ({ transport: nextTransport(s.transport, 'stop') }))
+  tunerStore.set((s) => ({ transport: nextTransport(s.transport, 'stop'), touchStartsSound: false }))
   if (tunerStore.get().locked) unlock()
   else evaluate()
 }
@@ -226,6 +284,7 @@ export function getEverLocked(): boolean {
 export function forgetFirstLock() {
   cancelGlide()
   clearHold()
+  cancelHeldBanner()
   removeKey(SIGNAL_KEY)
   const wasLocked = tunerStore.get().locked
   tunerStore.set({
@@ -236,6 +295,7 @@ export function forgetFirstLock() {
     holding: false,
     holdSince: 0,
     transport: 'open',
+    touchStartsSound: true,
   })
   if (wasLocked) setTunerLocked(false)
 }

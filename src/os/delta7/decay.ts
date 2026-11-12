@@ -100,6 +100,19 @@ export function depthOf(bucket: number): number {
   return round(clamp01((0.7 - bucket) / 0.6), 1000)
 }
 
+/** True once any decay step is active (mood or depth above 0, i.e. the bucket is below 0.95). */
+export function decayActive(bucket: number): boolean {
+  return moodOf(bucket) > 0 || depthOf(bucket) > 0
+}
+
+/**
+ * The count beside `recent files`: right while the dashboard is healthy; once any decay step is active it is one
+ * short of the rows shown (the quiet wrong detail). A pure function of the decay bucket.
+ */
+export function recentFilesCount(rows: number, bucket: number): number {
+  return decayActive(bucket) ? rows - 1 : rows
+}
+
 function shuffled<T>(items: readonly T[], rnd: () => number): T[] {
   const a = [...items]
   for (let i = a.length - 1; i > 0; i--) {

@@ -49,8 +49,10 @@ export const CLARITY_AT_CLEAR = 0.7
 /**
  * The ONLY range any assist works in: the release magnet, the wheel-idle glide, tap-to-tune and the sticky notch
  * that slows the dial. Nothing tugs, slows or glides the dial towards the target from further away than this.
+ * It IS the "clear" zone (defined from it, so the two can't drift apart): once the signal reads clear, a calm hand
+ * is drawn in.
  */
-export const PULL_RANGE = 0.008
+export const PULL_RANGE = ZONE_CLEAR
 /**
  * The magnet only takes a dial that is (nearly) at rest: dial speed at release / wheel idle, in MHz per second.
  * A flick, or a drag still moving faster than this, sails past.
@@ -61,6 +63,20 @@ export const NOTCH_POWER = 2
 /** Old names, kept for existing imports: both are the pull range now. */
 export const MAGNET_RANGE = PULL_RANGE
 export const NOTCH_RANGE = PULL_RANGE
+
+/* ---------- the needle: it warms with closeness, inside the faint zone only ---------- */
+
+/** The warm accent the needle tints towards (the tuner's own lock colour). */
+export const NEEDLE_WARM = '#B65A34'
+/**
+ * How much of NEEDLE_WARM shows over the plain ink needle in each clarity zone (0 = the plain needle, exactly as
+ * outside the zones; 1 = fully warm). Distance only, never direction. "clear" and the lock share the full tint.
+ */
+export const NEEDLE_TINT_FAINT = 0.3
+export const NEEDLE_TINT_CLEARER = 0.6
+export const NEEDLE_TINT_CLEAR = 1
+/** The needle's colour change (ms). Colour only: no size or position change. */
+export const NEEDLE_TINT_MS = 200
 
 /** While locked, a drag must travel this far (in raw units) before the lock lets go. */
 export const LOCKED_DETENT = 0.02

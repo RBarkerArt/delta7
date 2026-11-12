@@ -14,6 +14,7 @@ import {
   unnotch,
   wheelNotches,
 } from './tunerMath'
+import { startSoundOnDialTouch } from './tunerAudio'
 
 /** Hand speed is measured over this window (ms). */
 const HAND_WINDOW_MS = 90
@@ -48,6 +49,8 @@ function dialSpeed(samples: Sample[], now: number, windowMs: number): number {
  *  - once locked, a drag has to travel past a small detent before the lock lets go.
  * A mouse-wheel notch is a plain 0.01 grid step (like the arrow keys); trackpad scrolling is proportional.
  * A slowly inching hand moves the dial at fineGain() (everywhere on the dial, both ways): fine control on a thumb.
+ * The first touch of the dial while the transport is still `open` starts the sound (startSoundOnDialTouch), from
+ * inside the gesture: a mouse press, a touch/pen lift, or a wheel when the page already has a live activation.
  */
 export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
   useEffect(() => {
@@ -126,6 +129,8 @@ export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
       moved = false
       hand = [{ x: e.clientX, t: downAt }]
       dial = [{ v: raw, t: downAt }]
+      // A mouse press is a user activation; a touch or pen only activates on lift (handled in onUp).
+      startSoundOnDialTouch(e.pointerType === 'mouse')
     }
 
     const onMove = (e: PointerEvent) => {
@@ -149,6 +154,7 @@ export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
       if (e.pointerId !== pointerId) return
       pointerId = null
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+      if (e.pointerType !== 'mouse') startSoundOnDialTouch(true)
       const now = performance.now()
       if (!moved) {
         if (now - downAt > 450) return
@@ -188,6 +194,7 @@ export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
         let v = getTuner().locked ? TARGET : getTuner().value
         for (let i = 0; i < Math.abs(notches); i++) v = stepOnGrid(v, WHEEL_NOTCH_STEP, notches > 0 ? 1 : -1)
         setTunerValue(v)
+        startSoundOnDialTouch(false)
         return
       }
       const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
@@ -199,6 +206,7 @@ export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
       }
       wheelRaw = Math.min(FREQ_MAX, Math.max(FREQ_MIN, wheelRaw + (d * 0.6) / pxPerUnit))
       applyRaw(wheelRaw)
+      startSoundOnDialTouch(false)
       wheelSamples.push({ v: wheelRaw, t: now })
       while (wheelSamples.length > 2 && now - wheelSamples[0].t > WHEEL_WINDOW_MS * 2) wheelSamples.shift()
       if (wheelTimer) clearTimeout(wheelTimer)

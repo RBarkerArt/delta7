@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { bucketOf, decayPlan, depthOf, moodOf } from './decay.ts'
+import { bucketOf, decayActive, decayPlan, depthOf, moodOf, recentFilesCount } from './decay.ts'
 import { levelFor } from '../store/coherenceMath.ts'
 
 const SEED = 'd7:1'
@@ -55,4 +55,19 @@ test('nav items stay legible and the tuner is never touched', () => {
     assert.ok(!('tuner' in p.nav))
     for (const panel of Object.values(p.panels)) assert.ok(panel.opacity >= 0.75)
   }
+})
+
+test('recent files count: right while healthy, one short once any decay step is active', () => {
+  const rows = 5
+  for (const c of [1, 0.99, 0.975, 0.95]) {
+    assert.equal(decayActive(bucketOf(c)), false, `decay active at ${c}`)
+    assert.equal(recentFilesCount(rows, bucketOf(c)), rows, `count wrong while healthy at ${c}`)
+  }
+  for (const c of [0.949, 0.925, 0.9, 0.8, 0.75, 0.7, 0.4, 0]) {
+    assert.equal(decayActive(bucketOf(c)), true, `no decay at ${c}`)
+    assert.equal(recentFilesCount(rows, bucketOf(c)), rows - 1, `count not off by one at ${c}`)
+  }
+  // The same rule as the plan: the first decay step is the first bucket with any mood.
+  assert.equal(decayActive(decayPlan(1, SEED).bucket), false)
+  assert.equal(decayActive(decayPlan(0.9, SEED).bucket), true)
 })
