@@ -39,8 +39,8 @@ export default function SearchPanel({ anchorRef }: { anchorRef: RefObject<HTMLBu
       style={{ transformOrigin: 'top right' }}
       className="os-panel absolute right-3 top-[calc(100%+4px)] z-50 w-[min(280px,calc(100vw-24px))] rounded-[14px] p-1.5"
     >
-      <label className="flex items-center gap-2 rounded-[9px] bg-white/55 px-2.5 py-1.5 ring-1 ring-os-ink/10 focus-within:ring-os-ink/25">
-        <Search size={15} strokeWidth={1.5} className="shrink-0 text-os-ink-soft" aria-hidden="true" />
+      <label className="os-tap-h flex items-center gap-2 rounded-[9px] bg-white/55 px-2.5 py-1.5 ring-1 ring-os-ink/10 focus-within:ring-os-ink/25">
+        <Search size={15} strokeWidth={1.5} className="shrink-0 os-text-soft" aria-hidden="true" />
         <input
           autoFocus
           type="text"
@@ -67,7 +67,7 @@ export default function SearchPanel({ anchorRef }: { anchorRef: RefObject<HTMLBu
               closePopover()
             }
           }}
-          className="os-selectable w-full bg-transparent font-os-mono text-[13px] lowercase text-os-ink outline-none placeholder:text-os-ink-soft/60"
+          className="os-selectable w-full bg-transparent font-os-mono text-[13px] lowercase text-os-ink outline-none placeholder:os-text-soft"
         />
       </label>
     </motion.div>

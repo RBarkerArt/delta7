@@ -8,6 +8,8 @@ import { clampFrame, initialFrame, maximizedFrame, saveFrame, viewport } from '.
 import type { Frame } from './frames'
 import { centrePose, iconRadius, identityPose, landSpring, launchSpring, poseOnto } from './pose'
 import { usePose } from './usePose'
+import { takeFocusOnPointer, useWindowFocus } from './useWindowFocus'
+import { windowTitleId } from './titleId'
 import { animateFrame, readFrame, useFrameGestures, writeFrame } from './useFrameGestures'
 import type { FrameValues } from './useFrameGestures'
 import { getApp } from '../apps/registry'
@@ -50,6 +52,8 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
   const fh = useMotionValue(init.start.h)
   const [frame] = useState<FrameValues>(() => ({ x: fx, y: fy, w: fw, h: fh }))
   const pose = usePose({ ...identityPose(RADIUS), o: 0 })
+  const sectionRef = useRef<HTMLElement>(null)
+  useWindowFocus(sectionRef, app.id)
 
   const setMaximized = useCallback((v: boolean) => {
     maxRef.current = v
@@ -136,17 +140,22 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
   const hidden = app.minimized || !isPresent
   return (
     <motion.section
+      ref={sectionRef}
       data-testid={`window-${app.id}`}
       data-os-window={app.id}
       data-focused={focused && !hidden ? 'true' : 'false'}
       data-maximized={maximized ? 'true' : 'false'}
       data-minimized={app.minimized ? 'true' : 'false'}
-      aria-label={def.label}
+      role="dialog"
+      aria-labelledby={windowTitleId(app.id)}
+      tabIndex={-1}
       inert={hidden}
       onPointerDownCapture={() => {
-        if (!hidden) focusApp(app.id)
+        if (hidden) return
+        focusApp(app.id)
+        takeFocusOnPointer(sectionRef.current)
       }}
-      className={`absolute left-0 top-0 ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}
+      className={`absolute left-0 top-0 outline-none ${hidden ? 'pointer-events-none' : 'pointer-events-auto'}`}
       style={{ x: fx, y: fy, width: fw, height: fh, zIndex: app.z, opacity: hidden ? pose.values.o : 1 }}
     >
       <motion.div

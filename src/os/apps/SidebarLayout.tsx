@@ -47,13 +47,13 @@ export default function SidebarLayout({ items, selectedId, onSelect, footer, lis
               onSelect(it.id)
               setShowList(false)
             }}
-            className={`flex min-h-[40px] items-center justify-between gap-2 rounded-[10px] px-3.5 text-left font-os-mono text-[13px] lowercase outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-os-ink/25 ${
+            className={`flex min-h-[44px] items-center justify-between gap-2 rounded-[10px] px-3.5 text-left font-os-mono text-[13px] lowercase outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-os-ink/25 ${
               selected && !narrow ? 'bg-[#ddd1c3] text-os-ink' : 'text-os-ink/80 hover:bg-[#e4d9cc]'
             }`}
           >
             <span className="truncate">{it.label}</span>
             {it.dot ? <span aria-label="new" className="h-1.5 w-1.5 shrink-0 rounded-full bg-os-ink/55" /> : null}
-            {!it.dot && it.meta ? <span className="shrink-0 text-[11px] text-os-ink-soft/80">{it.meta}</span> : null}
+            {!it.dot && it.meta ? <span className="shrink-0 text-[11px] os-text-soft">{it.meta}</span> : null}
           </button>
         )
       })}
@@ -68,12 +68,12 @@ export default function SidebarLayout({ items, selectedId, onSelect, footer, lis
           <div className="flex-1 bg-[#efe8de]">{list}</div>
         ) : (
           <>
-            <div className="flex h-10 shrink-0 items-center border-b border-os-ink/[0.06] px-1.5">
+            <div className="flex h-12 shrink-0 items-center border-b border-os-ink/[0.06] px-1.5">
               <button
                 type="button"
                 data-testid="sidebar-back"
                 onClick={() => setShowList(true)}
-                className="flex h-9 items-center gap-1 rounded-[9px] pl-1 pr-2.5 font-os-mono text-[12.5px] lowercase text-os-ink/70 outline-none hover:bg-os-ink/[0.05] focus-visible:ring-2 focus-visible:ring-os-ink/25"
+                className="flex h-11 items-center gap-1 rounded-[9px] pl-1 pr-3 font-os-mono text-[12.5px] lowercase text-os-ink/80 outline-none hover:bg-os-ink/[0.05] focus-visible:ring-2 focus-visible:ring-os-ink/25"
               >
                 <ChevronLeft size={16} strokeWidth={1.5} />
                 {listLabel}

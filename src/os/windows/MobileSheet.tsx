@@ -5,6 +5,8 @@ import LaunchVeil from './LaunchVeil'
 import { CloseGlyph } from './controlGlyphs'
 import { centrePose, iconRadius, identityPose, landSpring, launchSpring, poseOnto } from './pose'
 import { usePose } from './usePose'
+import { useWindowFocus } from './useWindowFocus'
+import { windowTitleId } from './titleId'
 import { useSheetGestures } from './useSheetGestures'
 import type { Fling } from './useSheetGestures'
 import { getApp } from '../apps/registry'
@@ -27,6 +29,7 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
   const reduced = useReducedMotionPref()
   const [isPresent, safeToRemove] = usePresence()
   const boxRef = useRef<HTMLDivElement>(null)
+  useWindowFocus(boxRef, app.id)
   const flingRef = useRef<Fling | null>(null)
   const pose = usePose({ ...identityPose(RADIUS), o: 0 })
 
@@ -96,10 +99,11 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
       ref={boxRef}
       data-testid={`mobile-sheet-${app.id}`}
       data-os-window={app.id}
-      aria-label={def.label}
       role="dialog"
+      aria-labelledby={windowTitleId(app.id)}
+      tabIndex={-1}
       inert={!isPresent}
-      className={`absolute inset-x-0 bottom-0 ${isPresent ? 'pointer-events-auto' : 'pointer-events-none'}`}
+      className={`absolute inset-x-0 bottom-0 outline-none ${isPresent ? 'pointer-events-auto' : 'pointer-events-none'}`}
       style={{ top: 'calc(env(safe-area-inset-top, 0px) + 48px)', zIndex: app.z }}
     >
       <motion.section
@@ -125,14 +129,14 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
         >
           <div className="flex min-w-0 items-center gap-2">
             <def.Glyph size={16} strokeWidth={1.5} className="shrink-0 text-os-ink/75" />
-            <h2 className="truncate font-os-mono text-[13px] lowercase tracking-[0.03em] text-os-ink">{def.label}</h2>
+            <h2 id={windowTitleId(app.id)} className="truncate font-os-mono text-[13px] lowercase tracking-[0.03em] text-os-ink">{def.label}</h2>
           </div>
           <button
             type="button"
             aria-label={`close ${def.label}`}
             data-testid={`window-close-${app.id}`}
             onClick={() => closeApp(app.id)}
-            className="absolute right-1.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-[10px] text-os-ink/65 outline-none active:bg-os-ink/[0.06] focus-visible:ring-2 focus-visible:ring-os-ink/30"
+            className="absolute right-1.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-[10px] text-os-ink/65 outline-none active:bg-os-ink/[0.06] focus-visible:ring-2 focus-visible:ring-os-ink/30"
           >
             <CloseGlyph />
           </button>
@@ -145,9 +149,10 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
           aria-hidden="true"
           onPointerDown={gestures.onIndicatorPointerDown}
           className="relative flex shrink-0 items-start justify-center bg-os-cream"
-          style={{ touchAction: 'none', height: 'calc(env(safe-area-inset-bottom, 0px) + 24px)' }}
+          style={{ touchAction: 'none', height: 'calc(env(safe-area-inset-bottom, 0px) + 44px)' }}
         >
-          <span className="mt-[9px] block h-[5px] w-[118px] rounded-full bg-os-ink/25" />
+          {/* In flow below the app body (never over it): a full 44px swipe zone; the pill sits low in it. */}
+          <span className="mt-[24px] block h-[5px] w-[118px] rounded-full bg-os-ink/25" />
         </div>
         <LaunchVeil def={def} pose={pose} glyph={MOBILE_GLYPH} />
       </motion.section>

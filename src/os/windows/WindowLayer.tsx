@@ -3,6 +3,7 @@ import { AnimatePresence } from 'motion/react'
 import DesktopWindow from './DesktopWindow'
 import MobileSheet from './MobileSheet'
 import { useWindowKeys } from './useWindowKeys'
+import { useWindowFocusKeys } from './useWindowFocusKeys'
 import { backgroundAllExcept, useFocusedAppId, useOpenApps } from '../store/windows'
 
 /**
@@ -13,6 +14,7 @@ export default function WindowLayer({ isMobile }: { isMobile: boolean }) {
   const apps = useOpenApps()
   const focused = useFocusedAppId()
   useWindowKeys(!isMobile)
+  useWindowFocusKeys()
 
   const front = isMobile ? apps.find((a) => a.id === focused && !a.minimized) : undefined
   const othersVisible = isMobile && front ? apps.some((a) => a.id !== front.id && !a.minimized) : false

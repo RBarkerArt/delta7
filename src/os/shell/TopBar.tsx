@@ -9,7 +9,7 @@ import { togglePopover, usePopover } from '../store/ui'
 import { useClock } from '../store/clock'
 
 const iconBtn =
-  'flex h-10 w-10 items-center justify-center rounded-[10px] text-os-cream/95 outline-none transition-colors duration-150 hover:bg-os-cream/[0.08] focus-visible:ring-2 focus-visible:ring-os-cream/60'
+  'os-tap flex h-10 w-10 items-center justify-center rounded-[10px] text-os-cream/95 outline-none transition-colors duration-150 hover:bg-os-cream/[0.08] focus-visible:ring-2 focus-visible:ring-os-cream/60'
 
 /** Thin, nearly transparent top bar: menu · time · signal + search. Nothing else. */
 export default function TopBar({ isMobile }: { isMobile: boolean }) {
@@ -28,7 +28,7 @@ export default function TopBar({ isMobile }: { isMobile: boolean }) {
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-[150%]"
-        style={{ background: 'linear-gradient(180deg, rgba(52,36,44,0.16) 0%, rgba(52,36,44,0.05) 60%, rgba(52,36,44,0) 100%)' }}
+        style={{ background: 'linear-gradient(180deg, rgba(52,36,44,0.3) 0%, rgba(52,36,44,0.1) 60%, rgba(52,36,44,0) 100%)' }}
       />
       <div className={`relative flex items-center justify-between ${isMobile ? 'h-12 px-2' : 'h-16 px-5'}`}>
         <div className="relative">
@@ -47,7 +47,7 @@ export default function TopBar({ isMobile }: { isMobile: boolean }) {
         </div>
 
         <time
-          className="os-label-shadow pointer-events-none absolute left-1/2 -translate-x-1/2 font-os-mono font-light tabular-nums text-os-cream/95"
+          className="os-label-shadow os-label-halo pointer-events-none absolute left-1/2 -translate-x-1/2 font-os-mono font-light tabular-nums text-os-cream"
           style={{ fontSize: isMobile ? 16 : 19, letterSpacing: '0.1em' }}
           data-testid="clock"
         >

@@ -1,5 +1,6 @@
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { CloseGlyph, MaximizeGlyph, MinimizeGlyph, RestoreGlyph } from './controlGlyphs'
+import { windowTitleId } from './titleId'
 import type { AppDefinition } from '../types'
 
 interface Props {
@@ -41,9 +42,9 @@ export default function TitleBar({ def, focused, maximized, onPointerDown, onTog
       className={`flex h-12 shrink-0 cursor-default items-center justify-between border-b border-os-ink/[0.08] pl-4 pr-2 transition-colors duration-200 ${focused ? 'bg-[#ebe3d8]' : 'bg-[#efe8de]'}`}
       style={{ touchAction: 'none' }}
     >
-      <div className={`flex min-w-0 items-center gap-2.5 transition-opacity duration-200 ${focused ? 'opacity-100' : 'opacity-60'}`}>
+      <div className={`flex min-w-0 items-center gap-2.5 transition-opacity duration-200 ${focused ? 'opacity-100' : 'opacity-75'}`}>
         <def.Glyph size={18} strokeWidth={1.5} className="shrink-0 text-os-ink/80" />
-        <h2 className="truncate font-os-mono text-[13.5px] lowercase tracking-[0.02em] text-os-ink">{def.label}</h2>
+        <h2 id={windowTitleId(def.id)} className="truncate font-os-mono text-[13.5px] lowercase tracking-[0.02em] text-os-ink">{def.label}</h2>
       </div>
       <div className="flex items-center gap-0.5">
         <Control label={`minimize ${def.label}`} testId={`window-min-${def.id}`} onClick={onMinimize}>

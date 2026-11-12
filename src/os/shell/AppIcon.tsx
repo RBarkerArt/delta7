@@ -52,6 +52,7 @@ export default function AppIcon({ appId, isMobile }: Props) {
         {isDelta7 ? <HeartbeatHalo ref={haloRef} /> : null}
         <motion.div
           ref={(el) => registerIconEl(appId, el)}
+          tabIndex={-1}
           whileTap={reduced ? { opacity: 0.85 } : { scale: 0.94 }}
           transition={reduced ? fadeFast : springs.snappy}
           className="os-tile relative flex h-full w-full items-center justify-center text-os-cream group-focus-visible:ring-2 group-focus-visible:ring-os-cream/80 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-transparent"
@@ -61,9 +62,9 @@ export default function AppIcon({ appId, isMobile }: Props) {
         </motion.div>
       </div>
       <span
-        className={`os-label-shadow mt-2.5 max-w-full truncate font-os-mono lowercase text-os-cream/[0.88] ${isMobile ? 'text-[11.5px]' : 'text-[13.5px] tracking-[0.02em]'}`}
+        className={`os-label-shadow os-label-halo mt-2.5 max-w-full font-os-mono lowercase text-os-cream ${isMobile ? 'text-[12px]' : 'text-[13.5px] tracking-[0.02em]'}`}
       >
-        {app.label}
+        <span className="block truncate">{app.label}</span>
       </span>
       <span
         aria-hidden="true"

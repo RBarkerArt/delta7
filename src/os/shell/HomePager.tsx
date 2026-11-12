@@ -54,8 +54,8 @@ export default function HomePager({ isMobile }: { isMobile: boolean }) {
         {matches.length ? (
           <IconPage apps={matches} isMobile={isMobile} />
         ) : (
-          <div className="os-label-shadow flex h-full items-center justify-center font-os-mono text-sm lowercase text-os-cream/70">
-            nothing here
+          <div className="flex h-full items-center justify-center">
+            <p className="os-label-shadow os-label-halo font-os-mono text-sm lowercase text-os-cream">nothing here</p>
           </div>
         )}
       </div>

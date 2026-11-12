@@ -39,7 +39,43 @@
     -webkit-user-select: text;
   }
   .os-label-shadow {
-    text-shadow: 0 1px 2px rgba(48, 30, 36, 0.45), 0 0 10px rgba(48, 30, 36, 0.25);
+    text-shadow:
+      0 1px 2px rgba(40, 24, 30, 0.55),
+      0 0 6px rgba(40, 24, 30, 0.4),
+      0 0 16px rgba(40, 24, 30, 0.3);
+  }
+  /*
+   * Cream text straight on the wallpaper: a soft, feathered warm-dark glow behind the words (no edge, no pill) so a
+   * label holds on the brightest part of any wallpaper. Pair with .os-label-shadow.
+   */
+  .os-label-halo {
+    position: relative;
+    isolation: isolate;
+  }
+  .os-label-halo::before {
+    content: '';
+    position: absolute;
+    inset: -0.15em -0.45em;
+    z-index: -1;
+    border-radius: 999px;
+    background: rgba(40, 24, 30, 0.5);
+    filter: blur(7px);
+    pointer-events: none;
+  }
+  /*
+   * Phone touch targets (≥ 44×44) without changing the desktop look. The OS root carries data-mobile="true" on phones.
+   * .os-tap: min 44×44 · .os-tap-h: min height 44.
+   */
+  [data-mobile='true'] .os-tap {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  [data-mobile='true'] .os-tap-h {
+    min-height: 44px;
+  }
+  /* Secondary ink on cream panels (dates, counts, hints). Passes AA on cream, the sidebar cream and selected rows. */
+  .os-text-soft {
+    color: #5f5355;
   }
   .os-glyph-shadow {
     filter: drop-shadow(0 1px 1.5px rgba(48, 30, 36, 0.3));

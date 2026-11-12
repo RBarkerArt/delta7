@@ -21,8 +21,8 @@ export default function RowsApp({ sections, listLabel, isMobile }: { sections: S
             className="flex items-center gap-3 border-b border-os-ink/[0.07] px-2 py-3 font-os-mono text-[12.5px] lowercase text-os-ink/85 last:border-b-0"
           >
             <span className="min-w-0 flex-1 truncate">{r.name}</span>
-            <span className="shrink-0 tabular-nums text-os-ink-soft/80">{r.date}</span>
-            <span className="w-14 shrink-0 text-right tabular-nums text-os-ink-soft/80">{r.size}</span>
+            <span className="shrink-0 tabular-nums os-text-soft">{r.date}</span>
+            <span className="w-14 shrink-0 text-right tabular-nums os-text-soft">{r.size}</span>
           </li>
         ))}
       </ul>

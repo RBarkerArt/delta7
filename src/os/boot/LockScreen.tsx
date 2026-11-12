@@ -14,7 +14,7 @@ interface Props {
 }
 
 const VEIL =
-  'radial-gradient(90% 75% at 50% 46%, rgba(44, 28, 36, 0.06) 0%, rgba(44, 28, 36, 0.3) 100%), linear-gradient(180deg, rgba(44, 28, 36, 0.14) 0%, rgba(44, 28, 36, 0) 40%, rgba(44, 28, 36, 0.18) 100%)'
+  'radial-gradient(90% 75% at 50% 46%, rgba(44, 28, 36, 0.24) 0%, rgba(44, 28, 36, 0.42) 100%), linear-gradient(180deg, rgba(44, 28, 36, 0.2) 0%, rgba(44, 28, 36, 0.04) 40%, rgba(44, 28, 36, 0.22) 100%)'
 
 /**
  * Lock screen foreground: a soft veil over the (blurred) wallpaper, the time, an abstract picture and a plain
@@ -53,7 +53,7 @@ export default function LockScreen({ leaving, autoResume, isMobile, reduced }: P
       >
         <time
           data-testid="lock-time"
-          className="os-label-shadow font-os-mono font-extralight tabular-nums text-os-cream/95"
+          className="os-label-shadow font-os-mono font-extralight tabular-nums text-os-cream"
           style={{ fontSize: isMobile ? 64 : 92, letterSpacing: '0.06em', lineHeight: 1 }}
         >
           {time}
@@ -63,12 +63,12 @@ export default function LockScreen({ leaving, autoResume, isMobile, reduced }: P
 
         <LockAvatar size={isMobile ? 76 : 88} reduced={reduced} leaving={leaving} />
 
-        <div className="mt-6 flex h-11 items-center justify-center">
+        <div className="mt-6 flex h-12 items-center justify-center">
           {autoResume ? (
             <p
               data-testid="lock-resuming"
               role="status"
-              className="os-label-shadow font-os-mono text-[13px] lowercase tracking-[0.08em] text-os-cream/75"
+              className="os-label-shadow os-label-halo font-os-mono text-[13px] lowercase tracking-[0.08em] text-os-cream"
             >
               resuming…
             </p>
@@ -92,12 +92,12 @@ export default function LockScreen({ leaving, autoResume, isMobile, reduced }: P
                 autoFocus={!isMobile}
                 autoComplete="off"
                 spellCheck={false}
-                className="os-selectable h-10 w-[min(212px,56vw)] rounded-[12px] border border-os-ink/10 bg-os-cream/90 px-3.5 text-[14px] text-os-ink shadow-[0_6px_20px_-10px_rgba(30,18,24,0.55)] outline-none transition-[background-color,box-shadow] duration-200 placeholder:font-os-mono placeholder:text-[12.5px] placeholder:lowercase placeholder:tracking-[0.06em] placeholder:text-os-ink-soft/70 focus:bg-os-cream focus-visible:ring-2 focus-visible:ring-os-cream/60"
+                className="os-selectable h-11 w-[min(212px,56vw)] rounded-[12px] border border-os-ink/25 bg-os-cream/95 px-3.5 text-[14px] text-os-ink shadow-[0_6px_20px_-10px_rgba(30,18,24,0.55)] outline-none transition-[background-color,box-shadow] duration-200 placeholder:font-os-mono placeholder:text-[12.5px] placeholder:lowercase placeholder:tracking-[0.06em] placeholder:os-text-soft focus:bg-os-cream focus-visible:ring-2 focus-visible:ring-os-cream/60"
               />
               <button
                 type="submit"
                 data-testid="lock-resume"
-                className="h-10 rounded-[12px] border border-os-cream/30 bg-os-cream/[0.14] px-3.5 font-os-mono text-[12.5px] lowercase tracking-[0.06em] text-os-cream/95 outline-none transition-colors duration-150 hover:bg-os-cream/[0.22] active:bg-os-cream/[0.28] focus-visible:ring-2 focus-visible:ring-os-cream/60"
+                className="h-11 rounded-[12px] border border-os-ink/25 bg-[#e8dfd3]/95 px-3.5 font-os-mono text-[13px] lowercase tracking-[0.06em] text-os-ink shadow-[0_6px_20px_-10px_rgba(30,18,24,0.55)] outline-none transition-colors duration-150 hover:bg-[#efe7dc] active:bg-[#ddd2c4] focus-visible:ring-2 focus-visible:ring-os-cream/70"
               >
                 resume
               </button>

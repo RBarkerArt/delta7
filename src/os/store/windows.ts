@@ -10,15 +10,24 @@ export interface OpenApp {
   openedAt: number
 }
 
+/** "Move keyboard focus into this window" (open, restore, bring-to-front by icon or Ctrl+`). `n` makes each request unique. */
+export interface FocusRequest {
+  id: AppId
+  n: number
+}
+
 interface WindowsState {
   apps: OpenApp[]
   /** Top-most non-minimized app, or null. */
   focusedId: AppId | null
+  /** Pending keyboard-focus move; the window consumes it once it has focused itself. */
+  focusRequest: FocusRequest | null
 }
 
-export const windowsStore = createStore<WindowsState>({ apps: [], focusedId: null })
+export const windowsStore = createStore<WindowsState>({ apps: [], focusedId: null, focusRequest: null })
 
 let zCounter = 1
+let focusCounter = 0
 
 function topVisible(apps: OpenApp[]): AppId | null {
   let best: OpenApp | null = null
@@ -56,15 +65,25 @@ export function openApp(id: AppId, params?: AppParams) {
     const apps = existing
       ? s.apps.map((a) => (a.id === id ? { ...a, params, minimized: false, z } : a))
       : [...s.apps, { id, params, minimized: false, z, openedAt: Date.now() }]
-    return { apps, focusedId: id }
+    return { apps, focusedId: id, focusRequest: { id, n: ++focusCounter } }
   })
 }
 
+export function useFocusRequest(): FocusRequest | null {
+  return windowsStore.use((s) => s.focusRequest)
+}
+/** Called by the window once it has taken focus for request `n`. */
+export function consumeFocusRequest(n: number) {
+  windowsStore.set((s) => (s.focusRequest?.n === n ? { focusRequest: null } : {}))
+}
+
 export function closeApp(id: AppId) {
+  const giveBack = focusIsIn(id)
   windowsStore.set((s) => {
     const apps = s.apps.filter((a) => a.id !== id)
     return { apps, focusedId: topVisible(apps) }
   })
+  if (giveBack) focusIconOf(id)
 }
 
 export function focusApp(id: AppId) {
@@ -79,10 +98,12 @@ export function focusApp(id: AppId) {
 }
 
 export function minimizeApp(id: AppId) {
+  const giveBack = focusIsIn(id)
   windowsStore.set((s) => {
     const apps = s.apps.map((a) => (a.id === id ? { ...a, minimized: true } : a))
     return { apps, focusedId: topVisible(apps) }
   })
+  if (giveBack) focusIconOf(id)
 }
 
 /** Mobile: only one app is in front; every other open app is backgrounded (kept open, minimized). */
@@ -99,6 +120,7 @@ export function cycleFocus() {
   if (visible.length < 2) return
   const lowest = visible.reduce((lo, a) => (a.z < lo.z ? a : lo))
   focusApp(lowest.id)
+  windowsStore.set({ focusRequest: { id: lowest.id, n: ++focusCounter } })
 }
 
 /* ---------- icon rects (launch / close animation origin) ---------- */
@@ -109,6 +131,31 @@ const iconEls = new Map<AppId, HTMLElement>()
 export function registerIconEl(id: AppId, el: HTMLElement | null) {
   if (el) iconEls.set(id, el)
   else iconEls.delete(id)
+}
+
+/** Is keyboard focus inside this app's window (or nowhere in particular)? Then closing it hands focus back to its icon. */
+function focusIsIn(id: AppId): boolean {
+  if (typeof document === 'undefined') return false
+  const a = document.activeElement
+  return !a || a === document.body || a.closest(`[data-os-window="${id}"]`) != null
+}
+
+function tryFocus(el: HTMLElement | null | undefined): boolean {
+  if (!el || !el.isConnected || el.closest('[inert]')) return false
+  el.focus({ preventScroll: true })
+  return document.activeElement === el
+}
+
+/**
+ * Keyboard focus back to the app's home icon. If that icon can't take it (other page, filtered out by search), the
+ * first focusable icon on screen; failing that, nowhere (body). Never throws.
+ */
+export function focusIconOf(id: AppId) {
+  if (typeof document === 'undefined') return
+  if (tryFocus(iconEls.get(id)?.closest('button'))) return
+  for (const el of document.querySelectorAll<HTMLElement>('[data-testid^="app-icon-"]')) if (tryFocus(el)) return
+  const a = document.activeElement
+  if (a instanceof HTMLElement && a.closest('[data-os-window]')) a.blur()
 }
 
 export function getIconRect(id: AppId): DOMRect | null {

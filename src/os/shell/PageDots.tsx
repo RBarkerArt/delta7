@@ -24,7 +24,7 @@ export default function PageDots({ isMobile }: { isMobile: boolean }) {
             aria-label={`page ${i + 1}`}
             aria-current={i === page ? 'page' : undefined}
             onClick={() => setPage(i)}
-            className="flex h-6 w-6 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-os-cream/70"
+            className="os-tap flex h-6 w-6 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-os-cream/70"
           >
             <motion.span
               className="block h-2 w-2 rounded-full bg-os-cream shadow-[0_0_6px_rgba(60,36,44,0.25)]"

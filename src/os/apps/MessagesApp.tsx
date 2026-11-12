@@ -18,7 +18,7 @@ function Bubble({ m }: { m: Message }) {
       >
         {m.text}
       </p>
-      <span className="mt-1 px-1.5 font-os-mono text-[11px] tabular-nums text-os-ink-soft/80">{m.time}</span>
+      <span className="mt-1 px-1.5 font-os-mono text-[11px] tabular-nums os-text-soft">{m.time}</span>
     </div>
   )
 }
@@ -51,7 +51,7 @@ export default function MessagesApp({ isMobile }: AppProps) {
       footer={
         <button
           type="button"
-          className="mt-1 flex min-h-[40px] items-center gap-2 rounded-[10px] px-3.5 font-os-mono text-[13px] lowercase text-os-ink/60 outline-none hover:bg-[#e4d9cc] focus-visible:ring-2 focus-visible:ring-os-ink/25"
+          className="mt-1 flex min-h-[44px] items-center gap-2 rounded-[10px] px-3.5 font-os-mono text-[13px] lowercase text-os-ink/80 outline-none hover:bg-[#e4d9cc] focus-visible:ring-2 focus-visible:ring-os-ink/25"
         >
           <Plus size={14} strokeWidth={1.5} /> new
         </button>
@@ -69,7 +69,7 @@ export default function MessagesApp({ isMobile }: AppProps) {
             onChange={(e) => setDraft(e.target.value)}
             aria-label="message"
             data-testid="messages-input"
-            className="h-11 min-w-0 flex-1 rounded-full border border-os-ink/[0.14] bg-[#f8f4ee] px-4 text-[16px] md:text-[14.5px] text-os-ink outline-none placeholder:text-os-ink-soft/60 focus:border-os-ink/30 focus-visible:ring-2 focus-visible:ring-os-ink/15"
+            className="h-11 min-w-0 flex-1 rounded-full border border-os-ink/[0.14] bg-[#f8f4ee] px-4 text-[16px] md:text-[14.5px] text-os-ink outline-none placeholder:os-text-soft focus:border-os-ink/30 focus-visible:ring-2 focus-visible:ring-os-ink/15"
           />
           <button
             type="submit"

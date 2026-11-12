@@ -16,11 +16,15 @@ export default function WallpaperPicker() {
           title={name}
           data-testid={`wallpaper-${name}`}
           onClick={() => setWallpaper(name)}
-          className={`relative h-9 w-12 overflow-hidden rounded-[7px] outline-none ring-offset-2 ring-offset-os-cream focus-visible:ring-2 focus-visible:ring-os-ink/40 ${
-            current === name ? 'ring-[1.5px] ring-os-ink/55' : 'ring-1 ring-os-ink/10'
-          }`}
+          className="os-tap-h group flex w-12 items-center outline-none"
         >
-          <WallpaperArt name={name} grain={false} />
+          <div
+            className={`relative h-9 w-12 overflow-hidden rounded-[7px] ring-offset-2 ring-offset-os-cream group-focus-visible:ring-2 group-focus-visible:ring-os-ink/40 ${
+              current === name ? 'ring-[1.5px] ring-os-ink/55' : 'ring-1 ring-os-ink/10'
+            }`}
+          >
+            <WallpaperArt name={name} grain={false} />
+          </div>
         </button>
       ))}
     </div>

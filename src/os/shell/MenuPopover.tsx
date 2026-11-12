@@ -18,7 +18,7 @@ const SETTERS: Record<'sound' | 'reduceMotion' | 'vibrate', (v: boolean) => void
   vibrate: setVibrate,
 }
 
-const row = 'flex w-full items-center justify-between gap-4 rounded-[9px] px-3 py-[7px] text-left text-[13.5px] text-os-ink'
+const row = 'os-tap-h flex w-full items-center justify-between gap-4 rounded-[9px] px-3 py-[7px] text-left text-[13.5px] text-os-ink'
 const rowHover = 'outline-none hover:bg-os-ink/[0.05] focus-visible:bg-os-ink/[0.06] focus-visible:ring-1 focus-visible:ring-os-ink/20'
 
 function ToggleRow({ item }: { item: Extract<MenuItem, { kind: 'toggle' }> }) {
@@ -27,7 +27,7 @@ function ToggleRow({ item }: { item: Extract<MenuItem, { kind: 'toggle' }> }) {
     <div className={row}>
       <span>
         {item.label}
-        {item.hint ? <span className="ml-1.5 font-os-mono text-[11px] text-os-ink-soft/80">{item.hint}</span> : null}
+        {item.hint ? <span className="ml-1.5 font-os-mono text-[11px] os-text-soft">{item.hint}</span> : null}
       </span>
       <Switch checked={value} onChange={SETTERS[item.setting]} label={item.label} testId={`menu-toggle-${item.id}`} />
     </div>
@@ -60,7 +60,7 @@ function Item({ item }: { item: MenuItem }) {
               <button
                 key={l}
                 type="button"
-                className="rounded-[7px] border border-os-ink/15 bg-white/50 px-2.5 py-1 text-[12.5px] text-os-ink-soft outline-none hover:bg-white focus-visible:ring-2 focus-visible:ring-os-ink/25"
+                className="os-tap-h rounded-[7px] border border-os-ink/15 bg-white/50 px-2.5 py-1 text-[13px] os-text-soft outline-none hover:bg-white focus-visible:ring-2 focus-visible:ring-os-ink/25"
               >
                 {l}
               </button>
@@ -89,7 +89,7 @@ function Item({ item }: { item: MenuItem }) {
           >
             {item.label}
           </button>
-          {aboutOpen ? <p className="px-3 pb-2 font-os-mono text-[11.5px] text-os-ink-soft">{item.text}</p> : null}
+          {aboutOpen ? <p className="px-3 pb-2 font-os-mono text-[11.5px] os-text-soft">{item.text}</p> : null}
         </div>
       )
   }

@@ -36,6 +36,8 @@ export default function OSApp() {
           className="os-chrome fixed inset-0 overflow-clip font-os-sans text-os-cream"
         >
           <Wallpaper />
+          {/* First in the DOM so keyboard order on the home is top bar → icons → page dots (stacking is by z-index). */}
+          <TopBar isMobile={isMobile} />
           <main className={`absolute inset-x-0 ${isMobile ? 'bottom-[64px] top-12' : 'bottom-[64px] top-16'}`}>
             <HomePager isMobile={isMobile} />
           </main>
@@ -43,7 +45,6 @@ export default function OSApp() {
           <div className={`pointer-events-none absolute inset-0 isolate ${sheetRaised ? 'z-[45]' : 'z-30'}`}>
             <WindowLayer isMobile={isMobile} />
           </div>
-          <TopBar isMobile={isMobile} />
           <NotificationBanner />
           {DevPanel && devOpen ? (
             <Suspense fallback={null}>

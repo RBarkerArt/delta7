@@ -90,7 +90,7 @@ export default function NotificationBanner() {
               aria-label="dismiss"
               data-testid="os-notification-dismiss"
               onClick={() => dismissNotification()}
-              className="mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] text-os-ink-soft outline-none hover:bg-os-ink/[0.06] focus-visible:ring-2 focus-visible:ring-os-ink/30"
+              className="os-tap mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] os-text-soft outline-none hover:bg-os-ink/[0.06] focus-visible:ring-2 focus-visible:ring-os-ink/30"
             >
               <X size={15} strokeWidth={1.5} />
             </button>

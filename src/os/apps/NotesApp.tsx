@@ -16,7 +16,7 @@ export default function NotesApp({ isMobile }: AppProps) {
       isMobile={isMobile}
     >
       <article className="mx-auto max-w-[620px] px-7 py-6">
-        <h3 className="font-os-mono text-[13px] lowercase text-os-ink-soft">{note.title}</h3>
+        <h3 className="font-os-mono text-[13px] lowercase os-text-soft">{note.title}</h3>
         <div className="mt-4 space-y-3.5 text-[15px] leading-relaxed text-os-ink/90">
           {note.body.map((p, i) => (
             <p key={i}>{p}</p>

@@ -52,7 +52,7 @@ export default function AudioApp({ isMobile }: AppProps) {
       <div className="flex h-full flex-col">
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-8">
           <p className="font-os-mono text-[13px] lowercase text-os-ink">{clip.name}</p>
-          <p className="font-os-mono text-[11.5px] text-os-ink-soft/80">TODO(copy)</p>
+          <p className="font-os-mono text-[11.5px] os-text-soft">TODO(copy)</p>
         </div>
         <div className="flex shrink-0 items-center gap-3 border-t border-os-ink/[0.08] bg-[#efe8de] px-4 py-3" data-testid="audio-player">
           <button
@@ -60,11 +60,11 @@ export default function AudioApp({ isMobile }: AppProps) {
             aria-label={playing ? 'pause' : 'play'}
             data-testid="audio-play"
             onClick={toggle}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-os-ink/[0.12] bg-[#f6f1ea] text-os-ink/80 outline-none hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-os-ink/25"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-os-ink/[0.12] bg-[#f6f1ea] text-os-ink/80 outline-none hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-os-ink/25"
           >
             {playing ? <Pause size={16} strokeWidth={1.5} /> : <Play size={16} strokeWidth={1.5} className="translate-x-[1px]" />}
           </button>
-          <motion.span className="w-10 shrink-0 font-os-mono text-[11.5px] tabular-nums text-os-ink-soft">{elapsed}</motion.span>
+          <motion.span className="w-10 shrink-0 font-os-mono text-[11.5px] tabular-nums os-text-soft">{elapsed}</motion.span>
           <div className="relative h-[3px] min-w-0 flex-1 overflow-hidden rounded-full bg-os-ink/[0.12]">
             <motion.div
               data-testid="audio-progress"
@@ -72,7 +72,7 @@ export default function AudioApp({ isMobile }: AppProps) {
               style={{ scaleX: progress, originX: 0 }}
             />
           </div>
-          <span className="w-10 shrink-0 text-right font-os-mono text-[11.5px] tabular-nums text-os-ink-soft">{mmss(clip.seconds)}</span>
+          <span className="w-10 shrink-0 text-right font-os-mono text-[11.5px] tabular-nums os-text-soft">{mmss(clip.seconds)}</span>
         </div>
       </div>
     </SidebarLayout>
