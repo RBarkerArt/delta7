@@ -68,6 +68,17 @@ export function roundFreq(v: number): number {
   return Math.round(v * 1000) / 1000
 }
 
+/**
+ * A keyboard step: move to the next multiple of `step` in direction `dir`. Keys therefore always land on round values
+ * (and so exactly on the target) wherever a drag left the dial. It is the same grid everywhere on the dial, so it says
+ * nothing about where the signal is.
+ */
+export function stepOnGrid(value: number, step: number, dir: 1 | -1): number {
+  const k = value / step
+  const next = dir > 0 ? Math.floor(k + 1e-6) + 1 : Math.ceil(k - 1e-6) - 1
+  return roundFreq(clampFreq(next * step))
+}
+
 /** Tiny tolerance so values that sit exactly on a zone edge (float noise) count as inside it. */
 const EDGE_EPS = 1e-9
 

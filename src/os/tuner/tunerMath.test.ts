@@ -26,6 +26,7 @@ import {
   notch,
   pullTarget,
   roundFreq,
+  stepOnGrid,
   unnotch,
 } from './tunerMath.ts'
 
@@ -114,6 +115,21 @@ test('keyboard steps of 0.01 land exactly on the target', () => {
     v = roundFreq(v + 0.01)
   }
   assert.ok(hit)
+})
+
+test('keyboard steps snap to a fixed grid, so keys can land on the target after any drag', () => {
+  // from an off-grid value left by a drag, one step lands on the next round value in that direction
+  assert.equal(stepOnGrid(1.174, 0.01, 1), 1.18)
+  assert.equal(stepOnGrid(1.174, 0.01, -1), 1.17)
+  // on-grid values move one whole step
+  assert.equal(stepOnGrid(1.18, 0.01, 1), 1.19)
+  assert.equal(stepOnGrid(1.18, 0.01, -1), 1.17)
+  // from just beside the target, a single step lands exactly on it, from either side
+  assert.equal(stepOnGrid(roundFreq(T - 0.006), 0.01, 1), roundFreq(T))
+  assert.equal(stepOnGrid(roundFreq(T + 0.004), 0.01, -1), roundFreq(T))
+  // stays inside the band
+  assert.equal(stepOnGrid(FREQ_MAX, 0.01, 1), FREQ_MAX)
+  assert.equal(stepOnGrid(FREQ_MIN, 0.01, -1), FREQ_MIN)
 })
 
 test('isInLockWindow edges', () => {

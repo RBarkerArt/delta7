@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { nudgeTuner, setTunerValue } from '../store/tuner'
-import { FREQ_MAX, FREQ_MIN } from './tunerMath'
+import { FREQ_MAX, FREQ_MIN, stepOnGrid } from './tunerMath'
 import { useTuneGestures } from './useTuneGestures'
 
 const PAD = 24 // svg overhang past each end so end labels aren't clipped
@@ -63,11 +63,11 @@ export default function TickStrip({ value, locked, pxPerUnit, ariaText }: Props)
     switch (e.key) {
       case 'ArrowRight':
       case 'ArrowUp':
-        nudgeTuner(step)
+        setTunerValue(stepOnGrid(value, step, 1))
         break
       case 'ArrowLeft':
       case 'ArrowDown':
-        nudgeTuner(-step)
+        setTunerValue(stepOnGrid(value, step, -1))
         break
       case 'PageUp':
         nudgeTuner(0.1)
