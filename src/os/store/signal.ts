@@ -33,11 +33,16 @@ export function clearNew() {
 export function useNotification(): OSNotification | null {
   return signalStore.use((s) => s.notification)
 }
+/**
+ * The banner text. Never carries a digit or a partial frequency, before or after the first lock: the dial is the
+ * only place the player reads numbers. Keep the `Signal detected` prefix (scripts look for it). TODO(copy)
+ */
+export const NOTIFICATION_TEXT = 'Signal detected · something on the dial'
+
 /** In-OS banner only — never the browser Notification API. */
 export function showNotification() {
-  // TODO(copy): notification text is placeholder.
   signalStore.set((s) => ({
-    notification: { id: nextId++, text: 'Signal detected · 1.4? MHz' },
+    notification: { id: nextId++, text: NOTIFICATION_TEXT },
     hasNew: true,
     pulseNonce: s.pulseNonce + 1,
   }))
