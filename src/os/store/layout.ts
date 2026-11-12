@@ -1,17 +1,19 @@
 import { createStore } from './createStore'
+import { isAppId } from '../apps/registry'
 import type { AppId, IconPlacement } from '../types'
 
 /**
- * Icon positions are DATA (page, index) so the story can move/add icons later.
- * Page one: the apps the spec names. Page two: the ordinary extras.
+ * Icon positions are DATA (page, index) so the story can move/add icons later. For now there is one home page:
+ * the apps the spec names. A second page is just more entries with `page: 1`.
  */
 const PAGE_1: AppId[] = ['delta7', 'tuner', 'gallery', 'video', 'messages', 'files', 'logs']
-const PAGE_2: AppId[] = ['audio', 'notes', 'lab', 'archive', 'keep']
 
-const DEFAULT_LAYOUT: IconPlacement[] = [
-  ...PAGE_1.map((appId, index) => ({ appId, page: 0, index })),
-  ...PAGE_2.map((appId, index) => ({ appId, page: 1, index })),
-]
+const DEFAULT_LAYOUT: IconPlacement[] = PAGE_1.map((appId, index) => ({ appId, page: 0, index }))
+
+/** Drops placements of apps this build doesn't have (e.g. a layout saved by an older build), silently. */
+function knownOnly(icons: IconPlacement[]): IconPlacement[] {
+  return icons.filter((p) => isAppId(p.appId))
+}
 
 interface LayoutState {
   icons: IconPlacement[]
@@ -64,7 +66,8 @@ export function getPageCount(): number {
   const s = layoutStore.get()
   return pageCountOf(s.icons, s.capacity)
 }
-export function setLayout(icons: IconPlacement[]) {
+export function setLayout(next: IconPlacement[]) {
+  const icons = knownOnly(next)
   layoutStore.set((s) => ({ icons, currentPage: Math.min(s.currentPage, pageCountOf(icons, s.capacity) - 1) }))
 }
 /** The home pager reports how many icons fit on one screen; the shown page stays on the first icon it showed. */

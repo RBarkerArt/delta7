@@ -20,7 +20,8 @@ const VEIL =
 
 /**
  * Lock screen foreground: a soft veil over the (blurred) wallpaper, the time, an abstract picture and a plain
- * password field. ANY input unlocks, including an empty one. No account name, no error states.
+ * password field (no word inside it; its name is `password` for assistive tech). ANY input unlocks, including an
+ * empty one. No account name, no error states.
  */
 export default function LockScreen({ leaving, releasing, autoResume, isMobile, reduced }: Props) {
   const time = useClock()
@@ -89,14 +90,13 @@ export default function LockScreen({ leaving, releasing, autoResume, isMobile, r
                 type="password"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder="password"
                 aria-label="password"
                 data-testid="lock-password"
                 autoFocus={!isMobile}
                 style={{ fontSize: isMobile ? 16 : 14 }}
                 autoComplete="off"
                 spellCheck={false}
-                className="os-selectable h-11 w-[min(212px,56vw)] rounded-[12px] border border-os-ink/25 bg-os-cream/95 px-3.5 text-os-ink shadow-[0_6px_20px_-10px_rgba(30,18,24,0.55)] outline-none transition-[background-color,box-shadow] duration-200 placeholder:font-os-mono placeholder:text-[12.5px] placeholder:lowercase placeholder:tracking-[0.06em] placeholder:os-text-soft focus:bg-os-cream focus-visible:ring-2 focus-visible:ring-os-cream/60"
+                className="os-selectable h-11 w-[min(212px,56vw)] rounded-[12px] border border-os-ink/25 bg-os-cream/95 px-3.5 text-os-ink shadow-[0_6px_20px_-10px_rgba(30,18,24,0.55)] outline-none transition-[background-color,box-shadow] duration-200 focus:bg-os-cream focus-visible:ring-2 focus-visible:ring-os-cream/60"
               />
               <button
                 type="submit"

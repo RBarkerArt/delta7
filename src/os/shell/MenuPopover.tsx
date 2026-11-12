@@ -105,7 +105,7 @@ function Item({ item }: { item: MenuItem }) {
           <div className="text-[13.5px] text-os-ink">{item.label}</div>
           <div className="mt-1 flex gap-1.5">
             {/* TODO(auth): placeholders, no Firebase. Unavailable until their behaviour is decided. */}
-            {['Sign in', 'Sign out'].map((l) => (
+            {['sign in', 'sign out'].map((l) => (
               <button
                 key={l}
                 type="button"

@@ -3,12 +3,15 @@ import { setPage, useCurrentPage, usePageCount } from '../store/layout'
 import { useSearchQuery } from '../store/ui'
 import { springs } from '../lib/motion'
 
-/** Bottom-centre page dots. Nothing else lives at the bottom. */
+/**
+ * Bottom-centre page dots. Nothing else lives at the bottom. With a single page the lone dot still shows (the spec's
+ * "bottom: page dots only"); hidden only while searching.
+ */
 export default function PageDots({ isMobile }: { isMobile: boolean }) {
   const count = usePageCount()
   const page = useCurrentPage()
   const query = useSearchQuery()
-  if (query.trim() || count < 2) return null
+  if (query.trim()) return null
   return (
     <nav
       aria-label="pages"

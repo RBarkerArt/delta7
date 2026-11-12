@@ -62,6 +62,11 @@ export function usePagerGestures(el: HTMLElement | null, width: number, enabled:
       const dx = e.clientX - startX
       const dy = e.clientY - startY
       if (!dragging) {
+        // One page: nothing to page to, so no drag and no rubber band (taps stay plain taps).
+        if (getPageCount() < 2) {
+          pointerId = null
+          return
+        }
         if (Math.abs(dx) < DRAG_THRESHOLD || Math.abs(dx) < Math.abs(dy)) {
           if (Math.abs(dy) > DRAG_THRESHOLD * 2) pointerId = null // vertical intent: give up
           return
@@ -135,7 +140,8 @@ export function usePagerGestures(el: HTMLElement | null, width: number, enabled:
     }
     const onWheel = (e: WheelEvent) => {
       if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return
-      e.preventDefault()
+      e.preventDefault() // also with one page: a sideways trackpad swipe never pans or navigates the browser
+      if (getPageCount() < 2) return
       if (idleTimer) clearTimeout(idleTimer)
       idleTimer = setTimeout(release, WHEEL_IDLE_MS)
       if (locked) return

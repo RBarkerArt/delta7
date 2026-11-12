@@ -18,7 +18,7 @@ export interface FakePlayback {
 }
 
 /**
- * Silent stand-in playback for the audio and video apps: play/pause advances a progress value over `seconds`, stops
+ * Silent stand-in playback for the video app: play/pause advances a progress value over `seconds`, stops
  * at the end. No media element, no sound.
  */
 export function useFakePlayback(seconds: number): FakePlayback {

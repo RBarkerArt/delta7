@@ -128,7 +128,7 @@ desktop (home icons and page dots).
 | ``Ctrl+` `` (or ``Alt+` ``) | cycle between open windows; from the top bar or desktop, go back into the front window |
 | `Esc` | close the open popover, then the focused window |
 | `Tab` / `Shift+Tab` | move inside the current region (a focused window keeps Tab inside itself; the top bar and desktop never tab into a window) |
-| `←` / `→` | page the home (from an icon, focus moves to the first icon of the new page) |
+| `←` / `→` | page the home when it has more than one page (from an icon, focus moves to the first icon of the new page) |
 | `Enter` | open the focused icon |
 | `↑` / `↓`, `Home` / `End` | in the four-dot menu: move between its items (it opens with focus on the first one) |
 
@@ -141,8 +141,8 @@ OS (one history entry, same URL); with nothing open it leaves as usual. The desk
 - `boot/` — boot animation, lock screen, "only asleep" session flag
 - `shell/` — top bar, four-dot menu, search, home pager, app icons, page dots, notification banner
 - `windows/` — desktop window manager (drag, resize, maximize, minimize) and full-screen phone sheets with close gestures
-- `apps/` — app registry and the stand-in apps. Home page one: delta7, tuner, gallery, video, messages, files, logs;
-  page two: audio, notes, lab, archive, keep (icon placement is data in `store/layout.ts`)
+- `apps/` — app registry and the stand-in apps. One home page: delta7, tuner, gallery, video, messages, files, logs
+  (icon placement is data in `store/layout.ts`, so more pages can come back later)
 - `delta7/` — the Delta7 dashboard and its coherence-driven decay
 - `tuner/` — the tuner (dial, waveform, lock at the target frequency, optional Web Audio)
 - `store/` — tiny `useSyncExternalStore` stores (settings, windows, layout, coherence, tuner, clock, …)
@@ -153,7 +153,7 @@ OS (one history entry, same URL); with nothing open it leaves as usual. The desk
 
 **What's mocked.** Everything story- or account-related is a stand-in. Search the tree for these tags:
 `TODO(engine)` (day clock, coherence, absence decay, "only asleep" window — see `src/os/mock/`), `TODO(auth)` (the lock
-screen's password and the menu's sign in / sign out; nothing is checked or sent anywhere), `TODO(copy)` (all text and file
+screen's password and the menu's sign in / sign out, which is hidden for now; nothing is checked or sent anywhere), `TODO(copy)` (all text and file
 names inside apps) and `TODO(story)` (hooks such as search and bleeds for later).
 
 **Tests.** Unit tests for the pure logic (decay floors and recovery, tuner lock and clarity, decay plan, heartbeat) run on

@@ -8,11 +8,6 @@ export type AppId =
   | 'messages'
   | 'files'
   | 'logs'
-  | 'audio'
-  | 'notes'
-  | 'lab'
-  | 'archive'
-  | 'keep'
 
 export type AppParams = Record<string, string>
 

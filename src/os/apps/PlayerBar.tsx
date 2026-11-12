@@ -3,7 +3,7 @@ import { Pause, Play } from 'lucide-react'
 import { mmss } from './useFakePlayback'
 import type { FakePlayback } from './useFakePlayback'
 
-/** The quiet player bar under the audio and video apps: play/pause · elapsed · bar · length. */
+/** The quiet player bar under the video app: play/pause · elapsed · bar · length. */
 export default function PlayerBar({ playback, seconds, testIdPrefix }: { playback: FakePlayback; seconds: number; testIdPrefix: string }) {
   const { playing, progress, elapsed, toggle } = playback
   return (
