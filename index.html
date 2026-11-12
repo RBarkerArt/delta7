@@ -5,6 +5,19 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Delta 7 Project</title>
+    <script>
+      // Paint the root dark before the (lazy) app stylesheet arrives: the live game is #050505, the OS shell (/os)
+      // starts on its boot colour. Same path test as src/main.tsx.
+      (function () {
+        try {
+          var p = location.pathname;
+          var os = p === '/os' || p.indexOf('/os/') === 0;
+          document.documentElement.style.backgroundColor = os ? '#251b21' : '#050505';
+        } catch (e) {
+          /* never block the page */
+        }
+      })();
+    </script>
   </head>
   <body>
     <script>

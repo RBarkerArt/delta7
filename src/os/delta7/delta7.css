@@ -1,0 +1,187 @@
+/* Delta7 dashboard — a homemade tool. Plainer than the OS's own apps, on purpose. Scoped under .d7. */
+
+.d7 {
+  --d7-paper: #f4eee5;
+  --d7-sheet: #fbf8f3;
+  --d7-side: #ebe3d7;
+  --d7-ink: #3a3034;
+  /* ≥ 4.5:1 on every Delta7 surface (sheet, paper, side panel, header). */
+  --d7-soft: #6a5e60;
+  --d7-rule: rgba(58, 48, 52, 0.16);
+  --d7-accent: #9b5e5e;
+  background: var(--d7-paper);
+  color: var(--d7-ink);
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Decay transitions: drift, never jump. Only transform/opacity animate. */
+.d7-fx {
+  transition:
+    transform 850ms cubic-bezier(0.3, 0.7, 0.2, 1),
+    opacity 850ms ease;
+}
+.d7-reduced .d7-fx {
+  transition: opacity 160ms ease-out;
+}
+
+/* One panel family: thin border, small radius, faint shadow. */
+.d7-panel {
+  background: var(--d7-sheet);
+  border: 1px solid var(--d7-rule);
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(40, 24, 30, 0.06);
+}
+/* A torn panel loses its outline on the torn side; a soft drop-shadow on the wrapper keeps the edge readable. */
+.d7-torn {
+  filter: drop-shadow(0 1px 1px rgba(40, 24, 30, 0.12));
+}
+
+/* Default-looking controls (what you get if you don't style anything, warmed a little). */
+.d7-btn {
+  border: 1px solid #b4a99f;
+  border-radius: 3px;
+  background: linear-gradient(#fffdf9, #ece5db);
+  padding: 1px 9px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--d7-ink);
+  cursor: default;
+}
+.d7-btn:hover {
+  background: linear-gradient(#ffffff, #f2ece3);
+}
+.d7-btn:active {
+  background: #e6ded3;
+}
+.d7-btn:focus-visible,
+.d7-hit:focus-visible > .d7-btn,
+.d7-select:focus-visible,
+.d7 input[type='checkbox']:focus-visible,
+.d7-row:focus-visible,
+.d7-nav-btn:focus-visible {
+  outline: 2px solid rgba(155, 94, 94, 0.55);
+  outline-offset: 1px;
+}
+.d7-select {
+  border: 1px solid #b4a99f;
+  border-radius: 3px;
+  background: #fffdf9;
+  font-size: 13px;
+  height: 24px;
+  padding: 0 4px;
+  color: var(--d7-ink);
+}
+.d7 input[type='checkbox'] {
+  accent-color: var(--d7-accent);
+}
+
+/* The one label in a mismatched monospace. */
+.d7-courier {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.d7-row {
+  cursor: default;
+}
+.d7-row:hover {
+  background: rgba(155, 94, 94, 0.07);
+}
+
+.d7-nav-btn {
+  cursor: default;
+  opacity: var(--d7-nav-o, 1);
+}
+/* A faded or ghosted item comes back under the hand / focus. */
+.d7-nav-btn:hover,
+.d7-nav-btn:focus-visible {
+  opacity: max(var(--d7-nav-o, 1), 0.92);
+}
+/* Ghosted: a faint double, as if printed twice. Still legible, still clickable. */
+.d7-ghost > span {
+  text-shadow: 3px 0 0 rgba(58, 48, 52, 0.2);
+}
+
+/* Hit areas. A control wrapped in .d7-hit keeps its small look; on phones (compact) the hit area grows to 44px. */
+.d7-hit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  outline: none;
+  cursor: default;
+}
+.d7-hit:hover > .d7-btn {
+  background: linear-gradient(#ffffff, #f2ece3);
+}
+.d7-hit:active > .d7-btn {
+  background: #e6ded3;
+}
+.d7-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.d7[data-compact='true'] .d7-hit {
+  min-width: 44px;
+  min-height: 44px;
+}
+.d7[data-compact='true'] .d7-check {
+  min-height: 44px;
+  padding: 0 8px 0 12px;
+  margin-left: -4px;
+}
+.d7[data-compact='true'] .d7-hit + .d7-check {
+  margin-left: 4px;
+}
+.d7[data-compact='true'] .d7-select {
+  height: 44px;
+  padding: 0 8px;
+}
+/* 48px rows: a little spare so a tilted panel still keeps a full 44px under the finger. */
+.d7[data-compact='true'] .d7-row,
+.d7[data-compact='true'] .d7-nav-btn {
+  min-height: 48px;
+  align-items: center;
+}
+
+/* Static film grain — never animated, never clickable. Steps between decay levels with a short fade. */
+.d7-grain {
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.23  0 0 0 0 0.18  0 0 0 0 0.2  0 0 0 1.1 -0.2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-size: 180px 180px;
+  /* Normal blending on purpose: dark specks at low alpha read the same on the light paper as a multiply did, without
+     re-compositing the whole area whenever anything beneath it (the chart, a panel, the window) changes. */
+  transition: opacity 200ms ease;
+}
+
+/* Dusk closing in at the edges. Warm grey-plum, never black. */
+.d7-vignette {
+  pointer-events: none;
+  background: radial-gradient(ellipse 85% 80% at 50% 45%, rgba(74, 58, 68, 0) 55%, rgba(74, 58, 68, 0.2) 82%, rgba(60, 46, 54, 0.38) 100%);
+}
+
+/* The log line that rewrites itself: two texts cross-fading slowly. */
+.d7-rewrite > span {
+  transition: opacity 1400ms ease;
+}
+.d7-reduced .d7-rewrite > span {
+  transition: opacity 160ms ease-out;
+}
+
+.d7-feed {
+  background:
+    radial-gradient(ellipse 60% 55% at 68% 38%, rgba(232, 168, 120, 0.75), rgba(232, 168, 120, 0) 70%),
+    radial-gradient(ellipse 80% 60% at 20% 80%, rgba(110, 84, 96, 0.55), rgba(110, 84, 96, 0) 75%),
+    linear-gradient(170deg, #b89a96 0%, #a5838a 45%, #8c7079 100%);
+}
+.d7-feed-wash {
+  background: linear-gradient(180deg, #b7aeb0, #a49a9e);
+  mix-blend-mode: color;
+  pointer-events: none;
+}
+
+
+.d7-edge {
+  touch-action: pan-y;
+}

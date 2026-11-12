@@ -1,19 +1,12 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import App from './App.tsx'
-import { initAnalytics } from './lib/analytics'
-
-if (import.meta.env.VITE_ENABLE_APP_CHECK === 'true') {
-  void import('./lib/appCheck').then(({ initAppCheck }) => initAppCheck());
-} else if (import.meta.env.DEV) {
-  console.info('[Delta-7] App Check disabled. Set VITE_ENABLE_APP_CHECK=true after Firebase App Check is configured.');
+// Entry switch. Picks the OS shell or the live game by path BEFORE importing anything heavy, so the OS bundle never
+// pulls in Firebase or the legacy CSS. The OS lives at /os (and /os/…); every other path is the live game, unchanged.
+// Keep the path test in step with the background script in index.html.
+function isOSPath(pathname: string): boolean {
+  return pathname === '/os' || pathname.startsWith('/os/')
 }
 
-void initAnalytics();
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+if (isOSPath(window.location.pathname)) {
+  void import('./os/entry')
+} else {
+  void import('./legacyEntry')
+}
