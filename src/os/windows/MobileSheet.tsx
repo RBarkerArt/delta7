@@ -146,7 +146,8 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
             </span>
           </button>
         </div>
-        <div className="os-selectable relative min-h-0 flex-1 overflow-auto overscroll-contain">
+        {/* z-0: its own stacking context, so nothing inside an app (e.g. a drawer) can cover the strip's close button. */}
+        <div className="os-selectable relative z-0 min-h-0 flex-1 overflow-auto overscroll-contain">
           <AppBody app={app} isMobile />
         </div>
         <div
