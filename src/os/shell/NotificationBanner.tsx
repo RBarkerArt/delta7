@@ -78,12 +78,13 @@ export default function NotificationBanner() {
               type="button"
               onClick={open}
               aria-label={`${n.text}. open delta7 tuner`}
-              className="flex min-h-[48px] flex-1 items-center gap-3 rounded-[13px] py-2.5 pl-3.5 pr-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-os-ink/30"
+              className="flex min-h-[48px] min-w-0 flex-1 items-center gap-3 rounded-[13px] py-2.5 pl-3.5 pr-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-os-ink/30"
             >
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-os-plum text-os-cream/95">
                 <WaveGlyph size={16} strokeWidth={1.5} />
               </span>
-              <span className="min-w-0 flex-1 truncate font-os-mono text-[12.5px] tracking-[0.01em] text-os-ink/90">{n.text}</span>
+              {/* Wraps instead of truncating, so longer copy never pushes the dismiss control out of the banner. */}
+              <span className="min-w-0 flex-1 font-os-mono text-[12.5px] leading-snug tracking-[0.01em] text-os-ink/90">{n.text}</span>
             </button>
             <button
               type="button"
