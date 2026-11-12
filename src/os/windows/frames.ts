@@ -24,7 +24,10 @@ export const TOP_INSET = 64
 export const EDGE = 8
 /** Maximized windows keep a hair of wallpaper around them. */
 export const MAX_GAP = 6
-const CASCADE_STEP = 30
+/** Offset between cascaded windows. */
+export const CASCADE_STEP = 30
+/** Height of a desktop window's title bar (TitleBar `h-12`). */
+export const TITLE_H = 48
 
 export function viewport(): Viewport {
   return { w: window.innerWidth, h: window.innerHeight }
@@ -51,17 +54,25 @@ export function maxSize(vp: Viewport) {
   return { w: Math.max(200, vp.w - EDGE * 2), h: Math.max(160, vp.h - TOP_INSET - EDGE) }
 }
 
-/** Size first (never larger than the viewport, never smaller than min), then position inside bounds. */
+/** Whole pixels, so a frame saved, maximized and restored comes back exactly (no sub-pixel drift per cycle). */
+export function roundFrame(f: Frame): Frame {
+  return { x: Math.round(f.x), y: Math.round(f.y), w: Math.round(f.w), h: Math.round(f.h) }
+}
+
+/**
+ * Size first (never larger than the viewport, never smaller than min), then position inside bounds, in whole pixels.
+ * The whole title bar, controls included, always ends up inside the viewport and under the top bar.
+ */
 export function clampFrame(f: Frame, min: { w: number; h: number }, vp: Viewport): Frame {
   const max = maxSize(vp)
-  const w = clamp(f.w, Math.min(min.w, max.w), max.w)
-  const h = clamp(f.h, Math.min(min.h, max.h), max.h)
+  const w = Math.round(clamp(f.w, Math.min(min.w, max.w), max.w))
+  const h = Math.round(clamp(f.h, Math.min(min.h, max.h), max.h))
   const b = bounds(w, h, vp)
-  return { w, h, x: clamp(f.x, b.minX, b.maxX), y: clamp(f.y, b.minY, b.maxY) }
+  return { w, h, x: Math.round(clamp(f.x, b.minX, b.maxX)), y: Math.round(clamp(f.y, b.minY, b.maxY)) }
 }
 
 export function maximizedFrame(vp: Viewport): Frame {
-  return { x: MAX_GAP, y: TOP_INSET, w: vp.w - MAX_GAP * 2, h: vp.h - TOP_INSET - MAX_GAP }
+  return { x: MAX_GAP, y: TOP_INSET, w: Math.round(vp.w) - MAX_GAP * 2, h: Math.round(vp.h) - TOP_INSET - MAX_GAP }
 }
 
 /** Soft resistance past an edge: follows 1:1 at first, then flattens out (never more than ~`limit` px). */
@@ -109,7 +120,16 @@ export function saveFrame(id: AppId, f: SavedFrame) {
   })
 }
 
-/** Where a window opens: its remembered frame if any, else centred with a cascade offset so windows don't stack exactly. */
+/** The default size of a window in this viewport. */
+export function defaultSize(def: AppDefinition, vp: Viewport) {
+  const max = maxSize(vp)
+  return { w: Math.min(def.defaultSize.w, max.w), h: Math.min(def.defaultSize.h, max.h - 40) }
+}
+
+/**
+ * A window's default slot: its remembered frame if any, else centred with a cascade offset. Used by "Reset window
+ * positions" and as the restore fallback; a newly opened window is placed by `placeWindow` (placement.ts).
+ */
 export function initialFrame(def: AppDefinition, cascadeIndex: number, vp: Viewport): SavedFrame {
   const saved = loadFrame(def.id)
   if (saved) return { ...clampFrame(saved, def.minSize, vp), maximized: saved.maximized }

@@ -14,8 +14,13 @@ interface LockState {
   phase: LockPhase
   /** Lock screen auto-resumes (no password) because the session was only asleep. */
   autoResume: boolean
-  /** The shell has been shown at least once (it stays mounted, inert, when re-locked). */
+  /**
+   * The shell is mounted (inert and invisible while locked). It mounts quietly behind the lock screen once the lock
+   * has settled, so the unlock only has to animate; it stays mounted, inert, when re-locked.
+   */
   shellMounted: boolean
+  /** Unlock was asked for before the shell had mounted: the lock is already inert; the move starts once it has. */
+  unlockPending: boolean
 }
 
 const SESSION_KEY = 'session'
@@ -28,6 +33,8 @@ export const RESUME_BEAT_MS = 600
 /** Unlock transition length (lock content lifts away, home eases in). */
 export const UNLOCK_MS = 620
 export const UNLOCK_MS_REDUCED = 220
+/** After the lock screen has eased in, the shell mounts behind it (so mounting never eats the unlock animation). */
+export const PREPARE_SHELL_MS = 750
 
 export const skipBoot: boolean = urlFlag('skipboot')
 const forceLock: boolean = urlFlag('lock')
@@ -49,8 +56,8 @@ export function markSession() {
 
 export const lockStore = createStore<LockState>(
   skipBoot
-    ? { phase: 'home', autoResume: false, shellMounted: true }
-    : { phase: 'boot', autoResume: !forceLock && sessionIsAsleep(), shellMounted: false },
+    ? { phase: 'home', autoResume: false, shellMounted: true, unlockPending: false }
+    : { phase: 'boot', autoResume: !forceLock && sessionIsAsleep(), shellMounted: false, unlockPending: false },
 )
 
 export function useLockPhase(): LockPhase {
@@ -62,6 +69,9 @@ export function useAutoResume(): boolean {
 export function useShellMounted(): boolean {
   return lockStore.use((s) => s.shellMounted)
 }
+export function useUnlockPending(): boolean {
+  return lockStore.use((s) => s.unlockPending)
+}
 /** True while the home must not react to input (booting, locked, or mid-unlock). */
 export function isLocked(): boolean {
   return lockStore.get().phase !== 'home'
@@ -71,12 +81,36 @@ export function finishBoot() {
   lockStore.set((s) => (s.phase === 'boot' ? { phase: 'lock' } : {}))
 }
 
-/** Any input unlocks — the password is not checked. TODO(auth): this becomes the Firebase login later. */
+/** Mount the shell behind the lock screen (inert, invisible) ahead of the unlock. */
+export function prepareShell() {
+  lockStore.set((s) => (s.shellMounted ? {} : { shellMounted: true }))
+}
+
+/** Keyboard focus leaves the lock screen the moment unlock starts (it goes to the page; Tab lands in the top bar). */
+function releaseLockFocus() {
+  if (typeof document === 'undefined') return
+  const a = document.activeElement
+  if (a instanceof HTMLElement && a.closest('[data-testid="lock-screen"]')) a.blur()
+}
+
+/**
+ * Any input unlocks — the password is not checked. TODO(auth): this becomes the Firebase login later.
+ * If the shell hasn't mounted yet it mounts first (the lock stays put, already inert) and the move starts once it
+ * has painted (`beginUnlock`), so the transition is always seen in full.
+ */
 export function unlock() {
-  if (lockStore.get().phase !== 'lock') return
+  const s = lockStore.get()
+  if (s.phase !== 'lock' || s.unlockPending) return
   markSession()
   haptic()
-  lockStore.set({ phase: 'unlocking', shellMounted: true })
+  releaseLockFocus()
+  if (s.shellMounted) lockStore.set({ phase: 'unlocking' })
+  else lockStore.set({ shellMounted: true, unlockPending: true })
+}
+
+/** The shell has mounted and painted: start the unlock move. */
+export function beginUnlock() {
+  lockStore.set((s) => (s.unlockPending ? { unlockPending: false, phase: 'unlocking' } : {}))
 }
 
 export function finishUnlock() {
@@ -87,7 +121,7 @@ export function finishUnlock() {
 export function relock() {
   removeKey(SESSION_KEY)
   haptic()
-  lockStore.set({ phase: 'lock', autoResume: false })
+  lockStore.set({ phase: 'lock', autoResume: false, unlockPending: false })
 }
 
 /* Keep the "only asleep" flag fresh while the home is in use (tab hidden, page closed). Not with ?skipboot. */

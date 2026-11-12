@@ -8,6 +8,7 @@ import PageDots from './shell/PageDots'
 import NotificationBanner from './shell/NotificationBanner'
 import WindowLayer from './windows/WindowLayer'
 import { useGlobalKeys } from './shell/useGlobalKeys'
+import { useBackGuard } from './shell/useBackGuard'
 import { useIsMobile } from './store/device'
 import { useCurrentPage } from './store/layout'
 import { useSheetRaised } from './store/ui'
@@ -25,6 +26,7 @@ export default function OSApp() {
   const devOpen = useDevOpen()
   const sheetRaised = useSheetRaised()
   useGlobalKeys()
+  useBackGuard(isMobile)
 
   return (
     <MotionConfig reducedMotion={reduced ? 'always' : 'never'}>
@@ -38,7 +40,13 @@ export default function OSApp() {
           <Wallpaper />
           {/* First in the DOM so keyboard order on the home is top bar → icons → page dots (stacking is by z-index). */}
           <TopBar isMobile={isMobile} />
-          <main aria-label="desktop" data-os-region="desktop" className={`absolute inset-x-0 ${isMobile ? 'bottom-[64px] top-12' : 'bottom-[64px] top-16'}`}>
+          {/* The bottom band is reserved for the page dots (phone: their 44px hit area), so no label sits under them. */}
+          <main
+            aria-label="desktop"
+            data-os-region="desktop"
+            className={`absolute inset-x-0 ${isMobile ? 'top-12' : 'top-16'}`}
+            style={{ bottom: isMobile ? 'calc(env(safe-area-inset-bottom, 0px) + 84px)' : 64 }}
+          >
             <HomePager isMobile={isMobile} />
           </main>
           <PageDots isMobile={isMobile} />

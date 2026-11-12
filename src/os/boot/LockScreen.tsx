@@ -7,6 +7,8 @@ import { useClock } from '../store/clock'
 interface Props {
   /** Unlock has begun: the content lifts away and the veil clears. */
   leaving: boolean
+  /** Unlock was asked for (possibly still waiting for the shell): the lock no longer takes input or focus. */
+  releasing: boolean
   /** Session was only asleep: no field, a quiet `resuming…` line, unlocks by itself. */
   autoResume: boolean
   isMobile: boolean
@@ -20,10 +22,10 @@ const VEIL =
  * Lock screen foreground: a soft veil over the (blurred) wallpaper, the time, an abstract picture and a plain
  * password field. ANY input unlocks, including an empty one. No account name, no error states.
  */
-export default function LockScreen({ leaving, autoResume, isMobile, reduced }: Props) {
+export default function LockScreen({ leaving, releasing, autoResume, isMobile, reduced }: Props) {
   const time = useClock()
   const [value, setValue] = useState('')
-  const ease = { duration: reduced ? 0.2 : 0.42, ease: [0.32, 0.72, 0, 1] as const }
+  const ease = { duration: reduced ? 0.2 : 0.45, ease: [0.4, 0, 0.2, 1] as const }
 
   return (
     <div
@@ -31,7 +33,8 @@ export default function LockScreen({ leaving, autoResume, isMobile, reduced }: P
       role="dialog"
       aria-modal="true"
       aria-label="locked"
-      className={`os-chrome fixed inset-0 z-[2500] font-os-sans text-os-cream ${leaving ? 'pointer-events-none' : ''}`}
+      inert={releasing}
+      className={`os-chrome fixed inset-0 z-[2500] font-os-sans text-os-cream ${releasing ? 'pointer-events-none' : ''}`}
     >
       <motion.div
         aria-hidden="true"
@@ -48,7 +51,7 @@ export default function LockScreen({ leaving, autoResume, isMobile, reduced }: P
           paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 6vh)',
         }}
         initial={reduced ? { opacity: 0 } : { opacity: 0, y: 14 }}
-        animate={leaving ? { opacity: 0, y: reduced ? 0 : -40 } : { opacity: 1, y: 0 }}
+        animate={leaving ? { opacity: 0, y: reduced ? 0 : -32 } : { opacity: 1, y: 0 }}
         transition={leaving ? ease : { duration: reduced ? 0.2 : 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
         <time
@@ -90,9 +93,10 @@ export default function LockScreen({ leaving, autoResume, isMobile, reduced }: P
                 aria-label="password"
                 data-testid="lock-password"
                 autoFocus={!isMobile}
+                style={{ fontSize: isMobile ? 16 : 14 }}
                 autoComplete="off"
                 spellCheck={false}
-                className="os-selectable h-11 w-[min(212px,56vw)] rounded-[12px] border border-os-ink/25 bg-os-cream/95 px-3.5 text-[14px] text-os-ink shadow-[0_6px_20px_-10px_rgba(30,18,24,0.55)] outline-none transition-[background-color,box-shadow] duration-200 placeholder:font-os-mono placeholder:text-[12.5px] placeholder:lowercase placeholder:tracking-[0.06em] placeholder:os-text-soft focus:bg-os-cream focus-visible:ring-2 focus-visible:ring-os-cream/60"
+                className="os-selectable h-11 w-[min(212px,56vw)] rounded-[12px] border border-os-ink/25 bg-os-cream/95 px-3.5 text-os-ink shadow-[0_6px_20px_-10px_rgba(30,18,24,0.55)] outline-none transition-[background-color,box-shadow] duration-200 placeholder:font-os-mono placeholder:text-[12.5px] placeholder:lowercase placeholder:tracking-[0.06em] placeholder:os-text-soft focus:bg-os-cream focus-visible:ring-2 focus-visible:ring-os-cream/60"
               />
               <button
                 type="submit"

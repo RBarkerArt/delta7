@@ -67,7 +67,7 @@ export default function SearchPanel({ anchorRef }: { anchorRef: RefObject<HTMLBu
               closePopover()
             }
           }}
-          className="os-selectable w-full bg-transparent font-os-mono text-[13px] lowercase text-os-ink outline-none placeholder:os-text-soft"
+          className="os-selectable os-input-phone w-full self-stretch bg-transparent font-os-mono text-[13px] lowercase text-os-ink outline-none placeholder:os-text-soft"
         />
       </label>
     </motion.div>

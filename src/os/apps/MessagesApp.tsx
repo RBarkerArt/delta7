@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Plus } from 'lucide-react'
 import SidebarLayout from './SidebarLayout'
 import { THREADS } from '../mock/placeholderContent'
 import type { Message } from '../mock/placeholderContent'
 import { useClock } from '../store/clock'
+import { useReducedMotionPref } from '../lib/useReducedMotionPref'
 import type { AppProps } from '../types'
 
 function Bubble({ m }: { m: Message }) {
@@ -29,8 +30,18 @@ export default function MessagesApp({ isMobile }: AppProps) {
   const [sent, setSent] = useState<Record<string, Message[]>>({})
   const [draft, setDraft] = useState('')
   const now = useClock()
+  const reduced = useReducedMotionPref()
+  const listRef = useRef<HTMLDivElement>(null)
   const thread = THREADS.find((t) => t.id === threadId) ?? THREADS[0]
   const messages = [...thread.messages, ...(sent[thread.id] ?? [])]
+  const sentHere = sent[thread.id]?.length ?? 0
+
+  // After sending, bring the new bubble (and its time) into view above the input.
+  useEffect(() => {
+    if (sentHere === 0) return
+    const el = listRef.current
+    el?.scrollTo({ top: el.scrollHeight, behavior: reduced ? 'auto' : 'smooth' })
+  }, [sentHere, reduced])
 
   const send = (e: FormEvent) => {
     e.preventDefault()
@@ -58,7 +69,7 @@ export default function MessagesApp({ isMobile }: AppProps) {
       }
     >
       <div className="flex h-full flex-col">
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-5" data-testid="messages-list">
+        <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-5" data-testid="messages-list">
           {messages.map((m, i) => (
             <Bubble key={i} m={m} />
           ))}

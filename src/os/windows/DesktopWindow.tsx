@@ -4,13 +4,15 @@ import AppBody from './AppBody'
 import LaunchVeil from './LaunchVeil'
 import ResizeHandles from './ResizeHandles'
 import TitleBar from './TitleBar'
-import { clampFrame, initialFrame, maximizedFrame, saveFrame, viewport } from './frames'
+import { clampFrame, initialFrame, loadFrame, maximizedFrame, saveFrame, viewport } from './frames'
 import type { Frame } from './frames'
+import { registerLiveFrame, visibleFramesExcept } from './liveFrames'
+import { placeWindow } from './placement'
 import { centrePose, iconRadius, identityPose, landSpring, launchSpring, poseOnto } from './pose'
 import { usePose } from './usePose'
 import { takeFocusOnPointer, useWindowFocus } from './useWindowFocus'
 import { windowTitleId } from './titleId'
-import { animateFrame, readFrame, useFrameGestures, writeFrame } from './useFrameGestures'
+import { animateFrame, readFrame, settledFrame, stopFrame, useFrameGestures, writeFrame } from './useFrameGestures'
 import type { FrameValues } from './useFrameGestures'
 import { getApp } from '../apps/registry'
 import { closeApp, focusApp, getVisibleIconRect, minimizeApp, onResetWindowPositions } from '../store/windows'
@@ -24,7 +26,7 @@ const DESKTOP_GLYPH = Math.round(112 * 0.42) // glyph size on a desktop icon til
 interface Props {
   app: OpenApp
   focused: boolean
-  /** Position among open windows at mount; only used to cascade a window that has no remembered frame. */
+  /** Position among open windows; the default slot "Reset window positions" sends this window back to. */
   cascadeIndex: number
 }
 
@@ -38,8 +40,9 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
   const reduced = useReducedMotionPref()
   const [isPresent, safeToRemove] = usePresence()
   const [init] = useState(() => {
+    // Placed relative to the windows already open, so it never lands fully over (or under) one of them.
     const vp = viewport()
-    const saved = initialFrame(def, cascadeIndex, vp)
+    const saved = placeWindow(def, loadFrame(def.id), initialFrame(def, 0, vp), visibleFramesExcept(app.id), vp)
     return { saved, start: saved.maximized ? maximizedFrame(vp) : saved }
   })
   const [maximized, setMaximizedState] = useState(init.saved.maximized)
@@ -54,6 +57,7 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
   const pose = usePose({ ...identityPose(RADIUS), o: 0 })
   const sectionRef = useRef<HTMLElement>(null)
   useWindowFocus(sectionRef, app.id)
+  useEffect(() => registerLiveFrame(app.id, () => readFrame(frame)), [app.id, frame])
 
   const setMaximized = useCallback((v: boolean) => {
     maxRef.current = v
@@ -85,7 +89,7 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
       setMaximized(false)
       void animateFrame(frame, to, reduced).then(commit)
     } else {
-      restoreRef.current = readFrame(frame)
+      restoreRef.current = settledFrame(frame)
       setMaximized(true)
       void animateFrame(frame, maximizedFrame(vp), reduced).then(commit)
     }
@@ -144,11 +148,16 @@ export default function DesktopWindow({ app, focused, cascadeIndex }: Props) {
     [def, frame, reduced, setMaximized, app.minimized],
   )
 
-  // Keep the window inside the viewport when the viewport changes.
+  // Keep the window inside the viewport whenever the viewport changes: its whole title bar, controls included, stays in
+  // view and under the top bar. A spring still in flight is stopped first (it would otherwise carry on to an
+  // off-screen target), and a maximized window's restore frame is clamped too.
   useEffect(() => {
     const onResize = () => {
       const vp = viewport()
-      writeFrame(frame, maxRef.current ? maximizedFrame(vp) : clampFrame(readFrame(frame), def.minSize, vp))
+      const to = maxRef.current ? maximizedFrame(vp) : clampFrame(settledFrame(frame), def.minSize, vp)
+      stopFrame(frame)
+      writeFrame(frame, to)
+      if (restoreRef.current) restoreRef.current = clampFrame(restoreRef.current, def.minSize, vp)
     }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)

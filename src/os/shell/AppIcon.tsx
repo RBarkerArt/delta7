@@ -67,9 +67,11 @@ export default function AppIcon({ appId, isMobile }: Props) {
       >
         <span className="block truncate">{app.label}</span>
       </span>
+      {/* "Still open" dot: small and quiet, but big and bright enough to find a minimized app by. */}
       <span
         aria-hidden="true"
-        className={`mt-1 h-1 w-1 rounded-full bg-os-cream/80 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
+        data-testid={`open-dot-${appId}`}
+        className={`mt-1 h-1.5 w-1.5 rounded-full bg-os-cream shadow-[0_0_0_0.5px_rgba(40,24,30,0.25),0_0_5px_rgba(40,24,30,0.55)] transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0'}`}
       />
     </button>
   )

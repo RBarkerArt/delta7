@@ -15,7 +15,8 @@
     overflow: hidden;
     overscroll-behavior: none;
     cursor: default;
-    background: #6f5a60;
+    /* The boot colour (same as the index.html head script), so the first paint never flashes another shade. */
+    background: #251b21;
     color: #f3ede4;
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
@@ -91,6 +92,35 @@
       0 0 7px 1px rgba(40, 24, 30, 0.16);
     pointer-events: none;
   }
+  /*
+   * The top-bar clock: the label-pill language at a lower strength (lighter fill, gentler blur, a feathered rim), so
+   * the time holds at AA on every wallpaper without the dark smudge of a blurred halo.
+   */
+  .os-clock-pill {
+    position: relative;
+    z-index: 0;
+    padding: 0.16em 0.6em 0.2em 0.66em;
+    text-shadow: 0 1px 1.5px rgba(40, 24, 30, 0.4);
+  }
+  .os-clock-pill::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: 999px;
+    background: rgba(40, 24, 30, 0.12);
+    -webkit-backdrop-filter: blur(6px) brightness(0.95);
+    backdrop-filter: blur(6px) brightness(0.95);
+    box-shadow:
+      inset 0 0 0 0.5px rgba(255, 240, 228, 0.05),
+      0 0 10px 2px rgba(40, 24, 30, 0.08);
+    pointer-events: none;
+  }
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .os-clock-pill::before {
+      background: rgba(40, 24, 30, 0.2);
+    }
+  }
   [data-mobile='true'] .os-label-pill {
     padding-inline: 0.6em;
   }
@@ -110,6 +140,10 @@
   }
   [data-mobile='true'] .os-tap-h {
     min-height: 44px;
+  }
+  /* Text fields on phones: 16px or more, or iOS zooms the page on focus and stays zoomed. */
+  [data-mobile='true'] .os-input-phone {
+    font-size: 16px;
   }
   /* Secondary ink on cream panels (dates, counts, hints). Passes AA on cream, the sidebar cream and selected rows. */
   .os-text-soft {

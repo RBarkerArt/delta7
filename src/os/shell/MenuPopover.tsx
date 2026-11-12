@@ -3,9 +3,10 @@ import type { RefObject } from 'react'
 import { motion } from 'motion/react'
 import Switch from './Switch'
 import WallpaperPicker from './WallpaperPicker'
-import { MENU_ITEMS } from './menuItems'
+import { itemsFor } from './menuItems'
 import type { MenuItem } from './menuItems'
 import { usePopoverDismiss } from './usePopoverDismiss'
+import { useMenuKeys } from './useMenuKeys'
 import { closePopover } from '../store/ui'
 import { resetWindowPositions } from '../store/windows'
 import { setReduceMotion, setSound, setVibrate, useSettings } from '../store/settings'
@@ -21,11 +22,20 @@ const SETTERS: Record<'sound' | 'reduceMotion' | 'vibrate', (v: boolean) => void
 
 const row = 'os-tap-h flex w-full items-center justify-between gap-4 rounded-[9px] px-3 py-[7px] text-left text-[13.5px] text-os-ink'
 const rowHover = 'outline-none hover:bg-os-ink/[0.05] focus-visible:bg-os-ink/[0.06] focus-visible:ring-1 focus-visible:ring-os-ink/20'
+/** Shown but not available yet: muted, no hover or press, skipped by the keyboard. */
+const unavailable = 'cursor-default opacity-50 outline-none'
 
+/** Clicking anywhere on the row (label included) flips the switch; the switch itself stays the focusable control. */
 function ToggleRow({ item }: { item: Extract<MenuItem, { kind: 'toggle' }> }) {
   const value = useSettings((s: Settings) => s[item.setting])
   return (
-    <div className={row}>
+    <div
+      className={`${row} cursor-default hover:bg-os-ink/[0.05]`}
+      onClick={(e) => {
+        if ((e.target as Element).closest('button')) return // the switch handles its own click
+        SETTERS[item.setting](!value)
+      }}
+    >
       <span>
         {item.label}
         {item.hint ? <span className="ml-1.5 font-os-mono text-[11px] os-text-soft">{item.hint}</span> : null}
@@ -72,12 +82,19 @@ function Item({ item }: { item: MenuItem }) {
     case 'separator':
       return <div className="mx-3 my-1.5 h-px bg-os-ink/[0.08]" role="separator" />
     case 'link':
+      if (item.placeholder) {
+        return (
+          <button type="button" aria-disabled="true" tabIndex={-1} className={`${row} ${unavailable}`} data-testid={`menu-${item.id}`}>
+            {item.label}
+          </button>
+        )
+      }
       return (
         <a
           href={item.href}
           className={`${row} ${rowHover}`}
-          onClick={item.placeholder ? (e) => e.preventDefault() : undefined}
           data-testid={`menu-${item.id}`}
+          {...(item.newTab ? { target: '_blank', rel: 'noopener' } : {})}
         >
           {item.label}
         </a>
@@ -87,12 +104,14 @@ function Item({ item }: { item: MenuItem }) {
         <div className="px-3 py-[7px]">
           <div className="text-[13.5px] text-os-ink">{item.label}</div>
           <div className="mt-1 flex gap-1.5">
-            {/* TODO(auth): placeholders, no Firebase */}
+            {/* TODO(auth): placeholders, no Firebase. Unavailable until their behaviour is decided. */}
             {['Sign in', 'Sign out'].map((l) => (
               <button
                 key={l}
                 type="button"
-                className="os-tap-h rounded-[7px] border border-os-ink/15 bg-white/50 px-2.5 py-1 text-[13px] os-text-soft outline-none hover:bg-white focus-visible:ring-2 focus-visible:ring-os-ink/25"
+                aria-disabled="true"
+                tabIndex={-1}
+                className={`os-tap-h rounded-[7px] border border-os-ink/15 bg-white/50 px-2.5 py-1 text-[13px] os-text-soft ${unavailable}`}
               >
                 {l}
               </button>
@@ -134,12 +153,13 @@ function Item({ item }: { item: MenuItem }) {
   }
 }
 
-/** Four-dot menu popover, rendered from MENU_ITEMS. */
-export default function MenuPopover({ anchorRef }: { anchorRef: RefObject<HTMLButtonElement | null> }) {
+/** Four-dot menu popover, rendered from MENU_ITEMS (minus what doesn't apply to this layout). */
+export default function MenuPopover({ anchorRef, isMobile }: { anchorRef: RefObject<HTMLButtonElement | null>; isMobile: boolean }) {
   const panelRef = useRef<HTMLDivElement>(null)
   const reduced = useReducedMotionPref()
   const close = useCallback(() => closePopover(), [])
   usePopoverDismiss(panelRef, anchorRef, close)
+  useMenuKeys(panelRef, anchorRef)
   return (
     <motion.div
       ref={panelRef}
@@ -154,7 +174,7 @@ export default function MenuPopover({ anchorRef }: { anchorRef: RefObject<HTMLBu
       style={{ transformOrigin: 'top left' }}
       className="os-panel absolute left-3 top-[calc(100%+4px)] z-50 w-[260px] origin-top-left rounded-[15px] p-1.5 font-os-sans"
     >
-      {MENU_ITEMS.map((item) => (
+      {itemsFor(isMobile).map((item) => (
         <Item key={item.id} item={item} />
       ))}
     </motion.div>

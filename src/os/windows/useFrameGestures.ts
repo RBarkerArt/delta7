@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { animate } from 'motion/react'
 import type { MotionValue } from 'motion/react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { EDGE, TOP_INSET, bounds, clampFrame, rubberClamp, viewport } from './frames'
+import { EDGE, TOP_INSET, bounds, clampFrame, roundFrame, rubberClamp, viewport } from './frames'
 import type { Frame } from './frames'
 import { frameSpring } from './pose'
 import { trackPointer } from './pointerTrack'
@@ -51,17 +51,32 @@ export function writeFrame(f: FrameValues, v: Frame) {
   f.h.set(v.h)
 }
 
+/** Where an in-flight frame animation is headed, so a click mid-spring reads the settled frame, not a sub-pixel one. */
+const targets = new WeakMap<FrameValues, Frame>()
+
 export function stopFrame(f: FrameValues) {
+  targets.delete(f)
   f.x.stop()
   f.y.stop()
   f.w.stop()
   f.h.stop()
 }
 
-/** Springs the frame to `to`; resolves when it settles. */
+/** The frame as it is (or will be once its spring settles), in whole pixels. */
+export function settledFrame(f: FrameValues): Frame {
+  return targets.get(f) ?? roundFrame(readFrame(f))
+}
+
+/** Springs the frame to `to` (whole pixels); resolves when it settles. */
 export function animateFrame(f: FrameValues, to: Frame, reduced: boolean) {
+  const dest = roundFrame(to)
+  targets.set(f, dest)
   const t = reduced ? { duration: 0 } : frameSpring
-  return Promise.all([animate(f.x, to.x, t), animate(f.y, to.y, t), animate(f.w, to.w, t), animate(f.h, to.h, t)].map((c) => c.finished))
+  return Promise.all(
+    [animate(f.x, dest.x, t), animate(f.y, dest.y, t), animate(f.w, dest.w, t), animate(f.h, dest.h, t)].map((c) => c.finished),
+  ).then(() => {
+    if (targets.get(f) === dest) targets.delete(f)
+  })
 }
 
 /**
@@ -111,7 +126,10 @@ export function useFrameGestures(opts: FrameGestureOptions, reduced: boolean) {
           const settled = clampFrame(now, minSize, viewport())
           if (settled.x !== now.x || settled.y !== now.y) {
             void animateFrame(frame, settled, reduced).then(commit)
-          } else commit()
+          } else {
+            writeFrame(frame, settled)
+            commit()
+          }
         },
       )
     }
@@ -150,6 +168,7 @@ export function useFrameGestures(opts: FrameGestureOptions, reduced: boolean) {
         () => {
           root.style.cursor = ''
           root.classList.remove('os-dragging')
+          writeFrame(frame, roundFrame(readFrame(frame)))
           commit()
         },
       )

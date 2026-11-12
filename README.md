@@ -128,8 +128,12 @@ desktop (home icons and page dots).
 | ``Ctrl+` `` (or ``Alt+` ``) | cycle between open windows; from the top bar or desktop, go back into the front window |
 | `Esc` | close the open popover, then the focused window |
 | `Tab` / `Shift+Tab` | move inside the current region (a focused window keeps Tab inside itself; the top bar and desktop never tab into a window) |
-| `←` / `→` | page the home |
+| `←` / `→` | page the home (from an icon, focus moves to the first icon of the new page) |
 | `Enter` | open the focused icon |
+| `↑` / `↓`, `Home` / `End` | in the four-dot menu: move between its items (it opens with focus on the first one) |
+
+On the phone layout the browser's back gesture closes the open menu, search panel or app sheet instead of leaving the
+OS (one history entry, same URL); with nothing open it leaves as usual. The desktop layout leaves back alone.
 
 **Where things live** (`src/os/`):
 

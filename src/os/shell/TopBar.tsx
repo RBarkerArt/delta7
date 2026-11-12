@@ -50,7 +50,7 @@ export default function TopBar({ isMobile }: { isMobile: boolean }) {
         </div>
 
         <time
-          className="os-label-shadow os-label-halo pointer-events-none absolute left-1/2 -translate-x-1/2 font-os-mono font-light tabular-nums text-os-cream"
+          className="os-clock-pill pointer-events-none absolute left-1/2 -translate-x-1/2 font-os-mono font-light tabular-nums text-os-cream"
           style={{ fontSize: isMobile ? 16 : 19, letterSpacing: '0.1em' }}
           data-testid="clock"
         >
@@ -76,7 +76,7 @@ export default function TopBar({ isMobile }: { isMobile: boolean }) {
       </div>
 
       <AnimatePresence>
-        {popover === 'menu' ? <MenuPopover key="menu" anchorRef={menuRef} /> : null}
+        {popover === 'menu' ? <MenuPopover key="menu" anchorRef={menuRef} isMobile={isMobile} /> : null}
         {popover === 'search' ? <SearchPanel key="search" anchorRef={searchRef} /> : null}
       </AnimatePresence>
     </header>

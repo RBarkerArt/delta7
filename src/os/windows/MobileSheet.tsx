@@ -147,8 +147,12 @@ export default function MobileSheet({ app }: { app: OpenApp }) {
           </button>
         </div>
         {/* z-0: its own stacking context, so nothing inside an app (e.g. a drawer) can cover the strip's close button. */}
-        <div className="os-selectable relative z-0 min-h-0 flex-1 overflow-auto overscroll-contain">
-          <AppBody app={app} isMobile />
+        <div className="os-selectable relative z-0 min-h-0 flex-1 overflow-auto overscroll-contain" data-testid={`mobile-sheet-body-${app.id}`}>
+          {/* Never squeezed below the app's own minimum height (landscape, on-screen keyboard): the body scrolls instead,
+              so every control stays reachable. */}
+          <div style={{ height: `max(100%, ${def.minSize.h}px)` }}>
+            <AppBody app={app} isMobile />
+          </div>
         </div>
         <div
           data-testid="mobile-home-indicator"
