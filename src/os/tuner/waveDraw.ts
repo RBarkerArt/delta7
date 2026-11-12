@@ -59,10 +59,13 @@ export function drawWave(ctx: CanvasRenderingContext2D, f: WaveFrame) {
   ctx.lineTo(w - pad, mid + 0.5)
   ctx.stroke()
 
-  // Two layers of static, both from clarity: sparse crackle that thins out first (the wide, faint zone a patient
-  // sweep notices), then the hiss, which only really settles close in. The lock clears what is left.
-  const noiseAmt = Math.max(noiseFloor, (1 - s) ** 1.15)
-  const crackle = Math.max(noiseFloor * 0.6, Math.max(0, 1 - s / 0.3) ** 2)
+  // Off the zones (s = 0) this is an untuned radio: loud hiss, frequent crackle pops, only a ghost of a carrier.
+  // Entering the faint zone the crackle thins first ("getting warmer"), in the clearer zone the hiss drops and the
+  // carrier shows through, in the clear zone it resolves; the lock clears what is left.
+  const noiseAmt = Math.max(noiseFloor, (1 - s) ** 1.2)
+  const crackle = Math.max(noiseFloor * 0.6, Math.max(0, 1 - s / 0.45) ** 1.5)
+  const carrier = Math.max(0, Math.min(1, 0.06 + 0.94 * s ** 1.3 - noiseFloor * 0.3))
+  const popEdge = 0.93 - 0.11 * crackle // more pops the more crackle there is
   const amp = Math.min(h * 0.26, 76) * (1 + 0.22 * s)
   // Off-lock the carrier is detuned (more, faster cycles); at the lock it slows to ~2 calm cycles.
   const cycles = 2 + 6 * Math.max(0, 1 - s / 0.9) ** 1.5
@@ -81,8 +84,10 @@ export function drawWave(ctx: CanvasRenderingContext2D, f: WaveFrame) {
         0.3 * Math.sin(TAU * 41 * x - t * 13) +
         0.38 * softJitter(i / 3, frame)
       const k = jitter(i * 7.1 + 3, frame)
-      const pop = Math.abs(k) > 0.9 ? Math.sign(k) * ((Math.abs(k) - 0.9) / 0.1) * 0.95 : 0
-      const y = mid - amp * env * ((1 - noiseAmt * 0.45) * clean + noiseAmt * hiss + crackle * pop)
+      const pop = Math.abs(k) > popEdge ? Math.sign(k) * (0.45 + 0.55 * ((Math.abs(k) - popEdge) / (1 - popEdge))) * 1.1 : 0
+      // Sharp grain on top of the hiss while the crackle lasts: the untuned "fizz".
+      const fizz = 0.3 * crackle * jitter(i * 1.7 + 11, frame)
+      const y = mid - amp * env * (carrier * clean + noiseAmt * 1.05 * hiss + crackle * pop + fizz)
       const px = pad + x * (w - pad * 2)
       if (i === 0) ctx.moveTo(px, y)
       else ctx.lineTo(px, y)

@@ -1,18 +1,26 @@
 import { mulberry32, hashString } from '../lib/seeded.ts'
 import {
   BAD_STRETCH_HOLD_MS,
-  CLARITY_CLEAR,
-  CLARITY_CLEARER,
-  CLARITY_CORE_SIGMA,
-  CLARITY_FAINT,
-  CLARITY_WIDE_SIGMA,
-  CLARITY_WIDE_WEIGHT,
+  CLARITY_AT_CLEAR,
+  CLARITY_AT_CLEARER,
+  CLARITY_AT_FAINT,
+  COARSE_SPEED,
+  FINE_GAIN,
+  FINE_SPEED,
   FREQ_MAX,
   FREQ_MIN,
   HOLD_MS,
   LOCK_WINDOW,
-  NOTCH_RANGE,
+  NOTCH_POWER,
+  PULL_MAX_SPEED,
+  PULL_RANGE,
+  PX_PER_UNIT_MAX,
+  PX_PER_UNIT_MIN,
+  PX_PER_UNIT_PER_WIDTH,
   SIGNAL_TARGET,
+  ZONE_CLEAR,
+  ZONE_CLEARER,
+  ZONE_FAINT,
 } from './signalConfig.ts'
 
 /** Pure tuner helpers: no React, no DOM, deterministic. All constants live in `signalConfig.ts`. */
@@ -26,8 +34,13 @@ export {
   LOCK_WINDOW,
   MAGNET_RANGE,
   NOTCH_RANGE,
+  PULL_MAX_SPEED,
+  PULL_RANGE,
   SIGNAL_TARGET,
   START_VALUE,
+  ZONE_CLEAR,
+  ZONE_CLEARER,
+  ZONE_FAINT,
 } from './signalConfig.ts'
 
 /** Kept for existing imports: the same value as SIGNAL_TARGET. */
@@ -55,16 +68,29 @@ export function roundFreq(v: number): number {
   return Math.round(v * 1000) / 1000
 }
 
+/** Tiny tolerance so values that sit exactly on a zone edge (float noise) count as inside it. */
+const EDGE_EPS = 1e-9
+
 /**
- * How clear the signal is at `value`, 0..1: exactly 1 at the target, smooth and symmetric, a faint wide shoulder plus
- * a narrow core (see signalConfig). The ONE source for every soft hint: the trace, the audio, the icon's heartbeat,
- * the screen-reader words and the message line.
+ * How clear the signal is at `value`, 0..1, by distance from the target and the zones in signalConfig:
+ * 0 outside ±ZONE_FAINT (nothing but static), rising quickly once inside it (a perceptible thinning), on through the
+ * clearer zone, and smoothly to exactly 1 at the target. Continuous, symmetric, never rising with distance.
+ * The ONE source for every soft hint: the trace, the audio, the icon's heartbeat and the message line.
  */
 export function clarity(value: number): number {
-  const d = value - SIGNAL_TARGET
-  const wide = Math.exp(-((d / CLARITY_WIDE_SIGMA) ** 2))
-  const core = Math.exp(-((d / CLARITY_CORE_SIGMA) ** 2))
-  return CLARITY_WIDE_WEIGHT * wide + (1 - CLARITY_WIDE_WEIGHT) * core
+  const d = Math.abs(value - SIGNAL_TARGET)
+  if (d >= ZONE_FAINT) return CLARITY_AT_FAINT
+  if (d >= ZONE_CLEARER) {
+    // Ease-out: most of the faint zone's rise comes soon after entering it.
+    const t = (ZONE_FAINT - d) / (ZONE_FAINT - ZONE_CLEARER)
+    return CLARITY_AT_FAINT + (CLARITY_AT_CLEARER - CLARITY_AT_FAINT) * (1 - (1 - t) ** 2)
+  }
+  if (d >= ZONE_CLEAR) {
+    const t = (ZONE_CLEARER - d) / (ZONE_CLEARER - ZONE_CLEAR)
+    return CLARITY_AT_CLEARER + (CLARITY_AT_CLEAR - CLARITY_AT_CLEARER) * t
+  }
+  const u = d / ZONE_CLEAR
+  return 1 - (1 - CLARITY_AT_CLEAR) * u * u
 }
 
 /** Kept for existing callers: lock strength IS clarity. */
@@ -72,12 +98,13 @@ export const lockStrength = clarity
 
 export type ClarityBucket = 'none' | 'faint' | 'clearer' | 'clear' | 'locked'
 
-/** Coarse clarity, for words. Never says which way to go. */
-export function clarityBucket(c: number, locked: boolean): ClarityBucket {
+/** Coarse clarity for words, by distance from the target (switches exactly at the zone edges). Never says which way. */
+export function clarityBucket(value: number, locked: boolean): ClarityBucket {
   if (locked) return 'locked'
-  if (c >= CLARITY_CLEAR) return 'clear'
-  if (c >= CLARITY_CLEARER) return 'clearer'
-  if (c >= CLARITY_FAINT) return 'faint'
+  const d = Math.abs(value - SIGNAL_TARGET)
+  if (d <= ZONE_CLEAR + EDGE_EPS) return 'clear'
+  if (d <= ZONE_CLEARER + EDGE_EPS) return 'clearer'
+  if (d <= ZONE_FAINT + EDGE_EPS) return 'faint'
   return 'none'
 }
 
@@ -96,34 +123,62 @@ export function clarityWords(bucket: ClarityBucket): string {
 
 export function isInLockWindow(value: number): boolean {
   // Small epsilon so the window's exact edges (float noise) still count.
-  return Math.abs(value - SIGNAL_TARGET) <= LOCK_WINDOW + 1e-9
+  return Math.abs(value - SIGNAL_TARGET) <= LOCK_WINDOW + EDGE_EPS
 }
 
 /**
- * Sticky notch around the target for pointer / wheel input: `raw` is where the hand is, the return value is
- * the tuned frequency. Inside ±NOTCH_RANGE the frequency moves quadratically slower near the centre, so
- * the lock window is ~2.4× wider for the hand. Continuous at the edges; identity outside.
+ * Sticky notch around the target for pointer / wheel input: `raw` is where the hand is, the return value is the
+ * tuned frequency. Identity outside ±PULL_RANGE; inside it the frequency moves as (distance / range) ^ NOTCH_POWER,
+ * so it slows to a stop at the target and the lock window is a little wider for the hand. Continuous at the edges.
  */
 export function notch(raw: number): number {
   const d = raw - SIGNAL_TARGET
   const a = Math.abs(d)
-  if (a >= NOTCH_RANGE) return raw
-  return SIGNAL_TARGET + Math.sign(d) * NOTCH_RANGE * (a / NOTCH_RANGE) ** 2
+  if (a >= PULL_RANGE) return raw
+  return SIGNAL_TARGET + Math.sign(d) * PULL_RANGE * (a / PULL_RANGE) ** NOTCH_POWER
 }
 
 /** Inverse of notch(): the hand position that produces `value`. */
 export function unnotch(value: number): number {
   const d = value - SIGNAL_TARGET
   const a = Math.abs(d)
-  if (a >= NOTCH_RANGE) return value
-  return SIGNAL_TARGET + Math.sign(d) * NOTCH_RANGE * Math.sqrt(a / NOTCH_RANGE)
+  if (a >= PULL_RANGE) return value
+  return SIGNAL_TARGET + Math.sign(d) * PULL_RANGE * (a / PULL_RANGE) ** (1 / NOTCH_POWER)
+}
+
+/**
+ * The magnet decision, pure: where the dial should glide to when the hand lets go (release, wheel idle, a tap).
+ * `speed` is the dial's speed at that moment in MHz/s. Only a dial that is within ±PULL_RANGE AND (nearly) at rest
+ * goes to the target; anything else stays exactly where it is, so a flick or a quick pass sails past.
+ */
+export function pullTarget(value: number, speed: number): number {
+  if (Math.abs(value - SIGNAL_TARGET) > PULL_RANGE + EDGE_EPS) return value
+  if (Math.abs(speed) > PULL_MAX_SPEED) return value
+  return SIGNAL_TARGET
+}
+
+/**
+ * Hand → dial gain from hand speed (px/ms): FINE_GAIN for a slowly inching hand, 1 for a normal drag, linear between.
+ * The same everywhere on the dial and in both directions, so it says nothing about where the signal is.
+ */
+export function fineGain(handSpeed: number): number {
+  const v = Math.abs(handSpeed)
+  if (v <= FINE_SPEED) return FINE_GAIN
+  if (v >= COARSE_SPEED) return 1
+  return FINE_GAIN + (1 - FINE_GAIN) * ((v - FINE_SPEED) / (COARSE_SPEED - FINE_SPEED))
+}
+
+/** Dial scale (px per MHz) for a tuner card `width` px wide. */
+export function pxPerUnitFor(width: number): number {
+  return Math.min(PX_PER_UNIT_MAX, Math.max(PX_PER_UNIT_MIN, width * PX_PER_UNIT_PER_WIDTH))
 }
 
 export type Decode = 'none' | 'partial' | 'clear'
 
+/** `partial` from the clearer zone in, `clear` only at the lock. */
 export function decodeState(strength: number, locked: boolean): Decode {
   if (locked) return 'clear'
-  return strength < 0.3 ? 'none' : 'partial'
+  return strength < CLARITY_AT_CLEARER ? 'none' : 'partial'
 }
 
 const BLOCK = '▒'

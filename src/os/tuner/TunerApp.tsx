@@ -20,7 +20,7 @@ import TickStrip from './TickStrip'
 import Transport from './Transport'
 import Waveform from './Waveform'
 import ClarityStatus from './ClarityStatus'
-import { SIGNAL_TARGET, clarity, clarityBucket, clarityWords, decodeState } from './tunerMath'
+import { SIGNAL_TARGET, clarity, clarityBucket, clarityWords, decodeState, pxPerUnitFor } from './tunerMath'
 import { useTunerAudio } from './tunerAudio'
 
 /**
@@ -45,7 +45,7 @@ export default function TunerApp({ isMobile }: AppProps) {
   const shown = locked ? SIGNAL_TARGET : value
   const strength = locked ? 1 : clarity(value)
   const decode = decodeState(strength, locked)
-  const bucket = clarityBucket(strength, locked)
+  const bucket = clarityBucket(value, locked)
   // The words lag the wave a little: they only really clear in the last stretch, and fully at the lock.
   const messageClarity = locked ? 1 : Math.min(0.95, strength * strength)
   const readoutText = shown.toFixed(2)
@@ -58,7 +58,7 @@ export default function TunerApp({ isMobile }: AppProps) {
   const roomy = w >= 720 && height >= 520
   const pad = compact ? 16 : roomy ? 32 : 22
   const digit = compact ? 44 : roomy ? 76 : 58
-  const pxPerUnit = Math.min(900, Math.max(520, w * 1.5))
+  const pxPerUnit = pxPerUnitFor(w)
   const btn = isMobile || compact ? 44 : 34
 
   return (

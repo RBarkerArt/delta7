@@ -94,9 +94,10 @@ function sync() {
   const now = v.ctx.currentTime
   v.master.gain.setTargetAtTime(audible ? MASTER : 0, now, RAMP)
   const bad = !locked && coherenceStore.get().badStretch
-  v.noiseGain.gain.setTargetAtTime(0.55 * (1 - s) ** 1.5 + 0.02 + (bad ? BAD_STRETCH_STATIC : 0), now, RAMP)
+  v.noiseGain.gain.setTargetAtTime(0.6 * (1 - s) ** 1.3 + 0.02 + (bad ? BAD_STRETCH_STATIC : 0), now, RAMP)
   v.noiseFilter.frequency.setTargetAtTime(900 + 2200 * (1 - s), now, RAMP)
-  v.toneGain.gain.setTargetAtTime(0.08 + 0.55 * s * s, now, RAMP)
+  // Off the zones there is no tone at all, only static; it fades in through the zones.
+  v.toneGain.gain.setTargetAtTime(0.6 * s ** 1.5, now, RAMP)
   v.tone.frequency.setTargetAtTime(TONE_HZ + (value - TARGET) * 80, now, RAMP)
   v.wobbleDepth.gain.setTargetAtTime(locked ? 0 : 9 * (1 - s), now, RAMP)
   if (audible && v.ctx.state === 'suspended') void v.ctx.resume().catch(() => {})

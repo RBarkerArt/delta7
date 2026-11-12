@@ -1,27 +1,55 @@
 import { useEffect } from 'react'
 import { cancelGlide, getTuner, glideTo, setTunerValue } from '../store/tuner'
-import { FREQ_MAX, FREQ_MIN, LOCKED_DETENT, MAGNET_RANGE, TARGET, clampFreq, notch, unnotch } from './tunerMath'
+import { FREQ_MAX, FREQ_MIN, LOCKED_DETENT, TARGET, clampFreq, fineGain, notch, pullTarget, unnotch } from './tunerMath'
+
+/** Hand speed is measured over this window (ms). */
+const HAND_WINDOW_MS = 90
+/** Dial speed at release / wheel idle is measured over this window (ms). */
+const DIAL_WINDOW_MS = 160
+/** For the wheel: the window before it goes idle that must have been calm for the magnet to take it. */
+const WHEEL_WINDOW_MS = 400
+const WHEEL_IDLE_MS = 220
+/** Release faster than this (px/ms) coasts on as a flick. A flick never ends in a glide to the target. */
+const FLICK_SPEED = 0.4
+
+interface Sample {
+  v: number
+  t: number
+}
+
+/** MHz per second over the samples inside `windowMs` before `now` (0 when the dial has been still). */
+function dialSpeed(samples: Sample[], now: number, windowMs: number): number {
+  const recent = samples.filter((s) => now - s.t <= windowMs)
+  if (recent.length < 2) return 0
+  let travel = 0
+  for (let i = 1; i < recent.length; i++) travel += Math.abs(recent[i].v - recent[i - 1].v)
+  return (travel / Math.max(now - recent[0].t, 16)) * 1000
+}
 
 /**
  * Pointer + wheel tuning on the ruled strip. The strip moves under a fixed needle, so a drag moves it with
- * the hand (drag left → higher). Forgiveness, in layers:
- *  - a sticky notch around the target (the frequency moves slower than the hand near it),
- *  - on release / flick end / wheel idle, anything within MAGNET_RANGE glides into the target,
- *  - a tap on the strip glides to that spot (with the same magnet),
+ * the hand (drag left → higher). Every assist towards the target lives inside ±PULL_RANGE (see signalConfig):
+ *  - a sticky notch (the frequency slows to a stop at the target),
+ *  - on a calm release / calm wheel idle / a tap, a dial within the range glides into the target (pullTarget),
+ *  - a flick or a fast pass never glides anywhere: momentum just coasts and stops,
  *  - once locked, a drag has to travel past a small detent before the lock lets go.
+ * A slowly inching hand moves the dial at fineGain() (everywhere on the dial, both ways): fine control on a thumb.
  */
 export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
   useEffect(() => {
     if (!el) return
     let pointerId: number | null = null
-    let startX = 0
-    let startRaw = 0
+    let lastX = 0
+    let raw = 0
     let downAt = 0
     let moved = false
-    let samples: { x: number; t: number }[] = []
+    let startX = 0
+    let hand: { x: number; t: number }[] = []
+    let dial: Sample[] = []
     let momentumRaf = 0
     let wheelRaw: number | null = null
     let wheelTimer: ReturnType<typeof setTimeout> | null = null
+    let wheelSamples: Sample[] = []
 
     const rawNow = () => {
       const s = getTuner()
@@ -29,17 +57,19 @@ export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
     }
 
     /** Returns false when the raw position hit an end of the band. */
-    const applyRaw = (raw: number): boolean => {
-      const r = Math.min(FREQ_MAX, Math.max(FREQ_MIN, raw))
+    const applyRaw = (r0: number): boolean => {
+      const r = Math.min(FREQ_MAX, Math.max(FREQ_MIN, r0))
       if (getTuner().locked && Math.abs(r - TARGET) < LOCKED_DETENT) return true
       setTunerValue(clampFreq(notch(r)))
-      return r === raw
+      return r === r0
     }
 
-    const settle = () => {
+    /** The hand let go with the dial moving at `speed` MHz/s: the magnet takes it only if it is close AND calm. */
+    const settle = (speed: number) => {
       const s = getTuner()
       if (s.locked) return
-      if (Math.abs(s.value - TARGET) <= MAGNET_RANGE) glideTo(TARGET, 380)
+      const to = pullTarget(s.value, speed)
+      if (to !== s.value) glideTo(to, 380)
     }
 
     const stopMomentum = () => {
@@ -48,20 +78,18 @@ export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
     }
 
     const startMomentum = (pxPerMs: number) => {
-      let raw = rawNow()
+      let r = rawNow()
       let v = -pxPerMs / pxPerUnit // units per ms
       let last = performance.now()
       const step = (now: number) => {
         const dt = Math.min(32, now - last)
         last = now
-        raw += v * dt
+        r += v * dt
         v *= Math.exp(-dt / 280)
-        const inBand = applyRaw(raw)
-        // Slow enough near the target: let the magnet take it from here.
-        const slow = Math.abs(v * pxPerUnit) < 0.08
-        if (!inBand || slow || (Math.abs(raw - TARGET) <= MAGNET_RANGE && Math.abs(v * pxPerUnit) < 0.35)) {
+        const inBand = applyRaw(r)
+        // Coasts until it runs out of speed (or hits an end). No magnet at the end of a flick.
+        if (!inBand || Math.abs(v * pxPerUnit) < 0.08) {
           momentumRaf = 0
-          settle()
           return
         }
         momentumRaf = requestAnimationFrame(step)
@@ -78,48 +106,56 @@ export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
       pointerId = e.pointerId
       el.setPointerCapture(e.pointerId)
       startX = e.clientX
-      startRaw = rawNow()
+      lastX = e.clientX
+      raw = rawNow()
       downAt = performance.now()
       moved = false
-      samples = [{ x: e.clientX, t: downAt }]
+      hand = [{ x: e.clientX, t: downAt }]
+      dial = [{ v: raw, t: downAt }]
     }
 
     const onMove = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return
-      const dx = e.clientX - startX
-      if (!moved && Math.abs(dx) > 3) moved = true
+      if (!moved && Math.abs(e.clientX - startX) > 3) moved = true
       if (!moved) return
       const now = performance.now()
-      samples.push({ x: e.clientX, t: now })
-      while (samples.length > 2 && now - samples[0].t > 90) samples.shift()
-      applyRaw(startRaw - dx / pxPerUnit)
+      hand.push({ x: e.clientX, t: now })
+      while (hand.length > 2 && now - hand[0].t > HAND_WINDOW_MS) hand.shift()
+      const span = now - hand[0].t
+      const handSpeed = span > 0 ? Math.abs(e.clientX - hand[0].x) / span : 0
+      const dx = e.clientX - lastX
+      lastX = e.clientX
+      raw = Math.min(FREQ_MAX, Math.max(FREQ_MIN, raw - (dx / pxPerUnit) * fineGain(handSpeed)))
+      applyRaw(raw)
+      dial.push({ v: raw, t: now })
+      while (dial.length > 2 && now - dial[0].t > DIAL_WINDOW_MS * 2) dial.shift()
     }
 
     const onUp = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return
       pointerId = null
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+      const now = performance.now()
       if (!moved) {
-        if (performance.now() - downAt > 450) return
-        // Tap: glide to the tapped spot on the band.
+        if (now - downAt > 450) return
+        // Tap: glide to the tapped spot on the band (the magnet only if the spot itself is within the pull range).
         const rect = el.getBoundingClientRect()
-        let target = clampFreq(getTuner().value + (e.clientX - (rect.left + rect.width / 2)) / pxPerUnit)
-        if (Math.abs(target - TARGET) <= MAGNET_RANGE) target = TARGET
-        glideTo(target, 460)
+        const spot = clampFreq(getTuner().value + (e.clientX - (rect.left + rect.width / 2)) / pxPerUnit)
+        glideTo(pullTarget(spot, 0), 460)
         return
       }
-      const first = samples[0]
-      const lastS = samples[samples.length - 1]
+      const first = hand[0]
+      const lastS = hand[hand.length - 1]
       const span = lastS.t - first.t
-      const vx = span > 0 && performance.now() - lastS.t < 60 ? (lastS.x - first.x) / span : 0
-      if (Math.abs(vx) > 0.4) startMomentum(vx)
-      else settle()
+      const vx = span > 0 && now - lastS.t < 60 ? (lastS.x - first.x) / span : 0
+      if (Math.abs(vx) > FLICK_SPEED) startMomentum(vx)
+      else settle(dialSpeed(dial, now, DIAL_WINDOW_MS))
     }
 
     const onCancel = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return
       pointerId = null
-      settle()
+      settle(dialSpeed(dial, performance.now(), DIAL_WINDOW_MS))
     }
 
     const onWheel = (e: WheelEvent) => {
@@ -128,15 +164,24 @@ export function useTuneGestures(el: HTMLElement | null, pxPerUnit: number) {
       stopMomentum()
       const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1
       const d = (Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY) * scale
-      if (wheelRaw === null) wheelRaw = rawNow()
+      const now = performance.now()
+      if (wheelRaw === null) {
+        wheelRaw = rawNow()
+        wheelSamples = [{ v: wheelRaw, t: now }]
+      }
       wheelRaw = Math.min(FREQ_MAX, Math.max(FREQ_MIN, wheelRaw + (d * 0.6) / pxPerUnit))
       applyRaw(wheelRaw)
+      wheelSamples.push({ v: wheelRaw, t: now })
+      while (wheelSamples.length > 2 && now - wheelSamples[0].t > WHEEL_WINDOW_MS * 2) wheelSamples.shift()
       if (wheelTimer) clearTimeout(wheelTimer)
       wheelTimer = setTimeout(() => {
         wheelTimer = null
         wheelRaw = null
-        settle()
-      }, 220)
+        // Speed over the calm-down window before the wheel stopped: the tail of a fast fling still counts as fast.
+        const lastT = wheelSamples[wheelSamples.length - 1].t
+        settle(dialSpeed(wheelSamples, lastT, WHEEL_WINDOW_MS))
+        wheelSamples = []
+      }, WHEEL_IDLE_MS)
     }
 
     el.addEventListener('pointerdown', onDown)
