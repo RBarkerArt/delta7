@@ -1,13 +1,12 @@
-// Entry switch. Picks the legacy tree or the OS shell by path BEFORE importing
-// anything heavy, so the OS bundle never pulls in Firebase or the legacy CSS.
-const LEGACY_PREFIXES = ['/legacy', '/admin', '/rooms', '/privacy', '/terms']
-
-function isLegacyPath(pathname: string): boolean {
-  return LEGACY_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'))
+// Entry switch. Picks the OS shell or the live game by path BEFORE importing anything heavy, so the OS bundle never
+// pulls in Firebase or the legacy CSS. The OS lives at /os (and /os/…); every other path is the live game, unchanged.
+// Keep the path test in step with the background script in index.html.
+function isOSPath(pathname: string): boolean {
+  return pathname === '/os' || pathname.startsWith('/os/')
 }
 
-if (isLegacyPath(window.location.pathname)) {
-  void import('./legacyEntry')
-} else {
+if (isOSPath(window.location.pathname)) {
   void import('./os/entry')
+} else {
+  void import('./legacyEntry')
 }

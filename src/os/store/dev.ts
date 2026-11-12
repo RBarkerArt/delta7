@@ -1,11 +1,12 @@
 import { createStore } from './createStore'
 import { urlFlag } from '../lib/url'
+import { DEV_MODE } from '../lib/devMode'
 import { MOCK_DAY } from '../mock/engine'
 
-const fromUrl = urlFlag('dev')
+/** Dev tools exist only in dev builds (`vite dev`, or a build with `VITE_D7_DEV=1`); `?dev=1` opens the panel there. */
+export const devEnabled: boolean = DEV_MODE
 
-/** Dev tools are available in `vite dev`, or anywhere with `?dev=1`. Never in prod without the param. */
-export const devEnabled: boolean = fromUrl || import.meta.env.DEV
+const fromUrl = urlFlag('dev')
 
 interface DevState {
   devOpen: boolean

@@ -84,7 +84,7 @@ function build(name: WallpaperName, p: Palette): WallpaperSpec {
       { cx: 640, cy: 380, rx: 640, ry: 70, color: p.cloudLight, opacity: 0.32, blur: 46, rotate: -5 },
       { cx: 260, cy: 470, rx: 360, ry: 60, color: p.cloudDark, opacity: 0.22, blur: 50, rotate: 6 },
       { cx: 1250, cy: 300, rx: 120, ry: 300, color: p.sun, opacity: 0.32 * p.sunStrength, blur: 70, rotate: 32 },
-      { cx: 1420, cy: 470, rx: 340, ry: 70, color: p.cloudLight, opacity: 0.25, blur: 46, rotate: -10 },
+      { cx: 1418, cy: 470, rx: 340, ry: 70, color: p.cloudLight, opacity: 0.25, blur: 46, rotate: -10 },
     ],
     horizonGlow: { cx: 1130, cy: 752, rx: 250, ry: 62, color: p.glow, opacity: p.glowStrength, blur: 30 },
     hills: [0, 1, 2, 3].map((i) => ({

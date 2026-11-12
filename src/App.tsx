@@ -2330,7 +2330,7 @@ function App() {
             </div>
           )}
 
-          <BrowserRouter basename={window.location.pathname.startsWith('/legacy') ? '/legacy' : undefined}>
+          <BrowserRouter>
             <Routes>
               <Route path="/" element={<ObserverRoute />} />
               <Route path="/rooms/:roomSlug" element={<ObserverRoute />} />

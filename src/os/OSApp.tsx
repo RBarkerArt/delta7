@@ -11,10 +11,12 @@ import { useGlobalKeys } from './shell/useGlobalKeys'
 import { useIsMobile } from './store/device'
 import { useCurrentPage } from './store/layout'
 import { useSheetRaised } from './store/ui'
-import { devEnabled, useDevOpen } from './store/dev'
+import { useDevOpen } from './store/dev'
+import { DEV_MODE } from './lib/devMode'
 import { useReducedMotionPref } from './lib/useReducedMotionPref'
 
-const DevPanel = lazy(() => import('./dev/DevPanel'))
+// Build-time constant: a production build drops the dev panel chunk entirely.
+const DevPanel = DEV_MODE ? lazy(() => import('./dev/DevPanel')) : null
 
 export default function OSApp() {
   const isMobile = useIsMobile()
@@ -43,7 +45,7 @@ export default function OSApp() {
           </div>
           <TopBar isMobile={isMobile} />
           <NotificationBanner />
-          {devEnabled && devOpen ? (
+          {DevPanel && devOpen ? (
             <Suspense fallback={null}>
               <DevPanel />
             </Suspense>
